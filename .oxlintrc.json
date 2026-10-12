@@ -3,6 +3,9 @@
   "plugins": ["react", "typescript", "oxc"],
   "rules": {
     "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
+    "react/only-export-components": ["warn", { "allowConstantExport": true }],
+    "no-unused-vars": ["error", { "args": "all", "argsIgnorePattern": "^_" }],
+    "no-unused-private-class-members": "error",
+    "typescript/consistent-type-imports": "error"
   }
 }
