@@ -1,5 +1,5 @@
 import { useId } from 'react'
-import { Button, Spinner } from '@primer/react'
+import { Banner, Heading, Spinner, Stack, Text } from '@primer/react'
 import type { FetchArcs } from '../../types/arc.ts'
 import { useProjectPage } from '../../util/useProjectPage.ts'
 import { ArcList } from '../ArcList/ArcList.tsx'
@@ -11,14 +11,24 @@ export function TopStarredArcs({ fetchCall }: { fetchCall: FetchArcs }) {
 
   return (
     <section className={styles.section} aria-labelledby={headingId}>
-      <h2 id={headingId}>Most-starred ARCs</h2>
-      <p className={styles.subtitle}>Explore the 10 most-starred public research contexts.</p>
-      {state.status === 'loading' && <p role="status" className={styles.status}><Spinner size="small" /> Loading most-starred ARCs…</p>}
-      {state.status === 'error' && <div role="alert" className={styles.error}><p>{state.error}</p><Button onClick={state.retry}>Retry most-starred ARCs</Button></div>}
+      <Heading as="h2" variant="medium" id={headingId} className={styles.heading}>Most-starred ARCs</Heading>
+      <Text as="p" size="medium" className={styles.subtitle}>Explore the 10 most-starred public research contexts.</Text>
+      {state.status === 'loading' && (
+        <Stack role="status" direction="horizontal" gap="condensed" align="center" className={styles.status}>
+          <Spinner size="small" /><Text size="medium">Loading most-starred ARCs…</Text>
+        </Stack>
+      )}
+      {state.status === 'error' && (
+        <Banner variant="critical" role="alert" className={styles.error}
+          primaryAction={<Banner.PrimaryAction onClick={state.retry}>Retry most-starred ARCs</Banner.PrimaryAction>}>
+          <Banner.Title as="h3">Unable to load most-starred ARCs</Banner.Title>
+          <Banner.Description>{state.error}</Banner.Description>
+        </Banner>
+      )}
       {state.status === 'success' && (
         state.result.items.length
           ? <ArcList projects={state.result.items} label="Most-starred ARCs" />
-          : <p role="status" className={styles.status}>No public ARCs found.</p>
+          : <Text as="p" size="medium" role="status" className={styles.status}>No public ARCs found.</Text>
       )}
     </section>
   )

@@ -1,8 +1,8 @@
 .main { max-width: 1120px; margin: 0 auto; padding: 56px 24px; }
 .header { margin-bottom: 32px; max-width: 720px; }
-.eyebrow { color: var(--fgColor-muted, #59636e); font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; margin: 0 0 12px; }
-.header h1 { font-size: clamp(28px, 4vw, 40px); line-height: 1.15; letter-spacing: -.035em; margin: 0 0 16px; }
-.header > p:not(.eyebrow) { color: var(--fgColor-muted, #59636e); line-height: 1.6; margin: 0 0 12px; }
+.eyebrow { color: var(--fgColor-muted, #59636e); letter-spacing: .08em; text-transform: uppercase; margin: 0 0 12px; }
+.title { margin: 0 0 16px; }
+.intro { color: var(--fgColor-muted, #59636e); margin: 0 0 12px; }
 .source { font-size: 14px; }
 .grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: 24px; }
 @media (max-width: 760px) { .main { padding: 32px 16px; } .grid { grid-template-columns: minmax(0, 1fr); gap: 20px; } }

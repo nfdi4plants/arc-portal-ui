@@ -5,6 +5,10 @@ A React + TypeScript + Vite example for discovering Annotated Research Contexts
 example does not inspect repository contents to validate ARC structure.
 
 The UI uses [Primer React](https://primer.style/product/components/).
+The example uses Primer `Heading`, `Text`, and `Stack` for typography and layout,
+`FormControl` for the search input's label and caption, and critical `Banner`
+messages with retry actions for failures. Previous/Next paging uses Primer buttons
+because GitLab's total page count may be unavailable.
 
 ## Run locally
 
@@ -160,6 +164,8 @@ Vitest and React Testing Library run in jsdom. All tests are colocated
 not depend on a live GitLab instance.
 Shared test setup supplies jest-dom matchers, explicit cleanup, mock restoration,
 and Primer's required `matchMedia` shim.
+Vitest processes CSS so Primer's hidden responsive action copies are excluded
+from accessible queries.
 
 API tests cover source handling, encoding, filters, ranking, pagination, HTTP and
 network errors, and cancellation. Component and App tests cover observable ARC

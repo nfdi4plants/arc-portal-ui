@@ -17,6 +17,7 @@ describe('ArcSearch', () => {
     const user = userEvent.setup()
     renderWithTheme(<ArcSearch fetchCall={fetchCall} />)
     const input = screen.getByRole('textbox', { name: 'Search term' })
+    expect(input).toHaveAccessibleDescription('Search names, paths, and descriptions.')
     expect(screen.getByRole('search', { name: 'Search ARCs' })).toBeVisible()
     expect(screen.getByRole('button', { name: 'Search' })).toBeDisabled()
     await user.type(input, '   {Enter}')

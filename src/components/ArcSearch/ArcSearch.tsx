@@ -1,6 +1,6 @@
 import { useId, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Button, Spinner, TextInput } from '@primer/react'
+import { Banner, Button, FormControl, Heading, Spinner, Stack, Text, TextInput } from '@primer/react'
 import type { SearchArcs } from '../../types/arc.ts'
 import { useProjectPage } from '../../util/useProjectPage.ts'
 import { ArcList } from '../ArcList/ArcList.tsx'
@@ -8,8 +8,6 @@ import styles from './ArcSearch.module.css'
 
 export function ArcSearch({ fetchCall }: { fetchCall: SearchArcs }) {
   const headingId = useId()
-  const inputId = useId()
-  const hintId = useId()
   const [input, setInput] = useState('')
   const [request, setRequest] = useState<{ fetchCall: SearchArcs; query: string; page: number } | null>(null)
   const activeRequest = request?.fetchCall === fetchCall ? request : null
@@ -30,30 +28,41 @@ export function ArcSearch({ fetchCall }: { fetchCall: SearchArcs }) {
 
   return (
     <section className={styles.section} aria-labelledby={headingId}>
-      <h2 id={headingId}>Search ARCs</h2>
-      <p id={hintId} className={styles.subtitle}>Find public research contexts by name, path, or description.</p>
+      <Heading as="h2" variant="medium" id={headingId} className={styles.heading}>Search ARCs</Heading>
+      <Text as="p" size="medium" className={styles.subtitle}>Find public research contexts by name, path, or description.</Text>
       <form onSubmit={submit} className={styles.form} role="search" aria-label="Search ARCs">
-        <label htmlFor={inputId} className={styles.label}>Search term</label>
-        <div className={styles.controls}>
-          <TextInput id={inputId} aria-describedby={hintId} value={input} onChange={event => setInput(event.target.value)} placeholder="e.g. Arabidopsis" className={styles.input} />
-          <Button type="submit" variant="primary" disabled={!input.trim()}>Search</Button>
-        </div>
+        <FormControl className={styles.field}>
+          <FormControl.Label>Search term</FormControl.Label>
+          <TextInput block value={input} onChange={event => setInput(event.target.value)} placeholder="e.g. Arabidopsis" />
+          <FormControl.Caption>Search names, paths, and descriptions.</FormControl.Caption>
+        </FormControl>
+        <Button type="submit" variant="primary" disabled={!input.trim()} className={styles.submit}>Search</Button>
       </form>
-      {state.status === 'idle' && <p className={styles.status}>Enter a term to discover ARCs.</p>}
-      {state.status === 'loading' && <p role="status" className={styles.status}><Spinner size="small" /> Searching ARCs…</p>}
-      {state.status === 'error' && <div role="alert" className={styles.error}><p>{state.error}</p><Button onClick={state.retry}>Retry search</Button></div>}
+      {state.status === 'idle' && <Text as="p" size="medium" className={styles.status}>Enter a term to discover ARCs.</Text>}
+      {state.status === 'loading' && (
+        <Stack role="status" direction="horizontal" gap="condensed" align="center" className={styles.status}>
+          <Spinner size="small" /><Text size="medium">Searching ARCs…</Text>
+        </Stack>
+      )}
+      {state.status === 'error' && (
+        <Banner variant="critical" role="alert" className={styles.error}
+          primaryAction={<Banner.PrimaryAction onClick={state.retry}>Retry search</Banner.PrimaryAction>}>
+          <Banner.Title as="h3">Unable to search ARCs</Banner.Title>
+          <Banner.Description>{state.error}</Banner.Description>
+        </Banner>
+      )}
       {state.status === 'success' && activeRequest && <>
-        <p role="status" className={styles.status}>
+        <Text as="p" size="medium" role="status" className={styles.status}>
           {state.result.items.length
             ? `${state.result.items.length} results for “${activeRequest.query}” · Page ${state.result.page}`
             : `No ARCs found for “${activeRequest.query}” on page ${state.result.page}.`}
-        </p>
+        </Text>
         {state.result.items.length > 0 && <ArcList projects={state.result.items} label="ARC search results" />}
-        <nav aria-label="Search result pages" className={styles.pagination}>
+        <Stack as="nav" direction="horizontal" align="center" justify="space-between" gap="condensed" aria-label="Search result pages" className={styles.pagination}>
           <Button disabled={state.result.previousPage === null} onClick={() => goToPage(state.result.previousPage!)}>Previous</Button>
-          <span>Page {state.result.page}</span>
+          <Text size="medium">Page {state.result.page}</Text>
           <Button disabled={state.result.nextPage === null} onClick={() => goToPage(state.result.nextPage!)}>Next</Button>
-        </nav>
+        </Stack>
       </>}
     </section>
   )

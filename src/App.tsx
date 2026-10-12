@@ -1,6 +1,6 @@
 import '@primer/primitives/dist/css/functional/themes/light.css'
 import '@primer/css/dist/primer.css'
-import { BaseStyles, Link } from '@primer/react'
+import { BaseStyles, Heading, Link, Text } from '@primer/react'
 import { ThemeProvider } from '@primer/react/next'
 import { useCallback } from 'react'
 import { getTopStarredProjects, searchProjects } from './api/gitlab/index.ts'
@@ -24,9 +24,9 @@ function ArcExample({ fetchCall }: AppProps) {
   return (
     <main className={styles.main}>
       <header className={styles.header}>
-        <p className={styles.eyebrow}>DataPLANT · ARC portal</p>
-        <h1>Discover research contexts</h1>
-        <p>Browse Annotated Research Contexts (ARCs), represented here by GitLab repositories.</p>
+        <Text as="p" size="small" weight="semibold" className={styles.eyebrow}>DataPLANT · ARC portal</Text>
+        <Heading as="h1" variant="large" className={styles.title}>Discover research contexts</Heading>
+        <Text as="p" size="large" className={styles.intro}>Browse Annotated Research Contexts (ARCs), represented here by GitLab repositories.</Text>
         <Link href={referenceGitLab.exploreUrl} className={styles.source}>Explore the reference GitLab instance ↗</Link>
       </header>
       <div className={styles.grid}>
