@@ -1,0 +1,10 @@
+.section { padding: 24px; border: 1px solid var(--borderColor-default, #d1d9e0); border-radius: 12px; background: var(--bgColor-default, #fff); }
+.heading { margin: 0 0 8px; }
+.subtitle { color: var(--fgColor-muted, #59636e); margin: 0; }
+.form { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 8px; margin-top: 24px; }
+.field { min-width: 0; }
+.submit { margin-top: calc(var(--text-body-size-medium, .875rem) * var(--text-body-lineHeight-medium, 1.5) + var(--base-size-4, .25rem)); }
+.status { margin: 24px 0 0; color: var(--fgColor-muted, #59636e); }
+.error { margin-top: 24px; }
+.pagination { margin-top: 24px; }
+@media (max-width: 480px) { .section { padding: 20px; } .form { grid-template-columns: minmax(0, 1fr); gap: 12px; } .submit { margin-top: 0; } }
