@@ -1,0 +1,8 @@
+.list { list-style: none; padding: 0; margin: 0; }
+.item { padding: 20px 0; border-bottom: 1px solid var(--borderColor-muted, #d8dee4); }
+.item:last-child { border-bottom: 0; padding-bottom: 0; }
+.heading { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+.name { font-size: 18px; font-weight: 600; overflow-wrap: anywhere; }
+.stars { white-space: nowrap; color: var(--fgColor-muted, #59636e); font-size: 14px; }
+.namespace { margin: 4px 0 8px; font-size: 13px; color: var(--fgColor-muted, #59636e); overflow-wrap: anywhere; }
+.description { margin: 0; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
