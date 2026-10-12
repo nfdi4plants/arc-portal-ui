@@ -1,14 +1,5 @@
 import type { GitLabRequestOptions } from '../../types/gitlab.ts'
-
-export class GitLabApiError extends Error {
-  readonly status: number | null
-
-  constructor(message: string, status: number | null, cause?: unknown) {
-    super(message, { cause })
-    this.name = 'GitLabApiError'
-    this.status = status
-  }
-}
+import { Failure, Success, type Result } from '../../types/result.ts'
 
 function apiUrl(source: string, resource: string, params: URLSearchParams) {
   const url = new URL(source)
@@ -31,36 +22,42 @@ export async function requestGitLab<T>(
   source: string,
   resource: string,
   params: URLSearchParams,
-  options: GitLabRequestOptions,
-): Promise<{ data: T; headers: Headers }> {
-  const url = apiUrl(source, resource, params)
-  const headers = new Headers({ Accept: 'application/json' })
-  if (options.token) headers.set('PRIVATE-TOKEN', options.token)
+  options: GitLabRequestOptions = {},
+): Promise<Result<{ data: T; headers: Headers }>> {
+  let url: URL
+  let headers: Headers
+  try {
+    url = apiUrl(source, resource, params)
+    headers = new Headers({ Accept: 'application/json' })
+    if (options.token) headers.set('PRIVATE-TOKEN', options.token)
+  } catch (error) {
+    return Failure(error instanceof Error ? error.message : 'Invalid GitLab request options.')
+  }
 
   let response: Response
   try {
     response = await (options.fetchCall ?? fetch)(url, { headers, signal: options.signal, credentials: 'omit' })
   } catch (error) {
-    if (isCanceled(error, options.signal)) throw error
-    throw new GitLabApiError('Unable to reach GitLab. Check your connection and the instance’s browser access settings.', null, error)
+    return Failure(isCanceled(error, options.signal)
+      ? 'GitLab request canceled.'
+      : 'Unable to reach GitLab. Check your connection and the instance’s browser access settings.')
   }
 
   if (!response.ok) {
-    const body = await response.json().catch(error => {
-      if (isCanceled(error, options.signal)) throw error
-      return null
-    }) as { message?: unknown; error?: unknown } | null
+    let body: { message?: unknown; error?: unknown } | null = null
+    try { body = await response.json() } catch (error) {
+      if (isCanceled(error, options.signal)) return Failure('GitLab request canceled.')
+    }
+    if (response.status === 401) return Failure('Authentication failed: the token is invalid or expired.')
     const detail = body?.message ?? body?.error
-    throw new GitLabApiError(
+    return Failure(
       `GitLab request failed (${response.status})${typeof detail === 'string' ? `: ${detail}` : '.'}`,
-      response.status,
     )
   }
 
   try {
-    return { data: await response.json() as T, headers: response.headers }
+    return Success({ data: await response.json() as T, headers: response.headers })
   } catch (error) {
-    if (isCanceled(error, options.signal)) throw error
-    throw new GitLabApiError('GitLab returned an invalid JSON response.', response.status, error)
+    return Failure(isCanceled(error, options.signal) ? 'GitLab request canceled.' : 'GitLab returned an invalid JSON response.')
   }
 }

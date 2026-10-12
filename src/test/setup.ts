@@ -2,6 +2,22 @@ import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
 import { afterEach, vi } from 'vitest'
 
+// Primer dialogs observe their scrollable body; jsdom has no layout observer.
+Object.defineProperty(globalThis, 'ResizeObserver', {
+  configurable: true,
+  writable: true,
+  value: class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  },
+})
+
+// Primer's tooltip popover polyfill adopts sheets into document/shadow roots.
+for (const prototype of [Document.prototype, ShadowRoot.prototype]) {
+  Object.defineProperty(prototype, 'adoptedStyleSheets', { configurable: true, writable: true, value: [] })
+}
+
 // Primer's theme provider queries the system color scheme.
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
@@ -20,4 +36,5 @@ Object.defineProperty(window, 'matchMedia', {
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
 })

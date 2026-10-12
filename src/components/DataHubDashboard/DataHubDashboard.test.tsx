@@ -1,8 +1,9 @@
+import { Failure } from '../../types/result.ts'
 import { act, fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { FetchArcs, SearchArcs } from '../../types/arc.ts'
-import { arcPage, project, renderWithTheme } from '../../test/helpers.tsx'
+import { arcResult, project, renderWithTheme } from '../../test/helpers.tsx'
 import DataHubDashboard from './DataHubDashboard.tsx'
 
 afterEach(() => vi.useRealTimers())
@@ -12,11 +13,11 @@ describe('DataHubDashboard', () => {
     vi.useFakeTimers()
     const fetchTopStarred = vi.fn<FetchArcs>().mockImplementation(async () => {
       await new Promise(resolve => setTimeout(resolve, 5_000))
-      return arcPage([project({ name: 'Top ARC' })])
+      return arcResult([project({ name: 'Top ARC' })])
     })
     const fetchSearch = vi.fn<SearchArcs>().mockImplementation(async (_query, { page = 1 } = {}) => {
       await new Promise(resolve => setTimeout(resolve, 1_000))
-      return arcPage([project({ name: `Search page ${page} ARC` })], {
+      return arcResult([project({ name: `Search page ${page} ARC` })], {
         page, nextPage: page === 1 ? 2 : null, previousPage: page === 1 ? null : 1,
       })
     })
@@ -44,9 +45,9 @@ describe('DataHubDashboard', () => {
   })
 
   it('retries a failed callback without refetching the other section', async () => {
-    const fetchTopStarred = vi.fn<FetchArcs>().mockRejectedValueOnce(new Error('Top service unavailable'))
-      .mockResolvedValueOnce(arcPage([project({ name: 'Recovered ARC' })]))
-    const fetchSearch = vi.fn<SearchArcs>().mockResolvedValue(arcPage([project({ name: 'Found ARC' })]))
+    const fetchTopStarred = vi.fn<FetchArcs>().mockResolvedValueOnce(Failure('Top service unavailable'))
+      .mockResolvedValueOnce(arcResult([project({ name: 'Recovered ARC' })]))
+    const fetchSearch = vi.fn<SearchArcs>().mockResolvedValue(arcResult([project({ name: 'Found ARC' })]))
     const user = userEvent.setup()
     renderWithTheme(<DataHubDashboard fetchTopStarred={fetchTopStarred} fetchSearch={fetchSearch} />)
     expect(await screen.findByRole('alert')).toHaveTextContent('Top service unavailable')

@@ -1,4 +1,4 @@
-/** Public project fields used by the ARC portal; GitLab names stay intact. */
+/** Project fields used by the ARC portal; GitLab names stay intact. */
 export interface GitLabProject {
   id: number
   name: string
@@ -42,3 +42,28 @@ export interface GitLabPage<T> {
 
 export type TopStarredProjectsOptions = Omit<ListProjectsOptions, 'search' | 'orderBy' | 'sort' | 'visibility'>
 export type SearchProjectsOptions = Omit<ListProjectsOptions, 'search' | 'visibility'>
+
+export interface GitLabUser {
+  id: number
+  name: string
+  username: string
+}
+
+export interface GitLabGroup {
+  id: number
+  name: string
+  full_path: string
+  visibility?: 'public' | 'internal' | 'private'
+}
+
+export interface ListGroupsOptions extends GitLabRequestOptions {
+  page?: number
+  perPage?: number
+  allAvailable?: boolean
+  visibility?: 'public' | 'internal' | 'private'
+}
+
+export interface GroupProjectsOptions extends GitLabRequestOptions {
+  page?: number
+  perPage?: number
+}

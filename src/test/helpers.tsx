@@ -4,6 +4,7 @@ import { BaseStyles } from '@primer/react'
 import { ThemeProvider } from '@primer/react/next'
 import type { GitLabProject } from '../types/gitlab.ts'
 import type { ArcPage } from '../types/arc.ts'
+import { Success } from '../types/result.ts'
 
 export function renderWithTheme(element: ReactElement, strictMode = false) {
   return render(element, {
@@ -40,4 +41,8 @@ export function deferred<T>() {
   let reject!: (reason?: unknown) => void
   const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej })
   return { promise, resolve, reject }
+}
+
+export function arcResult(items: GitLabProject[] = [project()], overrides: Partial<ArcPage> = {}) {
+  return Success(arcPage(items, overrides))
 }

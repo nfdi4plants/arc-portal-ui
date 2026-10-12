@@ -1,16 +1,20 @@
 import type { FetchArcs, SearchArcs } from '../../types/arc.ts'
+import type { OrganisationBrowserProps } from '../../types/organisation.ts'
 import { referenceGitLab } from '../../config/gitlab.ts'
 import { TopStarredArcs } from '../TopStarredArcs/TopStarredArcs.tsx'
 import { ArcSearch } from '../ArcSearch/ArcSearch.tsx'
+import { OrganisationBrowser } from '../OrganisationBrowser/OrganisationBrowser.tsx'
 import styles from './DataHubDashboard.module.css'
 import { Heading, Link, Text } from '@primer/react'
 
 export interface DataHubDashboardProps {
   fetchTopStarred: FetchArcs
   fetchSearch: SearchArcs
+  signedIn?: boolean
+  organisations?: OrganisationBrowserProps
 }
 
-function DataHubDashboard({ fetchTopStarred, fetchSearch }: DataHubDashboardProps) {
+function DataHubDashboard({ fetchTopStarred, fetchSearch, signedIn = false, organisations }: DataHubDashboardProps) {
   return (
     <main className={styles.main}>
       <header className={styles.header}>
@@ -21,8 +25,9 @@ function DataHubDashboard({ fetchTopStarred, fetchSearch }: DataHubDashboardProp
       </header>
       <div className={styles.grid}>
         <TopStarredArcs fetchCall={fetchTopStarred} />
-        <ArcSearch fetchCall={fetchSearch} />
+        <ArcSearch fetchCall={fetchSearch} signedIn={signedIn} />
       </div>
+      {organisations && <OrganisationBrowser {...organisations} />}
     </main>
   )
 }
