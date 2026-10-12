@@ -26,7 +26,8 @@ describe('TopStarredArcs', () => {
     expect(within(list).getAllByRole('listitem')).toHaveLength(10)
     expect(within(list).getAllByRole('link').map(link => link.textContent)).toEqual(arcs.map(arc => arc.name))
     expect(fetchCall).toHaveBeenCalledTimes(1)
-    expect(fetchCall.mock.calls[0][0].aborted).toBe(false)
+    expect(fetchCall).toHaveBeenCalledWith({ page: 1, perPage: 10, signal: expect.any(AbortSignal) })
+    expect(fetchCall.mock.calls[0][0]!.signal!.aborted).toBe(false)
   })
 
   it('announces an empty result', async () => {
@@ -50,7 +51,7 @@ describe('TopStarredArcs', () => {
     fetchCall.mockReturnValue(oldRequest.promise)
     const replacement = vi.fn<FetchArcs>().mockResolvedValue(arcPage([project({ name: 'Current ARC' })]))
     const view = renderWithTheme(<TopStarredArcs fetchCall={fetchCall} />)
-    const oldSignal = fetchCall.mock.calls[0][0]
+    const oldSignal = fetchCall.mock.calls[0][0]!.signal!
     view.rerender(<TopStarredArcs fetchCall={replacement} />)
     expect(oldSignal.aborted).toBe(true)
     expect(await screen.findByRole('link', { name: 'Current ARC' })).toBeVisible()
@@ -62,7 +63,7 @@ describe('TopStarredArcs', () => {
   it('aborts on unmount', () => {
     fetchCall.mockReturnValue(deferred<ArcPage>().promise)
     const view = renderWithTheme(<TopStarredArcs fetchCall={fetchCall} />)
-    const signal = fetchCall.mock.calls[0][0]
+    const signal = fetchCall.mock.calls[0][0]!.signal!
     view.unmount()
     expect(signal.aborted).toBe(true)
   })
@@ -71,6 +72,6 @@ describe('TopStarredArcs', () => {
     fetchCall.mockReturnValueOnce(deferred<ArcPage>().promise).mockResolvedValueOnce(arcPage())
     renderWithTheme(<TopStarredArcs fetchCall={fetchCall} />, true)
     expect(await screen.findByRole('link', { name: 'Arabidopsis study' })).toBeVisible()
-    expect(fetchCall.mock.calls[0][0].aborted).toBe(true)
+    expect(fetchCall.mock.calls[0][0]!.signal!.aborted).toBe(true)
   })
 })

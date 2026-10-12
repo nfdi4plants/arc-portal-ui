@@ -98,9 +98,9 @@ try {
 ```
 
 Request options accept an optional `fetchCall` transport, defaulting to native
-`fetch`. API and App tests pass their mock transport directly; component tests
-pass callbacks returning plain page data. No global fetch or module patching is
-required.
+`fetch`. API tests pass their mock transport directly; dashboard and component
+tests pass callbacks returning plain page data. App wiring tests mock the API
+functions. Dashboard tests require no global fetch or module patching.
 
 Request options also accept an optional runtime `token`, sent using `PRIVATE-TOKEN`.
 The example uses no token and sends no browser session credentials. Never put a
@@ -117,23 +117,29 @@ enabled and pagination headers exposed during development.
 Each component keeps its implementation, styles, and tests under
 `src/components/<component-name>/`:
 
-- `TopStarredArcs` takes `fetchCall(signal)`, which resolves to an ARC page.
+- `DataHubDashboard` requires `fetchTopStarred(options?)` and
+  `fetchSearch(query, options?)`, both resolving to an ARC page. Their options
+  accept optional `page`, `perPage`, and `signal` fields. Defaults are page one
+  and 10 results per page; the UI supplies these values and an abort signal.
+- `TopStarredArcs` takes `fetchCall(options?)`, which resolves to an ARC page.
 - `ArcSearch` takes `fetchCall(query, { page, perPage, signal })`, which resolves
   to an ARC page. It fetches on explicit submission, with new queries starting at
   page one. Replacing the callback retires the current search; submit again to
   use the replacement.
 - `ArcList` accepts `projects` and an accessible list `label`.
 
-The example is composed directly inside `src/App.tsx`. Small, memoized wrappers
-there bind the reference source to the correct GitLab API functions. `App` also
-accepts an optional native-style `fetchCall` transport for integration tests.
+`src/App.tsx` supplies stable callbacks that bind the reference source to the
+correct GitLab API functions. The dashboard receives those callbacks as props
+and does not call the GitLab API itself.
 Keep callback identities stable (use `useCallback` when defining them in a parent)
 to avoid restarting requests on unrelated renders.
 
-A component test supplies mock data directly, without patching the API:
+A dashboard test supplies mock data and timing directly, without patching the API:
 
 ```tsx
-const fetchCall = vi.fn().mockResolvedValue({
+import type { ArcPage, FetchArcs, SearchArcs } from './src/types/arc.ts'
+
+const mockPage: ArcPage = {
   items: [mockProject],
   page: 1,
   perPage: 10,
@@ -141,9 +147,19 @@ const fetchCall = vi.fn().mockResolvedValue({
   previousPage: null,
   total: null,
   totalPages: null,
+}
+const fetchTopStarred = vi.fn<FetchArcs>().mockResolvedValue(mockPage)
+const fetchSearch = vi.fn<SearchArcs>().mockImplementation(async (_query, options = {}) => {
+  // Control the loading duration independently of the top-starred request.
+  await new Promise(resolve => setTimeout(resolve, 2_000))
+  return { ...mockPage, page: options.page ?? 1, perPage: options.perPage ?? 10 }
 })
-render(<TopStarredArcs fetchCall={fetchCall} />)
+render(<DataHubDashboard fetchTopStarred={fetchTopStarred} fetchSearch={fetchSearch} />)
 ```
+
+Callbacks can also reject with an `Error` to exercise failure and retry states,
+or return custom pagination metadata. Use Vitest fake timers to advance delayed
+mock responses without waiting in real time.
 
 Callback types live in `src/types/arc.ts`. Shared request state and
 cancellation live under `src/util/`; shared types and configuration have their own

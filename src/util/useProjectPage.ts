@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import type { ArcPage, FetchArcs } from '../types/arc.ts'
+import type { ArcPage } from '../types/arc.ts'
 
-type PageLoader = FetchArcs
+type PageLoader = (signal: AbortSignal) => Promise<ArcPage>
 type PageState =
   | { status: 'idle' | 'loading'; result?: never; error?: never }
   | { status: 'success'; result: ArcPage; error?: never }

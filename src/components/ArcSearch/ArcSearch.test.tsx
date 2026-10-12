@@ -69,7 +69,7 @@ describe('ArcSearch', () => {
   })
 
   it('paginates the submitted query and resets a new query to page one', async () => {
-    fetchCall.mockImplementation(async (_query, { page }) => arcPage(
+    fetchCall.mockImplementation(async (_query, { page = 1 } = {}) => arcPage(
       [project({ name: `Page ${page} ARC` })],
       { page, nextPage: page === 1 ? 2 : null, previousPage: page === 1 ? null : 1 },
     ))
@@ -110,7 +110,7 @@ describe('ArcSearch', () => {
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
     await user.click(screen.getByRole('button', { name: 'Previous' }))
     expect(await screen.findByRole('list')).toBeVisible()
-    expect(fetchCall.mock.calls.at(-1)![1].page).toBe(1)
+    expect(fetchCall.mock.calls.at(-1)![1]!.page).toBe(1)
   })
 
   it('ignores a late response from an earlier submission', async () => {
@@ -119,7 +119,7 @@ describe('ArcSearch', () => {
     const user = userEvent.setup()
     renderWithTheme(<ArcSearch fetchCall={fetchCall} />)
     await user.type(screen.getByRole('textbox'), 'old{Enter}')
-    const oldSignal = fetchCall.mock.calls[0][1].signal
+    const oldSignal = fetchCall.mock.calls[0][1]!.signal!
     await user.clear(screen.getByRole('textbox'))
     await user.type(screen.getByRole('textbox'), 'latest{Enter}')
     expect(await screen.findByRole('link', { name: 'Latest ARC' })).toBeVisible()
@@ -136,7 +136,7 @@ describe('ArcSearch', () => {
     const user = userEvent.setup()
     const view = renderWithTheme(<ArcSearch fetchCall={fetchCall} />)
     await user.type(screen.getByRole('textbox'), 'plants{Enter}')
-    const oldSignal = fetchCall.mock.calls[0][1].signal
+    const oldSignal = fetchCall.mock.calls[0][1]!.signal!
     view.rerender(<ArcSearch fetchCall={replacement} />)
     expect(oldSignal.aborted).toBe(true)
     expect(screen.getByText('Enter a term to discover ARCs.')).toBeVisible()
@@ -155,7 +155,7 @@ describe('ArcSearch', () => {
     const user = userEvent.setup()
     const view = renderWithTheme(<ArcSearch fetchCall={fetchCall} />)
     await user.type(screen.getByRole('textbox'), 'plants{Enter}')
-    const signal = fetchCall.mock.calls[0][1].signal
+    const signal = fetchCall.mock.calls[0][1]!.signal!
     view.unmount()
     expect(signal.aborted).toBe(true)
     await act(async () => pending.reject(new DOMException('Canceled', 'AbortError')))
