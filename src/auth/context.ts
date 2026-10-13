@@ -4,15 +4,19 @@ import type { Result } from '../types/result.ts'
 
 export const TOKEN_STORAGE_KEY = 'arc-portal-gitlab-token'
 
-export interface AuthenticationState {
+export interface DataHubAuthentication {
   session: { token: string; user: GitLabUser } | null
   hasSavedToken: boolean
   checking: boolean
   error: string | null
-  login: (token: string) => Promise<Result<GitLabUser>>
-  retrySavedLogin: () => Promise<Result<GitLabUser>>
-  cancelLogin: () => void
-  logout: () => void
+}
+
+export interface AuthenticationState {
+  accounts: Record<string, DataHubAuthentication>
+  login: (dataHubId: string, token: string) => Promise<Result<GitLabUser>>
+  retrySavedLogin: (dataHubId: string) => Promise<Result<GitLabUser>>
+  cancelLogin: (dataHubId: string) => void
+  logout: (dataHubId: string) => void
 }
 
 export const AuthenticationContext = createContext<AuthenticationState | null>(null)
