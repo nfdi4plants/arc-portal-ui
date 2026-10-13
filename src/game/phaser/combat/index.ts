@@ -59,7 +59,7 @@ export function createCombatWorld(scene: Phaser.Scene, options: CombatWorldOptio
   const hitboxes: HitboxState[] = []
   const projectiles: ProjectileState[] = []
   const listeners: Record<'hit' | 'kill', Set<Listener>> = { hit: new Set(), kill: new Set() }
-  const pool = createProjectilePool(scene)
+  const pool = createProjectilePool(scene, 1 / art.pixelsPerUnit)
   const feedback = createFeedback(scene, art)
   const debugGraphics = options.debug ? scene.add.graphics().setDepth(DEPTH.hud) : null
   const scratch: Rect = { x: 0, y: 0, w: 0, h: 0 }

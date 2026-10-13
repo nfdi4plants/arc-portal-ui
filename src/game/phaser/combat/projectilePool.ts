@@ -3,7 +3,8 @@ import { DEPTH } from '../../contracts/constants'
 
 // Plain sprites that the combat world moves itself. Arcade bodies are not needed for a shape that
 // only has to overlap hurtboxes, and a pool avoids allocating game objects per shot.
-export function createProjectilePool(scene: Phaser.Scene) {
+// `scale` maps texture pixels to world units (1 / ScribbleArt.pixelsPerUnit).
+export function createProjectilePool(scene: Phaser.Scene, scale: number) {
   const free: Phaser.GameObjects.Sprite[] = []
   const all = new Set<Phaser.GameObjects.Sprite>()
 
@@ -16,7 +17,7 @@ export function createProjectilePool(scene: Phaser.Scene) {
       }
       sprite.stop()
       sprite.setTexture(textureKey)
-      sprite.setPosition(x, y).setRotation(0).setFlipX(false).setActive(true).setVisible(true)
+      sprite.setPosition(x, y).setScale(scale).setRotation(0).setFlipX(false).setActive(true).setVisible(true)
       if (animKey && scene.anims.exists(animKey)) sprite.play(animKey)
       return sprite
     },

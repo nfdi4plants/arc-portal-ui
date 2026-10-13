@@ -56,6 +56,7 @@ function box(scene: Phaser.Scene, key: string, width: number, height: number, co
 const SIZE = { small: 20, medium: 30, large: 44 } as const
 
 export const placeholderArt: ScribbleArt = {
+  pixelsPerUnit: 1,
   monster(scene, spec) {
     const s = SIZE[spec.size]
     return box(scene, `monster:${spec.id}`, s, s, hueColor(spec.hue))
