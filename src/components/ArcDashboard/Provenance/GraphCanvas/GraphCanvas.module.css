@@ -1,0 +1,191 @@
+/*
+ * The --prov-* color tokens come from the root of the explorer. The fallbacks keep the canvas
+ * readable when it is used outside of it.
+ */
+.root {
+  position: relative;
+  display: flex;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  color: var(--fgColor-default, #1f2328);
+}
+
+.status {
+  margin: 0;
+  padding: 18px 14px;
+  color: var(--fgColor-muted, #59636e);
+}
+
+/* margin: auto centers a small graph and lets a large one start at the top left and scroll. */
+.svg {
+  display: block;
+  flex: none;
+  max-width: none;
+  margin: auto;
+}
+
+.study {
+  --canvas-color: var(--prov-study, #8250df);
+}
+
+.assay {
+  --canvas-color: var(--prov-assay, #1a7f37);
+}
+
+.run {
+  --canvas-color: var(--prov-run, #bc4c00);
+}
+
+.nodeNeutral {
+  --canvas-color: var(--borderColor-default, #d1d9e0);
+}
+
+.edgeNeutral {
+  --canvas-color: var(--borderColor-emphasis, #818b98);
+}
+
+.accent {
+  --canvas-color: var(--fgColor-accent, #0969da);
+}
+
+.arrowHead {
+  fill: var(--canvas-color);
+}
+
+.edge {
+  fill: none;
+  stroke: var(--canvas-color);
+  stroke-width: 1.5;
+}
+
+.highlighted {
+  stroke: var(--borderColor-accent-emphasis, #0969da);
+  stroke-width: 2.5;
+}
+
+.interactive {
+  cursor: pointer;
+}
+
+.interactive:focus-visible,
+.toggle:focus-visible {
+  outline: 3px solid var(--borderColor-accent-emphasis, #0969da);
+  outline-offset: 2px;
+}
+
+.nodeFill {
+  fill: var(--bgColor-muted, #f6f8fa);
+}
+
+.stripe {
+  fill: var(--canvas-color);
+}
+
+.nodeBorder {
+  fill: none;
+  stroke: var(--canvas-color);
+  stroke-width: 1;
+}
+
+.dashed .nodeBorder {
+  stroke-dasharray: 6 4;
+}
+
+.emphasized .nodeBorder {
+  stroke: var(--fgColor-default, #1f2328);
+  stroke-width: 2;
+}
+
+.selected .nodeBorder {
+  stroke: var(--borderColor-accent-emphasis, #0969da);
+  stroke-width: 3;
+}
+
+.title {
+  fill: var(--fgColor-default, #1f2328);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+.subtitle {
+  fill: var(--fgColor-muted, #59636e);
+  font-size: 12px;
+}
+
+.pill {
+  --pill-color: var(--borderColor-default, #d1d9e0);
+}
+
+.characteristic {
+  --pill-color: var(--prov-characteristic, #1b7c83);
+}
+
+.factor {
+  --pill-color: var(--prov-factor, #bf3989);
+}
+
+.parameter {
+  --pill-color: var(--prov-parameter, #9a6700);
+}
+
+.component {
+  --pill-color: var(--prov-component, #c4432b);
+}
+
+.other {
+  --pill-color: var(--prov-other, #59636e);
+}
+
+.process {
+  --pill-color: var(--fgColor-default, #1f2328);
+}
+
+.processHighlighted {
+  --pill-color: var(--borderColor-accent-emphasis, #0969da);
+}
+
+.pillBox {
+  fill: var(--bgColor-default, #ffffff);
+  stroke: var(--pill-color);
+  stroke-width: 1;
+}
+
+.pillDot {
+  fill: var(--pill-color);
+}
+
+.pillText {
+  font-size: 11px;
+}
+
+.pillName {
+  fill: var(--fgColor-muted, #59636e);
+}
+
+.pillValue {
+  fill: var(--fgColor-default, #1f2328);
+}
+
+.pillStrong {
+  fill: var(--fgColor-default, #1f2328);
+  font-weight: 600;
+}
+
+.pillEmpty {
+  fill: var(--fgColor-muted, #59636e);
+  font-style: italic;
+}
+
+.toggle {
+  cursor: pointer;
+}
+
+.toggle:hover .pillBox {
+  stroke: var(--fgColor-muted, #59636e);
+}

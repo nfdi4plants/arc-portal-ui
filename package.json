@@ -19,6 +19,7 @@
     "@primer/css": "^22.3.2",
     "@primer/primitives": "^11.10.0",
     "@primer/react": "^38.40.1",
+    "elkjs": "^0.9.3",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "use-sync-external-store": "^1.7.0"
