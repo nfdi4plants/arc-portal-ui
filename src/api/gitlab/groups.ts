@@ -1,6 +1,6 @@
 import type { GitLabGroup, GitLabPage, GitLabProject, GroupProjectsOptions, ListGroupsOptions } from '../../types/gitlab.ts'
-import { Failure, Success, type Result } from '../../types/result.ts'
-import { requestPage, validIdentifier } from './page.ts'
+import { Failure, type Result } from '../../types/result.ts'
+import { listAllPages, requestPage, validIdentifier } from './page.ts'
 import { isProject } from './projects.ts'
 
 function isGroup(data: unknown): data is GitLabGroup {
@@ -18,16 +18,10 @@ export function listGroups(source: string, options: ListGroupsOptions = {}): Pro
 }
 
 export async function listAllGroups(source: string, options: Omit<ListGroupsOptions, 'page' | 'perPage'> = {}): Promise<Result<GitLabGroup[]>> {
-  const groups: GitLabGroup[] = []
-  let page: number | null = 1
-  while (page !== null) {
-    if (options.signal?.aborted) return Failure('GitLab request canceled.')
-    const result = await listGroups(source, { ...options, page, perPage: 100 })
-    if (result.success === false) return Failure(result.error)
-    groups.push(...result.value.items)
-    page = result.value.nextPage
-  }
-  return Success(groups)
+  const params = new URLSearchParams({ order_by: 'name', sort: 'asc' })
+  if (options.allAvailable !== undefined) params.set('all_available', String(options.allAvailable))
+  if (options.visibility !== undefined) params.set('visibility', options.visibility)
+  return listAllPages(source, 'groups', params, isGroup, 'group', options)
 }
 
 export async function getGroupProjects(source: string, idOrPath: number | string, options: GroupProjectsOptions = {}): Promise<Result<GitLabPage<GitLabProject>>> {

@@ -26,3 +26,10 @@ storybook-static
 *.njsproj
 *.sln
 *.sw?
+ 
+CLAUDE.md
+/.specify
+/.kilocode
+/.claude
+specs
+.playwright-mcp

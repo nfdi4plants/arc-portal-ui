@@ -1,60 +1,135 @@
-import { useCallback, useState } from 'react'
-import type { ArcFetchOptions, FetchArcs, SearchArcs } from '../../types/arc.ts'
-import type { FetchGroupArcs, FetchGroups } from '../../types/organisation.ts'
-import type { GitLabInstance, GitLabRequestOptions } from '../../types/gitlab.ts'
-import { availableDataHubs, defaultDataHub } from '../../config/gitlab.ts'
-import { DataHubSelect } from '../DataHubSelect/DataHubSelect.tsx'
-import { TopStarredArcs } from '../TopStarredArcs/TopStarredArcs.tsx'
-import { ArcSearch } from '../ArcSearch/ArcSearch.tsx'
-import { OrganisationBrowser } from '../OrganisationBrowser/OrganisationBrowser.tsx'
+import { useEffect, useMemo, useReducer, useState } from 'react'
+import { Banner } from '@primer/react'
+import type { DataHubConnection, FilterKind } from '../../types/dashboard.ts'
+import { DashboardHeader } from '../DashboardHeader/DashboardHeader.tsx'
+import { StatsSidebar } from '../StatsSidebar/StatsSidebar.tsx'
+import { BarList } from '../BarList/BarList.tsx'
+import { WorkingGroupChart } from '../WorkingGroupChart/WorkingGroupChart.tsx'
+import { MonthlyChart } from '../MonthlyChart/MonthlyChart.tsx'
+import { ArcTable } from '../ArcTable/ArcTable.tsx'
+import { ArcFilterBar } from '../ArcFilterBar/ArcFilterBar.tsx'
+import { useArcIndex } from './hooks/useArcIndex.ts'
+import { useArcDetails } from './hooks/useArcDetails.ts'
+import { dashboardReducer, initialDashboardState } from './dashboardReducer.ts'
+import { applyFilters } from './logic/filters.ts'
+import { arcsPerMonth, countBy, headlineNumbers } from './logic/summary.ts'
+import { sortArcs } from './logic/sort.ts'
 import styles from './DataHubDashboard.module.css'
-import { Heading, Link, Text } from '@primer/react'
-
-type DataHubRequestOptions = ArcFetchOptions & Pick<GitLabRequestOptions, 'token'>
 
 export interface DataHubDashboardProps {
-  fetchTopStarred: (source: string, options?: DataHubRequestOptions) => ReturnType<FetchArcs>
-  fetchSearch: (source: string, query: string, options?: DataHubRequestOptions) => ReturnType<SearchArcs>
-  tokens?: Record<string, string>
-  organisations?: {
-    fetchPublicGroups: (source: string, signal: AbortSignal) => ReturnType<FetchGroups>
-    fetchMembershipGroups: ((source: string, signal: AbortSignal, token: string) => ReturnType<FetchGroups>) | null
-    fetchGroupProjects: (source: string, groupId: number, options?: DataHubRequestOptions) => ReturnType<FetchGroupArcs>
-  }
-  onArcClick?: (url: string, name: string, projectId: number, dataHub: GitLabInstance) => void
+  /** One per configured DataHUB, in display order. A new array identity means "reload everything". */
+  connections: DataHubConnection[]
+  onArcClick: (url: string, name: string) => void
+  /** Injected clock for tests. */
+  now?: () => Date
 }
 
-function DataHubDashboard({ fetchTopStarred, fetchSearch, tokens, organisations, onArcClick }: DataHubDashboardProps) {
-  const [activeGitLab, setActiveGitLab] = useState<GitLabInstance>(defaultDataHub)
-  const source = activeGitLab.url
-  const token = tokens?.[activeGitLab.id]
-  const selectArc = onArcClick
-    ? (url: string, name: string, projectId: number) => onArcClick(url, name, projectId, activeGitLab)
+function DataHubDashboard({ connections, onArcClick, now = () => new Date() }: DataHubDashboardProps) {
+  const { hubs, arcs, loading, updatedAt, retry, reload } = useArcIndex(connections)
+  const [state, dispatch] = useReducer(dashboardReducer, initialDashboardState)
+  const { filters, sort } = state
+  // The input responds immediately; filtering follows after a short pause.
+  const [queryInput, setQueryInput] = useState('')
+  useEffect(() => {
+    const timer = setTimeout(() => dispatch({ type: 'setQuery', query: queryInput }), 200)
+    return () => clearTimeout(timer)
+  }, [queryInput])
+  const current = now()
+
+  const hubNames = useMemo(() => new Map(connections.map(({ hub }) => [hub.id, hub.name])), [connections])
+  const groupNames = useMemo(() => new Map(arcs.map(arc => [arc.group.key, arc.group.label])), [arcs])
+
+  const connectionsByHub = useMemo(() => new Map(connections.map(connection => [connection.hub.id, connection])), [connections])
+  // Newest first keeps the newest ARCs' avatars filling in first.
+  const detailOrder = useMemo(() => sortArcs(arcs, { column: 'lastChange', direction: 'DESC' }, hubNames), [arcs, hubNames])
+  const { details } = useArcDetails(detailOrder, connectionsByHub)
+
+  const filtered = useMemo(() => applyFilters(arcs, filters, details, { now: current }), [arcs, filters, details, current])
+  const hubScoped = useMemo(() => applyFilters(arcs, filters, details, { now: current, ignore: 'hub' }), [arcs, filters, details, current])
+  const groupScoped = useMemo(() => applyFilters(arcs, filters, details, { now: current, ignore: 'group' }), [arcs, filters, details, current])
+
+  const chips: { kind: FilterKind; label: string }[] = []
+  if (filters.hubId !== undefined) chips.push({ kind: 'hub', label: `DataHUB: ${hubNames.get(filters.hubId) ?? filters.hubId}` })
+  if (filters.groupKey !== undefined) chips.push({ kind: 'group', label: `Working group: ${groupNames.get(filters.groupKey) ?? filters.groupKey}` })
+  if (filters.access !== undefined) chips.push({ kind: 'access', label: filters.access === 'public' ? 'Shared publicly' : 'Private' })
+  if (filters.recent) chips.push({ kind: 'recent', label: 'Changed in the last 30 days' })
+  if (filters.query.trim()) chips.push({ kind: 'query', label: `Search: “${filters.query.trim()}”` })
+  const filtering = chips.length > 0
+
+  const numbers = useMemo(() => headlineNumbers(filtered, details), [filtered, details])
+  const totals = useMemo(() => filtering ? headlineNumbers(arcs, details) : undefined, [arcs, details, filtering])
+  const hubCounts = useMemo(() => countBy(hubScoped, 'hub', hubNames), [hubScoped, hubNames])
+  const myGroupCounts = useMemo(() => countBy(groupScoped.filter(arc => arc.member), 'group', groupNames, hubNames), [groupScoped, groupNames, hubNames])
+  const publicGroupCounts = useMemo(() => countBy(groupScoped.filter(arc => arc.access === 'public'), 'group', groupNames, hubNames), [groupScoped, groupNames, hubNames])
+  // The chart buckets depend on the calendar month, not on the clock's time of day.
+  const currentMonth = `${current.getUTCFullYear()}-${String(current.getUTCMonth() + 1).padStart(2, '0')}`
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- the month key, not the Date, drives the buckets.
+  const months = useMemo(() => arcsPerMonth(filtered, current, 12), [filtered, currentMonth])
+  const sorted = useMemo(() => sortArcs(filtered, sort, hubNames), [filtered, sort, hubNames])
+
+  const clearAll = () => { dispatch({ type: 'clearFilters' }); setQueryInput('') }
+  const removeChip = (kind: FilterKind) => {
+    dispatch({ type: 'removeFilter', kind })
+    if (kind === 'query') setQueryInput('')
+  }
+
+  const failed = hubs.filter(hub => hub.status === 'failed')
+  const allFailed = hubs.length > 0 && failed.length === hubs.length
+  const updating = hubs.some(hub => hub.status === 'loading')
+  const membershipErrors = hubs.filter(hub => hub.membershipError !== undefined).map(hub => hub.hub.name)
+
+  const rejectedIds = new Set(hubs.filter(hub => hub.tokenRejected).map(hub => hub.hub.id))
+  const loggedInHubs = connections.filter(connection => connection.includesPrivate && !rejectedIds.has(connection.hub.id))
+  const signedIn = loggedInHubs.length > 0
+  const privateState = loggedInHubs.length === 0 ? 'hidden' : loggedInHubs.length === connections.length ? 'all' : 'partial'
+  const privateNote = privateState === 'partial'
+    ? `Private ARCs are included from ${loggedInHubs.map(connection => connection.hub.name).join(', ')} only.`
     : undefined
-  const loadTopStarred = useCallback<FetchArcs>(options => fetchTopStarred(source, { ...options, token }), [source, token, fetchTopStarred])
-  const searchArcs = useCallback<SearchArcs>((query, options) => fetchSearch(source, query, { ...options, token }), [source, token, fetchSearch])
-  const { fetchPublicGroups, fetchMembershipGroups, fetchGroupProjects } = organisations ?? {}
-  const loadPublicGroups = useCallback<FetchGroups>(signal => fetchPublicGroups!(source, signal), [source, fetchPublicGroups])
-  const loadMembershipGroups = useCallback<FetchGroups>(signal => fetchMembershipGroups!(source, signal, token!), [source, token, fetchMembershipGroups])
-  const loadGroupProjects = useCallback<FetchGroupArcs>((groupId, options) => fetchGroupProjects!(source, groupId, { ...options, token }), [source, token, fetchGroupProjects])
 
   return (
     <main className={styles.main}>
-      <header className={styles.header}>
-        <Text as="p" size="small" weight="semibold" className={styles.eyebrow}>DataPLANT · ARC portal</Text>
-        <Heading as="h1" variant="large" className={styles.title}>Discover research contexts</Heading>
-        <Text as="p" size="large" className={styles.intro}>Browse Annotated Research Contexts (ARCs), represented here by GitLab repositories.</Text>
-        <DataHubSelect availableDataHubs={availableDataHubs} current={activeGitLab} setCurrent={setActiveGitLab} className={styles.instanceSelector} />
-        <Link href={`${activeGitLab.url.replace(/\/+$/, '')}/explore/projects/active`} className={styles.source}>Explore {activeGitLab.name} ↗</Link>
-      </header>
-      <div key={`arcs:${source}`} className={styles.grid}>
-        <TopStarredArcs fetchCall={loadTopStarred} onArcClick={selectArc} />
-        <ArcSearch fetchCall={searchArcs} signedIn={!!token} onArcClick={selectArc} />
-      </div>
-      {organisations && <OrganisationBrowser key={`organisations:${source}`}
-        fetchPublicGroups={loadPublicGroups}
-        fetchMembershipGroups={token && fetchMembershipGroups ? loadMembershipGroups : null}
-        fetchGroupProjects={loadGroupProjects} onArcClick={selectArc} />}
+      <DashboardHeader hubCount={hubs.length} okCount={hubs.length - failed.length} updatedAt={updatedAt} now={current}
+        onUpdate={reload} updating={updating} />
+      {loading && <p role="status" className={styles.loading}>Loading ARCs from {hubs.length} DataHUBs…</p>}
+      {loading ? null : allFailed
+        ? <Banner variant="critical" title="Could not load ARCs"
+          primaryAction={<Banner.PrimaryAction onClick={reload}>Try again</Banner.PrimaryAction>} />
+        : <>
+          {failed.map(({ hub, error }) => (
+            <Banner key={hub.id} variant="warning" title={`Could not load ARCs from ${hub.name}`} description={error}
+              primaryAction={<Banner.PrimaryAction onClick={() => retry(hub.id)}>{`Retry ${hub.name}`}</Banner.PrimaryAction>} />
+          ))}
+          {hubs.filter(hub => hub.tokenRejected).map(({ hub }) => (
+            <Banner key={hub.id} variant="warning" title={`Your login for ${hub.name} has expired`}>
+              Showing public ARCs only. Log in again to see private ARCs.
+            </Banner>
+          ))}
+          <div className={styles.grid}>
+            <StatsSidebar numbers={numbers} totals={totals} filtersActive={filtering} activeAccess={filters.access}
+              onSelect={kind => kind === 'all' ? clearAll() : dispatch({ type: 'toggleAccess', value: kind })}
+              privateState={privateState} privateNote={privateNote} />
+            <div className={styles.content}>
+              <div className={styles.charts}>
+                <BarList title="ARCs per DataHUB" items={hubCounts} activeKey={filters.hubId}
+                  onToggle={value => dispatch({ type: 'toggleHub', value })} />
+                <WorkingGroupChart myItems={myGroupCounts} publicItems={publicGroupCounts} loggedIn={signedIn}
+                  membershipErrors={membershipErrors} activeKey={filters.groupKey}
+                  onToggle={value => dispatch({ type: 'toggleGroup', value })} />
+                <MonthlyChart months={months} />
+              </div>
+              <div className={styles.tableCard}>
+                <ArcFilterBar query={queryInput} onQueryChange={setQueryInput} recent={filters.recent}
+                  onRecentToggle={() => dispatch({ type: 'toggleRecent' })}
+                  chips={chips} onRemoveChip={removeChip} onClearAll={clearAll} shown={filtered.length} total={arcs.length} />
+                <ArcTable arcs={sorted} hubNames={hubNames} sort={sort} now={current} details={details}
+                  onSortChange={next => dispatch({ type: 'setSort', sort: next })}
+                  resetKey={JSON.stringify(filters) + JSON.stringify(sort)}
+                  onClearFilters={filtering ? clearAll : undefined}
+                  onOpen={arc => onArcClick(arc.url, arc.title)} />
+              </div>
+            </div>
+          </div>
+        </>}
     </main>
   )
 }

@@ -1,6 +1,8 @@
 import type { GitLabRequestOptions } from '../../types/gitlab.ts'
 import { Failure, Success, type Result } from '../../types/result.ts'
 
+export const AUTH_FAILED_MESSAGE = 'Authentication failed: the token is invalid or expired.'
+
 function apiUrl(source: string, resource: string, params: URLSearchParams) {
   const url = new URL(source)
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash) {
@@ -48,7 +50,7 @@ export async function requestGitLab<T>(
     try { body = await response.json() } catch (error) {
       if (isCanceled(error, options.signal)) return Failure('GitLab request canceled.')
     }
-    if (response.status === 401) return Failure('Authentication failed: the token is invalid or expired.')
+    if (response.status === 401) return Failure(AUTH_FAILED_MESSAGE)
     const detail = body?.message ?? body?.error
     return Failure(
       `GitLab request failed (${response.status})${typeof detail === 'string' ? `: ${detail}` : '.'}`,

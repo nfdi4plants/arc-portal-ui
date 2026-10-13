@@ -20,8 +20,20 @@ export interface GitLabProject {
   topics?: string[]
   last_activity_at?: string
   visibility?: GitLabVisibility
-  owner?: { name: string; web_url?: string } | null
-  namespace?: { name: string; web_url?: string }
+  namespace?: { id: number; name: string; path: string; kind: 'group' | 'user'; full_path: string }
+  created_at?: string
+  default_branch?: string | null
+}
+
+export interface GitLabContributor {
+  name: string
+  email: string
+  commits: number
+}
+
+export interface GitLabCommit {
+  author_name: string
+  committed_date: string
 }
 
 export interface GitLabRequestOptions {

@@ -1,0 +1,5 @@
+.panel { display: flex; flex-direction: column; gap: 8px; background: var(--bgColor-default);
+  border: 1px solid var(--borderColor-default); border-radius: 6px; padding: 12px; }
+.title { margin: 0; font-size: 14px; font-weight: 600; }
+.tabPanel { min-height: 0; }
+.error { margin: 0; font-size: 13px; color: var(--fgColor-muted); }

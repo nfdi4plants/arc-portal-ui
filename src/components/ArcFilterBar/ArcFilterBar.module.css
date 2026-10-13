@@ -1,0 +1,9 @@
+.bar { background: var(--bgColor-default); border: 1px solid var(--borderColor-default); border-radius: 6px; }
+.search { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px; border-bottom: 1px solid var(--borderColor-default); }
+.input { flex: 1 1 260px; min-width: 0; }
+.filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; font-size: 12px; }
+.label { color: var(--fgColor-muted); }
+.hint { color: var(--fgColor-muted); }
+.chip { display: inline-flex; align-items: center; }
+.count { margin-left: auto; color: var(--fgColor-muted); }
+.count strong { color: var(--fgColor-default); }

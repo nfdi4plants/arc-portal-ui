@@ -4,7 +4,7 @@ import type {
 } from '../../types/gitlab.ts'
 import { Failure, map, type Result } from '../../types/result.ts'
 import { requestGitLab } from './client.ts'
-import { requestPage, validIdentifier } from './page.ts'
+import { listAllPages, requestPage, validIdentifier } from './page.ts'
 
 export function isProject(data: unknown): data is GitLabProject {
   return typeof data === 'object' && data !== null
@@ -43,4 +43,22 @@ export async function searchProjects(source: string, query: string, options: Sea
   const search = query.trim()
   if (!search) return Failure('A non-empty search query is required.')
   return listProjects(source, { perPage: 10, ...options, search, visibility: options.token ? undefined : 'public' })
+}
+
+/** Loads every project the caller can see; anonymous callers only get public ones. */
+export async function listAllProjects(source: string, options: GitLabRequestOptions = {}): Promise<Result<GitLabProject[]>> {
+  const params = new URLSearchParams({ order_by: 'last_activity_at', sort: 'desc' })
+  if (!options.token) params.set('visibility', 'public')
+  return listAllPages(source, 'projects', params, isProject, 'project', options)
+}
+
+function isMemberProject(data: unknown): data is { id: number } {
+  return typeof data === 'object' && data !== null && 'id' in data && typeof data.id === 'number'
+}
+
+/** Project ids the token can see (memberships); the response is a simple id list. */
+export async function listMemberProjectIds(source: string, options: GitLabRequestOptions = {}): Promise<Result<number[]>> {
+  const params = new URLSearchParams({ membership: 'true', simple: 'true' })
+  const result = await listAllPages(source, 'projects', params, isMemberProject, 'project', options)
+  return map(result, projects => projects.map(project => project.id))
 }

@@ -1,0 +1,13 @@
+.sidebar { display: flex; flex-direction: column; gap: 8px; }
+.stat { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 10px 12px; text-align: left;
+  font: inherit; color: inherit; background: var(--bgColor-default); border: 1px solid var(--borderColor-default); border-radius: 6px; }
+.stat:hover { background: var(--bgColor-neutral-muted); }
+.stat[aria-pressed='true'] { background: var(--bgColor-accent-muted); border-color: var(--borderColor-accent-emphasis); }
+.icon { display: flex; align-items: center; color: var(--fgColor-muted); }
+.value { font-size: 22px; font-weight: 600; line-height: 1.2; }
+.label { display: block; font-size: 13px; color: var(--fgColor-muted); }
+.caption { display: block; font-size: 11px; color: var(--fgColor-muted); }
+.describedBy { display: block; font-size: 11px; color: var(--fgColor-muted); }
+.privateNote { margin: 0; font-size: 11px; color: var(--fgColor-muted); }
+.disabled { background: var(--bgColor-muted); opacity: .7; cursor: default; }
+.disabled .value { font-size: 15px; color: var(--fgColor-muted); line-height: 1.8; }

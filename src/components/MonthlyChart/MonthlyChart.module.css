@@ -1,0 +1,5 @@
+.panel { padding: 16px; background: var(--bgColor-default); border: 1px solid var(--borderColor-default); border-radius: 6px; min-width: 0; }
+.title { font-size: 14px; margin: 0 0 8px; }
+.svg { width: 100%; height: auto; display: block; }
+.count, .month { font-size: 10px; fill: var(--fgColor-muted); }
+.caption { margin: 4px 0 0; font-size: 12px; color: var(--fgColor-muted); }
