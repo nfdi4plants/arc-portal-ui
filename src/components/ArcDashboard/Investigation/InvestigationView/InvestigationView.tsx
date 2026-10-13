@@ -1,7 +1,6 @@
-import { Heading, Stack } from '@primer/react'
+import { Heading } from '@primer/react'
 import { ExpandableEntityList } from '../ExpandableEntityList'
 import { ContactList } from '../ContactList'
-import { GithubLinkList } from '../GithubLinkList'
 import { InvestigationHeader } from '../InvestigationHeader'
 import { PublicationList } from '../PublicationList'
 import type { InvestigationMetadata } from '../types'
@@ -14,14 +13,12 @@ export function InvestigationView({ metadata }: { metadata: InvestigationMetadat
         identifier={metadata.identifier}
         title={metadata.title}
         description={metadata.description}
+        githubLinks={metadata.githubLinks}
       />
 
       <div className="investigation-metadata-grid">
-        <Stack gap="normal">
-          <PublicationList publications={metadata.publications} />
-          <ContactList contacts={metadata.contacts} />
-        </Stack>
-        <GithubLinkList links={metadata.githubLinks} />
+        <PublicationList publications={metadata.publications} />
+        <ContactList contacts={metadata.contacts} />
       </div>
 
       <section className="entities-card" aria-labelledby="arc-contents-heading">

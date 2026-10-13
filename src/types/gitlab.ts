@@ -1,3 +1,5 @@
+export type GitLabVisibility = 'public' | 'internal' | 'private'
+
 /** Project fields used by the ARC portal; GitLab names stay intact. */
 export interface GitLabProject {
   id: number
@@ -10,6 +12,9 @@ export interface GitLabProject {
   archived?: boolean
   topics?: string[]
   last_activity_at?: string
+  visibility?: GitLabVisibility
+  owner?: { name: string; web_url?: string } | null
+  namespace?: { name: string; web_url?: string }
 }
 
 export interface GitLabRequestOptions {

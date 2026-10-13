@@ -70,10 +70,92 @@
   letter-spacing: -0.03em;
 }
 
+.investigation-header-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: 32px;
+}
+
+.investigation-header-main {
+  min-width: 0;
+}
+
+.investigation-header-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 16px;
+  padding-top: 36px;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.investigation-meta-label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--fgColor-muted);
+  font-weight: 600;
+}
+
+.investigation-visibility {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--fgColor-muted);
+}
+
+.investigation-visibility[data-visibility='unknown'] {
+  border: 1px solid var(--borderColor-default);
+  border-radius: 50%;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.investigation-visibility[data-visibility='public'] {
+  color: var(--fgColor-success);
+}
+
 .investigation-identifier {
   color: var(--fgColor-muted);
   font-family: var(--fontStack-monospace);
   font-size: 0.875rem;
+}
+
+.investigation-header-links {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 8px 16px;
+  margin-top: 16px;
+  font-size: 0.875rem;
+}
+
+.investigation-release-size {
+  display: block;
+  margin-top: 4px;
+  color: var(--fgColor-muted);
+}
+
+.investigation-header-links > span {
+  color: var(--fgColor-muted);
+  font-weight: 600;
+}
+
+.investigation-header-links ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.investigation-header-links a {
+  overflow-wrap: anywhere;
 }
 
 .investigation-description {
@@ -90,7 +172,7 @@
 
 .investigation-metadata-grid {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(240px, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
   margin-top: 24px;
 }
@@ -107,45 +189,6 @@
   padding: 24px;
 }
 
-.metadata-card-expandable {
-  padding: 0;
-}
-
-.metadata-card-summary {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 68px;
-  padding: 0 24px;
-  cursor: pointer;
-  list-style: none;
-}
-
-.metadata-card-summary::-webkit-details-marker {
-  display: none;
-}
-
-.metadata-card-summary:hover {
-  background: var(--bgColor-muted);
-}
-
-.metadata-card-summary:focus-visible {
-  outline: 2px solid var(--focus-outlineColor);
-  outline-offset: -2px;
-}
-
-.metadata-card-expandable[open] .metadata-card-summary {
-  border-bottom: 1px solid var(--borderColor-muted);
-}
-
-.metadata-card-expandable[open] .entity-list-chevron {
-  transform: rotate(90deg);
-}
-
-.metadata-card-content {
-  padding: 20px 24px 24px;
-}
-
 .metadata-card-heading,
 .entities-heading {
   margin: 0;
@@ -153,12 +196,15 @@
 }
 
 .publication-list,
-.github-link-list,
-.contact-list,
-.entity-list-items {
+.contact-list {
   padding: 0;
   margin: 0;
   list-style: none;
+}
+
+.metadata-card-heading + .contact-list,
+.metadata-card-heading + .publication-list {
+  margin-top: 20px;
 }
 
 .publication-list small,
@@ -166,6 +212,28 @@
   display: block;
   margin-top: 4px;
   color: var(--fgColor-muted);
+}
+
+.publication-title-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 24px;
+  align-items: start;
+  gap: 16px;
+}
+
+.publication-state {
+  color: var(--fgColor-muted);
+  font-size: 1.25rem;
+  line-height: 1;
+  text-align: center;
+}
+
+.publication-state[data-state='published'] {
+  color: var(--fgColor-success);
+}
+
+.publication-state[data-state='pending'] {
+  color: var(--fgColor-attention);
 }
 
 .contact-locations {
@@ -235,6 +303,7 @@
 .entity-list-items {
   margin: 0;
   padding: 0 24px 16px 39px;
+  list-style: none;
 }
 
 .entity-list-items li {
@@ -258,6 +327,24 @@
 }
 
 @media (max-width: 700px) {
+  .investigation-header-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .investigation-header-main {
+    display: contents;
+  }
+
+  .investigation-header-main > :first-child {
+    justify-self: start;
+  }
+
+  .investigation-header-meta {
+    grid-row: 3;
+    padding-top: 16px;
+  }
+
   .investigation-window-container {
     padding: 0;
   }
@@ -280,18 +367,6 @@
   .metadata-card,
   .entities-heading {
     padding: 20px;
-  }
-
-  .metadata-card-expandable {
-    padding: 0;
-  }
-
-  .metadata-card-summary {
-    padding: 0 20px;
-  }
-
-  .metadata-card-content {
-    padding: 16px 20px 20px;
   }
 
   .entity-list-summary {
