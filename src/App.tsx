@@ -13,7 +13,6 @@ import { useAuthentication } from './auth/context.ts'
 import { Navbar } from './components/Navbar/Navbar.tsx'
 import ArcDashboard from './components/ArcDashboard/ArcDashboard.tsx'
 
-
 const fetchPublicGroups: FetchGroups = signal => listAllGroups(referenceGitLab.source, { visibility: 'public', signal })
 
 type PageState =
@@ -47,7 +46,7 @@ function Portal() {
       pageState.type === "arc-dashboard" ? (
         <ArcDashboard url={pageState.data.url} name={pageState.data.name} onBack={() => setPageState({ type: "datahub-dashboard" })} />
       ) :
-      <DataHubDashboard 
+      <DataHubDashboard
         onArcClick={(url, name) => setPageState({ type: "arc-dashboard", data: { url, name } })}
         fetchTopStarred={fetchTopStarred} fetchSearch={fetchSearch} signedIn={!!session}
         organisations={{ fetchPublicGroups, fetchMembershipGroups: session ? fetchMembershipGroups : null, fetchGroupProjects }} />
