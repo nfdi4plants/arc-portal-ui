@@ -86,6 +86,8 @@ const DEFS: Record<ProjectileArt, ProjectileDef> = {
   },
 }
 
+export const PROJECTILE_KINDS = Object.keys(DEFS) as ProjectileArt[]
+
 export function projectile(scene: Phaser.Scene, kind: ProjectileArt): SpriteRef {
   const def = DEFS[kind]
   const centre = { x: 0, y: -def.height / 2 }

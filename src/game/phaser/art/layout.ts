@@ -1,5 +1,6 @@
 import type { TelegraphArt } from '../../contracts/art'
 import type { BodyKind, EnemyWeaponKind, MonsterSpec, PassiveKind } from '../../contracts/content'
+import { hashString } from '../../contracts/rng'
 
 // Sizes, frame packing and seeds. Pure, so it is unit-tested without a canvas or Phaser.
 
@@ -150,7 +151,15 @@ export function monsterLayout(spec: Pick<MonsterSpec, 'body' | 'size' | 'weapon'
   }
 }
 
-// Eye and mouth shape from the passive variant, so a monster keeps its face.
+export const FACE_COUNT = 16
+
+// The passive variant only has four values and the tuned passive reads it as a stat choice, so the
+// face index comes from the id. The id is a hash of the annotation, which keeps a monster's face.
+export function faceIndexOf(spec: Pick<MonsterSpec, 'id'>): number {
+  return hashString(spec.id) % FACE_COUNT
+}
+
+// Eye and mouth shape from a face index in 0 to 15.
 export function faceVariant(variant: number): { eyes: number; mouth: number } {
   const v = Math.abs(Math.trunc(variant))
   return { eyes: v % 4, mouth: Math.floor(v / 4) % 4 }

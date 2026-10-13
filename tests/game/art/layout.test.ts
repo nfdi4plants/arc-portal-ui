@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { BodyKind, EnemyWeaponKind, MonsterSpec, PassiveKind } from '../../../src/game/contracts/content'
+import { monsterFromAnnotation } from '../../../src/game/model/content/monster'
 import {
   BODY_ASPECT,
   ENEMY_WEAPON,
+  FACE_COUNT,
   MONSTER_HEIGHT,
   TEXTURE_SCALE,
+  faceIndexOf,
   faceVariant,
   frameRects,
   monsterLayout,
@@ -85,10 +88,19 @@ describe('monsterLayout', () => {
   })
 })
 
-describe('faceVariant', () => {
-  it('gives sixteen different faces for variants 0 to 15', () => {
-    const faces = new Set(Array.from({ length: 16 }, (_, v) => JSON.stringify(faceVariant(v))))
-    expect(faces.size).toBe(16)
+describe('faceIndexOf', () => {
+  it('gives the monsters of generated annotations all sixteen faces', () => {
+    const indices = new Set<number>()
+    const faces = new Set<string>()
+    for (let i = 0; i < 400; i++) {
+      const monster = monsterFromAnnotation({ name: `measurement ${i}`, value: String(i), unit: null, accession: null, category: 'parameter' }, 0)
+      const index = faceIndexOf(monster)
+      indices.add(index)
+      faces.add(JSON.stringify(faceVariant(index)))
+    }
+    expect([...indices].every((index) => index >= 0 && index < FACE_COUNT)).toBe(true)
+    expect(indices.size).toBe(FACE_COUNT)
+    expect(faces.size).toBe(FACE_COUNT)
   })
 })
 

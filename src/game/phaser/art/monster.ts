@@ -4,7 +4,7 @@ import type { MonsterSpec } from '../../contracts/content'
 import { animKeyOf, spriteFrom } from './atlas'
 import { BODIES, drawFace } from './bodies'
 import { drawEnemyWeapon } from './enemyWeapons'
-import { monsterLayout } from './layout'
+import { faceIndexOf, monsterLayout } from './layout'
 import { drawBodyMark, drawHeadMark } from './marks'
 import { swatch } from './palette'
 
@@ -28,11 +28,17 @@ export function monster(scene: Phaser.Scene, spec: MonsterSpec): SpriteRef {
     draw(pen) {
       BODIES[spec.body](pen, body, sw)
       drawBodyMark(pen, spec.passive.kind, body)
-      drawFace(pen, body, spec.body, spec.passive.variant)
+      drawFace(pen, body, spec.body, faceIndexOf(spec))
       drawEnemyWeapon(pen, spec.weapon.kind, layout.hand, layout.weaponLength, sw)
       drawHeadMark(pen, spec.passive.kind, body, sw)
     },
   })
+}
+
+// The spec a summoner's minions are drawn from: a small slime that keeps the summoner's hue, weapon
+// and passive. mobs/mob.ts builds the same look, so drawing this ahead of time fills the cache.
+export function minionArtSpec(spec: MonsterSpec): MonsterSpec {
+  return { ...spec, id: `${spec.id}${MINION_ID_SUFFIX}`, body: 'slime', size: 'small' }
 }
 
 // Monster textures live as long as the game, so a long path would collect one per annotation it

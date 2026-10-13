@@ -4,16 +4,17 @@ import type { MonsterSpec } from '../../contracts/content'
 import { textureBytes } from './atlas'
 import { boss } from './bosses'
 import { finalBoss } from './finalBoss'
-import { fx } from './fx'
+import { FX_KINDS, fx } from './fx'
 import { frameName, TEXTURE_SCALE } from './layout'
 import { monster } from './monster'
 import { playerWeapon } from './playerWeapons'
-import { projectile } from './projectiles'
+import { PROJECTILE_KINDS, projectile } from './projectiles'
 import { telegraph } from './telegraph'
 import { tiles } from './tiles'
 
 export { TEXTURE_SCALE, textureBytes }
-export { MINION_ID_SUFFIX, releaseMonsters } from './monster'
+export { MINION_ID_SUFFIX, minionArtSpec, releaseMonsters } from './monster'
+export { prewarmTelegraphs, releaseTelegraphs } from './telegraph'
 export { doorArt, shieldFragmentArt } from './props'
 export type { BossArt, PartRef } from './parts'
 
@@ -33,6 +34,13 @@ export function applySpriteRef(sprite: Phaser.GameObjects.Sprite, ref: SpriteRef
 // costs a lookup. A monster takes about 2 to 3 ms, so a segment of 40 takes around 100 ms.
 export function prewarm(scene: Phaser.Scene, specs: readonly MonsterSpec[]): void {
   for (const spec of specs) monster(scene, spec)
+}
+
+// Draws every effect and projectile texture, so the first hit or shot of a run does not draw its
+// texture mid-fight. Textures that exist are only looked up, so calling it again is cheap.
+export function prewarmEffects(scene: Phaser.Scene): void {
+  for (const kind of FX_KINDS) fx(scene, kind)
+  for (const kind of PROJECTILE_KINDS) projectile(scene, kind)
 }
 
 export function createScribbleArt(): ScribbleArt {

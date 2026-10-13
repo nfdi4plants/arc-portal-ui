@@ -127,6 +127,8 @@ const DEFS: Record<FxArt, FxDef> = {
   },
 }
 
+export const FX_KINDS = Object.keys(DEFS) as FxArt[]
+
 export function fx(scene: Phaser.Scene, kind: FxArt): string {
   const def = DEFS[kind]
   return spriteFrom(scene, {

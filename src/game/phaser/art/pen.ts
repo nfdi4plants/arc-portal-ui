@@ -230,17 +230,23 @@ export class Pen {
     return shifts
   }
 
-  // Fills the area inside the jittered outline, so the wash and the lines agree.
+  // Fills the area inside the jittered outline, so the wash and the lines agree. A polygon outline
+  // is one move op per side. Each of those would start a subpath with no area, so only the first
+  // move starts the path and the later ones join it with a line.
   private washOutline(drawable: Drawable, color: string): void {
     const { ctx } = this
     const outline = drawable.sets.find((set) => set.type === 'path')
     if (!outline) return
     ctx.fillStyle = color
     ctx.beginPath()
+    let started = false
     for (const item of outline.ops) {
       const d = item.data
-      if (item.op === 'move') ctx.moveTo(d[0], d[1])
-      else if (item.op === 'bcurveTo') ctx.bezierCurveTo(d[0], d[1], d[2], d[3], d[4], d[5])
+      if (item.op === 'move') {
+        if (started) ctx.lineTo(d[0], d[1])
+        else ctx.moveTo(d[0], d[1])
+        started = true
+      } else if (item.op === 'bcurveTo') ctx.bezierCurveTo(d[0], d[1], d[2], d[3], d[4], d[5])
       else ctx.lineTo(d[0], d[1])
     }
     ctx.fill()

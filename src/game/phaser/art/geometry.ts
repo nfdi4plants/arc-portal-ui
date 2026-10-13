@@ -150,3 +150,14 @@ export function wrapTitle(title: string, maxChars: number, maxLines: number): st
   kept[maxLines - 1] = `${kept[maxLines - 1].slice(0, Math.max(1, maxChars - 1)).trimEnd()}...`
   return kept
 }
+
+const TELEGRAPH_MIN = 16
+const TELEGRAPH_MAX = 1024
+
+// The smallest power of two from 16 to 1024 that holds `size`. Danger zone textures come in these
+// sizes only, so a fight draws a handful of them. The zone image is scaled to its real size.
+export function telegraphSize(size: number): number {
+  let step = TELEGRAPH_MIN
+  while (step < size && step < TELEGRAPH_MAX) step *= 2
+  return step
+}
