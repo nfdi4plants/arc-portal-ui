@@ -11,7 +11,7 @@ import { acquireBubble, releaseBubble } from './bubbles'
 import { bubbleAt, chatterText, chunkText } from './chatter'
 import { hitFromAbove, hitFromFront, incomingDamage } from './defense'
 import { playFx } from './fx'
-import { LEDGE_DEPTH, LEDGE_LOOKAHEAD, groundProbe, sameLevel, turnsAtLedge } from './ledge'
+import { LEDGE_DEPTH, LEDGE_LOOKAHEAD, PIT_DEPTH, groundProbe, sameLevel, turnsAtLedge } from './ledge'
 import type { Box } from './ledge'
 import { approach, blinkDestination } from './motion'
 import { dropShieldFragment } from './pickups'
@@ -236,6 +236,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
   let probeCount = 0
   let probedDir = 0
   let groundAheadCached = true
+  let pitAheadCached = false
 
   const stance = passive === 'stanceShift' ? createStance(rng.int(0, 2900), rng.chance(0.5)) : null
   let mods = stance ? stanceMods(stance) : NEUTRAL
@@ -273,14 +274,16 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     aggro = !player.isDead() && st.dx * st.dx + dyc * dyc <= range * range
   }
 
-  function groundAhead(dir: 1 | -1): boolean {
+  // True when the walker has to stop or turn at the edge ahead of it. The probes refresh every few steps.
+  function stopsAtLedge(dir: 1 | -1, chasing: boolean): boolean {
     if (dir !== probedDir || ++probeCount >= STEPS_PER_PROBE) {
       probeCount = 0
       probedDir = dir
-      groundProbe(probe, cx(), feetY(), dir, halfW, lookAhead)
-      groundAheadCached = world.staticTree.collides(probe)
+      groundAheadCached = world.staticTree.collides(groundProbe(probe, cx(), feetY(), dir, halfW, lookAhead))
+      // The deep probe only runs at an edge.
+      pitAheadCached = !groundAheadCached && !world.staticTree.collides(groundProbe(probe, cx(), feetY(), dir, halfW, lookAhead, PIT_DEPTH))
     }
-    return groundAheadCached
+    return !groundAheadCached && turnsAtLedge(chasing, sameLevel(feetY(), st.pFeet), spec.body === 'crawler', pitAheadCached)
   }
 
   // Aims the walker at `speed` in `dir`. Returns false when a wall or a ledge stops it.
@@ -292,7 +295,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     facing = dir
     st.targetVx = 0
     if (dir > 0 ? wallRight : wallLeft) return false
-    if (onGround && !groundAhead(dir) && turnsAtLedge(chasing, sameLevel(feetY(), st.pFeet), spec.body === 'crawler')) return false
+    if (onGround && stopsAtLedge(dir, chasing)) return false
     st.targetVx = dir * speed
     return true
   }
@@ -408,8 +411,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
       dir = Math.abs(offset) > WANDER_RADIUS ? (offset > 0 ? -1 : 1) : rng.chance(0.5) ? 1 : -1
     }
     facing = dir
-    const blocked = (dir > 0 ? wallRight : wallLeft) || (!groundAhead(dir) && turnsAtLedge(chasing, sameLevel(feetY(), st.pFeet), false))
-    if (blocked) {
+    if ((dir > 0 ? wallRight : wallLeft) || stopsAtLedge(dir, chasing)) {
       routeDir = dir === 1 ? -1 : 1
       st.hopMs = chasing ? 300 : 400
       return
@@ -700,7 +702,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
       if (!bomb.active) continue
       const fromX = bomb.x
       const fromY = bomb.y
-      // The same step order as the combat world, so the sprite and the blast agree.
+      // Move, then apply gravity, as the combat world does, so the sprite and the blast agree.
       bomb.x += bomb.vx * seconds
       bomb.y += bomb.vy * seconds
       bomb.vy += LOB_GRAVITY * seconds
@@ -949,6 +951,9 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     if (stance && stepStance(stance, dt)) mods = stanceMods(stance)
     if (passive === 'summoner' && aggro && !summoned) summon()
     if (passive === 'blink') updateBlink(dt)
+    // Before updateAttack, so a bomb launched in this step stays where it is. The combat world
+    // moves its projectile for the first time on the next step.
+    updateBombs(dt)
     if (armed) updateAttack(dt)
 
     if (flies) thinkFlying(dt)
@@ -957,7 +962,6 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
       applyGroundVelocity(dt)
     }
 
-    updateBombs(dt)
     touchPlayer(dt)
     if (passive === 'chatter') updateChatter(dt)
     if (minions.length > 0) updateMinions(dt)
@@ -966,9 +970,11 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
   }
 
   function setAsleep(next: boolean) {
-    if (next === asleep || destroyed || dead) return
+    if (next === asleep || destroyed) return
     asleep = next
+    // A dead summoner's minions live on, so they sleep and wake with it.
     for (const minionMob of minions) minionMob.setAsleep(next)
+    if (dead) return
     if (next) {
       cancelAttacks()
       dropBubble()
@@ -1017,7 +1023,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     position: () => ({ x: cx(), y: feetY() }),
     isInvulnerable: () => dead,
     isDead: () => dead,
-    receiveHit(hit: HitEvent) {
+    receiveHit(hit: HitEvent): number | void {
       if (dead) return
       const attacker = hit.attacker.position()
       const damage = incomingDamage(hit.damage, {
@@ -1030,17 +1036,18 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
       st.hp -= damage
       if (st.hp <= 0) {
         die()
-        return
+        return damage
       }
       st.flashMs = HIT_FLASH_MS
       st.stunMs = HIT_STUN_MS
       if (charge === 'run' || charge === 'windup') endCharge(300)
       if (swoop === 'dive') swoop = 'rise'
-      if (spec.body === 'turret') return
+      if (spec.body === 'turret') return damage
       const mass = KNOCKBACK_MASS[spec.size]
       body.velocity.x = hit.knockback.x * 0.5 * mass
       if (flies) body.velocity.y = hit.knockback.y * 0.4 * mass
       else if (onGround) body.velocity.y = -110 * mass
+      return damage
     },
     update,
     setAsleep,

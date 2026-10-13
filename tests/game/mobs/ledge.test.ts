@@ -27,19 +27,23 @@ describe('groundProbe', () => {
 
 describe('turnsAtLedge', () => {
   it('turns an idle walker at a ledge', () => {
-    expect(turnsAtLedge(false, false, false)).toBe(true)
+    expect(turnsAtLedge(false, false, false, false)).toBe(true)
   })
 
-  it('lets a chaser go on when the player is at its level', () => {
-    expect(turnsAtLedge(true, true, false)).toBe(false)
+  it('lets a chaser go on when the player is at its level and there is ground below', () => {
+    expect(turnsAtLedge(true, true, false, false)).toBe(false)
   })
 
   it('stops a chaser when the player is on another level', () => {
-    expect(turnsAtLedge(true, false, false)).toBe(true)
+    expect(turnsAtLedge(true, false, false, false)).toBe(true)
   })
 
   it('never lets a crawler leave its platform', () => {
-    expect(turnsAtLedge(true, true, true)).toBe(true)
+    expect(turnsAtLedge(true, true, true, false)).toBe(true)
+  })
+
+  it('stops a chaser at a pit even when the player is at its level', () => {
+    expect(turnsAtLedge(true, true, false, true)).toBe(true)
   })
 })
 

@@ -16,6 +16,9 @@ export const LEDGE_LOOKAHEAD = 10
 export const LEDGE_DEPTH = 16
 // Feet this close vertically count as standing on the same platform level.
 export const SAME_LEVEL = TILE * 0.75
+// A drop with no ground at all within this depth is a pit. The level has no floor under its gaps,
+// so a mob that goes in falls out of the world and is removed without a kill.
+export const PIT_DEPTH = TILE * 4
 
 // A thin box just ahead of the front foot, reaching from the feet down to LEDGE_DEPTH. It writes
 // into `out` so the per-step check does not allocate.
@@ -41,9 +44,10 @@ export function sameLevel(feetY: number, targetFeetY: number): boolean {
 }
 
 // Walkers turn at ledges. The exception is a chaser whose target stands at its own level, since
-// the gap between them is then the way to the target. Crawlers never leave their platform.
-export function turnsAtLedge(chasing: boolean, targetSameLevel: boolean, neverFalls: boolean): boolean {
-  if (neverFalls) return true
+// the drop between them is then the way to the target. It does not cover a pit, where the chaser
+// would fall out of the world. Crawlers never leave their platform.
+export function turnsAtLedge(chasing: boolean, targetSameLevel: boolean, neverFalls: boolean, pit: boolean): boolean {
+  if (neverFalls || pit) return true
   return !(chasing && targetSameLevel)
 }
 
