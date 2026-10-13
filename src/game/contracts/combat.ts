@@ -53,6 +53,9 @@ export interface HitboxSpec {
 
 export interface ProjectileSpec extends Omit<HitboxSpec, 'follow' | 'activeMs'> {
   textureKey: string
+  // The SpriteRef's animation. Art textures hold several variants side by side, so without it the
+  // projectile shows the whole strip.
+  animKey?: string
   velocity: { x: number; y: number }
   gravity: number
   lifetimeMs: number

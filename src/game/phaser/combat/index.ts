@@ -251,7 +251,7 @@ export function createCombatWorld(scene: Phaser.Scene, options: CombatWorldOptio
     },
     spawnProjectile(spec, origin) {
       const fallback = scene.textures.exists(spec.textureKey) ? null : art.projectile(scene, 'orb')
-      const sprite = pool.acquire(fallback?.textureKey ?? spec.textureKey, fallback?.animKey ?? null, origin.x, origin.y)
+      const sprite = pool.acquire(fallback?.textureKey ?? spec.textureKey, fallback?.animKey ?? spec.animKey ?? null, origin.x, origin.y)
       const idleFacing = spec.owner.facing()
       const state: ProjectileState = {
         owner: spec.owner,
