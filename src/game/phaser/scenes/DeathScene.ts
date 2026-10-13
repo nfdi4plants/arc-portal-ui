@@ -2,32 +2,9 @@ import Phaser from 'phaser'
 import type { KillerInfo } from '../../contracts/combat'
 import { PALETTE, SCENE } from '../../contracts/constants'
 import type { RunContext } from './context'
+import { deathText } from './deathText'
 import { addEndButtons } from './endScreen'
-import { addText, overlayView, plural } from './ui'
-
-const ANNOTATE_HINT = 'Annotate this step in your ARC to give the next mage a fighting chance.'
-
-// Headline and explanation for the death screen.
-export function deathText(killer: KillerInfo): { headline: string; detail: string } {
-  switch (killer.kind) {
-    case 'mob':
-      return { headline: `Slain by ${killer.label}`, detail: '' }
-    case 'boss': {
-      const n = killer.segment.annotations.length
-      const headline = `Defeated by ${killer.spec.label}`
-      // A fully annotated step already gives the longest warnings, so asking for more would read oddly.
-      if (killer.segment.quality >= 1) {
-        return { headline, detail: `${killer.segment.processName} has ${plural(n, 'annotation')}, so this boss warns before every big attack. Watch for the warnings and try again.` }
-      }
-      const count = n > 0 && killer.segment.quality < 0.5 ? `only ${plural(n, 'annotation')}` : plural(n, 'annotation')
-      return { headline, detail: `${killer.segment.processName} has ${count}. ${ANNOTATE_HINT}` }
-    }
-    case 'finalBoss':
-      return { headline: `The ARC ${killer.title} stood firm in phase ${killer.phase + 1}.`, detail: '' }
-    case 'hazard':
-      return { headline: killer.label, detail: '' }
-  }
-}
+import { addText, overlayView } from './ui'
 
 export class DeathScene extends Phaser.Scene {
   private readonly ctx: RunContext
@@ -39,7 +16,7 @@ export class DeathScene extends Phaser.Scene {
 
   create(data: { killer: KillerInfo }) {
     const director = this.ctx.director
-    const { headline, detail } = deathText(data.killer)
+    const { headline, detail } = deathText(data.killer, director?.plan ?? null)
     const dim = this.add.rectangle(0, 0, 1, 1, PALETTE.outline, 0.72).setOrigin(0, 0)
     const title = addText(this, 'The run is over', 10, { color: PALETTE.yellow, bold: true }).setOrigin(0.5)
     const main = addText(this, headline, 13, { bold: true, align: 'center' }).setOrigin(0.5, 0)
