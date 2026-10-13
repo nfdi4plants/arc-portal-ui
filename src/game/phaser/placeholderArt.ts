@@ -85,6 +85,12 @@ export const placeholderArt: ScribbleArt = {
     return box(scene, `telegraph:${shape}:${width}x${height}`, Math.max(2, Math.round(width)), Math.max(2, Math.round(height)), 0xe5484d).textureKey
   },
   fx(scene, kind) {
-    return box(scene, `fx:${kind}`, 12, 12, 0xffffff).animKey
+    // Effects play once, so they get their own non-looping animation.
+    const { textureKey } = box(scene, `fx:${kind}`, 12, 12, 0xffffff)
+    const animKey = `${textureKey}:once`
+    if (!scene.anims.exists(animKey)) {
+      scene.anims.create({ key: animKey, frames: [{ key: textureKey }], duration: 250, repeat: 0 })
+    }
+    return animKey
   },
 }
