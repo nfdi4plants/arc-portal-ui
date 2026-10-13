@@ -13,7 +13,9 @@ export function baseGameConfig(parent: HTMLElement, scenes: Phaser.Types.Scenes.
     scale: { mode: Phaser.Scale.NONE },
     physics: {
       default: 'arcade',
-      arcade: { gravity: { x: 0, y: 0 }, fps: PHYSICS_FPS, fixedStep: true, debug: false },
+      // useTree off: the dynamic body tree is rebuilt every step (about 2 MB/s of garbage) and only
+      // pays off with many dynamic bodies colliding with each other, which the game never does.
+      arcade: { gravity: { x: 0, y: 0 }, fps: PHYSICS_FPS, fixedStep: true, debug: false, useTree: false },
     },
     input: { mouse: { preventDefaultWheel: false }, keyboard: false },
     // Below 30 fps the game slows down instead of running many catch-up physics steps per frame,

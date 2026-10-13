@@ -19,7 +19,9 @@ export type { BossArt, PartRef } from './parts'
 // units, and starts the boiling animation. Frame 0 is set first so the display size is computed
 // from a single variant instead of the whole strip.
 export function applySpriteRef(sprite: Phaser.GameObjects.Sprite, ref: SpriteRef): void {
-  sprite.setTexture(ref.textureKey, frameName(0))
+  // Placeholder textures have a single frame and no variant frames.
+  const texture = sprite.scene.textures.get(ref.textureKey)
+  sprite.setTexture(ref.textureKey, texture.has(frameName(0)) ? frameName(0) : undefined)
   sprite.setOrigin(0.5, 1)
   sprite.setDisplaySize(ref.width, ref.height)
   sprite.play(ref.animKey)
