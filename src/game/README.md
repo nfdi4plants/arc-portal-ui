@@ -115,8 +115,8 @@ The target is a steady 60 fps on an integrated GPU.
 
 - Textures are drawn at `TEXTURE_SCALE = 2` canvas pixels per world unit (`phaser/art/layout.ts`)
   and cached by spec id. `ScribbleArt.pixelsPerUnit` is 2, so raw texture keys need a scale of 1/2.
-  The stretch scene draws the monster textures, effects and projectiles behind the intro banner, a
-  few per frame.
+  The stretch scene draws all effect and projectile textures on the first banner frame and the
+  monster textures a few per frame behind the intro banner.
 - Textures have a limited lifetime. Each stretch frees the monster textures of earlier segments
   (`releaseMonsters`). Danger zone sizes snap to powers of two, and the boss scenes draw the common
   zones up front and free them on shutdown (`prewarmTelegraphs`, `releaseTelegraphs`).

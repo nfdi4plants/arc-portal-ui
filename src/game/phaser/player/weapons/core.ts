@@ -58,8 +58,9 @@ export interface ExtraBox {
   maxTargets?: number
 }
 
-// Secondary hits (echo, chain, reviewer, DOI) belong to a stand-in attacker on the player's team. The damage modifier and every player-hit listener skip them, so a secondary hit never
-// triggers another one and its damage is exactly what the caller computed.
+// Secondary hits (echo, chain, reviewer, DOI) belong to a stand-in attacker on the player's team.
+// The damage modifier and every player-hit listener skip them, so a secondary hit never triggers
+// another one and its damage is exactly what the caller computed.
 export interface ExtraAttacks {
   // Puts the stand-in at a world point and returns it, for specs that a caller builds itself.
   at(x: number, y: number, face: 1 | -1): Combatant
