@@ -1,14 +1,9 @@
 # ARC portal UI
 
-A React + TypeScript + Vite example for discovering Annotated Research Contexts
-(ARCs). Every GitLab repository returned by the API is treated as an ARC; the
-example does not inspect repository contents to validate ARC structure.
-
-The UI uses [Primer React](https://primer.style/product/components/).
-The example uses Primer `Heading`, `Text`, and `Stack` for typography and layout,
-`FormControl` for the search input's label and caption, and critical `Banner`
-messages with retry actions for failures. Previous/Next paging uses Primer buttons
-because GitLab's total page count may be unavailable.
+A React + TypeScript + Vite portal for discovering Annotated Research Contexts
+(ARCs), using [Primer React](https://primer.style/product/components/).
+Every repository returned by GitLab is treated as an ARC; repository contents
+are not inspected to validate ARC structure.
 
 ## Run locally
 
@@ -17,10 +12,54 @@ npm ci
 npm run dev
 ```
 
-The example in `src/App.tsx` displays the 10 most-starred public ARCs and an
-independent search component. Search runs on Enter or Search button submission,
-with 10 results per page and Previous/Next controls. Both sections include archived
-repositories and expose loading, empty, error, and retry states.
+The dashboard displays the 10 most-starred public ARCs, independent server-side
+search, and an organisation browser. Search runs on Enter or Search submission.
+Search and organisation repositories use 10 results per page with Previous/Next
+controls. Archived repositories are included. Sections expose loading, empty,
+error, and retry states.
+
+## Optional authentication
+
+Public browsing is available immediately. The navbar Login button opens a Primer
+dialog accepting a GitLab personal access token. The generation link requests
+`read_user` and `read_api` scopes. `GET /user` validates the token and returns the
+name and username shown beside Logout.
+
+Successful tokens are stored under `arc-portal-gitlab-token` in local storage;
+login persists across browser sessions. Saved credentials are revalidated on
+startup while public discovery continues anonymously. Unvalidated saved tokens
+are never sent on discovery requests. Failed restoration preserves the saved
+token for Retry saved login or Forget saved login in the dialog. Closing the
+dialog cancels validation and clears its draft. Logout clears credentials and
+account-specific results.
+
+After login, search includes all accessible public, internal, and private
+projects. Most-starred ARCs remain public. Login/logout cancels old requests and
+clears submitted search results while preserving the draft search term.
+
+Tokens are supplied at runtime through `PRIVATE-TOKEN` headers; they never go in
+request URLs. Browser session credentials are omitted. Do not put private tokens
+in committed source, Vite environment variables, or public bundles.
+
+## Organisations
+
+Organisations are GitLab groups, including selectable subgroups labelled by their
+full path. The selector loads the complete catalogue at 100 groups per request.
+Anonymous visitors see Public organisations. Signed-in visitors see:
+
+- **Your organisations:** groups returned by authenticated `GET /groups` with
+  `all_available=false`, including public, internal, and private membership groups.
+- **Other public organisations:** independently fetched public groups, excluding
+  membership-group IDs so a public membership group appears only once.
+
+If membership lookup fails, public groups remain available under the neutral
+Public organisations label with a separate retry action. Selecting an organisation
+loads `GET /groups/:id/projects` with `include_subgroups=true`, `with_shared=false`,
+and name ascending order. Changing organisation resets paging. Login/logout resets
+the selection and removes previous repository results.
+
+See the [GitLab Groups API](https://docs.gitlab.com/api/groups/) and
+[Users API](https://docs.gitlab.com/api/users/).
 
 ## Reference GitLab
 
@@ -29,145 +68,110 @@ repositories and expose loading, empty, error, and retry states.
 - `source`: `https://git.nfdi4plants.org`
 - `exploreUrl`: `https://git.nfdi4plants.org/explore/projects/active`
 
-The explore URL is a navigation reference. API calls use the instance source,
-without the explore path. Every public API operation requires its own source
-argument and does not read the reference configuration.
+App binds this source to the API callbacks. API functions themselves always
+accept an explicit source and support installation subpaths and trailing slashes.
+Direct browser access requires the GitLab instance to permit your app origin
+through CORS. Network/CORS failures appear as errors with retry controls.
 
-## GitLab API
+## GitLab API and Results
 
-Import the client from `src/api/gitlab/index.ts`. Shared DTOs, options, and
-pagination types live in `src/types/gitlab.ts`.
+Import APIs from `src/api/gitlab/index.ts`. DTOs and options live in
+`src/types/gitlab.ts`; Result utilities live in `src/types/result.ts`.
 
 ```ts
 import {
-  getTopStarredProjects,
-  searchProjects,
-  listProjects,
-  getProject,
-  GitLabApiError,
+  getTopStarredProjects, searchProjects, listProjects, getProject,
+  getCurrentUser, listGroups, listAllGroups, getGroupProjects,
 } from './src/api/gitlab/index.ts'
 
-// Sources can include a GitLab installation subpath or a trailing slash.
 const source = 'https://another-gitlab.example/gitlab/'
 const controller = new AbortController()
+const featured = await getTopStarredProjects(source, { signal: controller.signal })
+if (featured.success === true) {
+  console.log(featured.value.items)
+} else {
+  console.error(featured.error)
+}
 
-const featured = await getTopStarredProjects(source, {
-  perPage: 10,
-  signal: controller.signal,
-})
-const matches = await searchProjects(source, 'plant growth', {
-  page: 1,
-  perPage: 10,
-  signal: controller.signal,
-})
-const activeProjects = await listProjects(source, {
-  archived: false,
-  visibility: 'public',
-  orderBy: 'last_activity_at',
-  sort: 'desc',
-})
+// Anonymous search remains public; supplying a runtime token expands access.
+const matches = await searchProjects(source, 'plant growth', { page: 1, perPage: 10 })
+const active = await listProjects(source, { archived: false, visibility: 'public' })
 const arc = await getProject(source, 'group/subgroup/arc-name')
-// Numeric IDs work too: await getProject(source, 123)
-
-console.log(featured.items, matches.nextPage, activeProjects.items, arc.name)
+const user = await getCurrentUser(source, { token: runtimeToken })
+const publicGroups = await listAllGroups(source, { visibility: 'public' })
+const memberships = await listAllGroups(source, { token: runtimeToken, allAvailable: false })
+const groupPage = await listGroups(source, { page: 1, perPage: 100 })
+const repositories = await getGroupProjects(source, 'research/plants', { page: 1, token: runtimeToken })
 ```
 
-All operations perform GET requests under `/api/v4`. Repository search uses
-[GitLab's Projects API](https://docs.gitlab.com/api/projects/),
-`/projects?search=…`, which matches names, paths, and descriptions on the server.
-This public-search example does not use the authenticated global `/search` API.
-Top-starred requests use `order_by=star_count&sort=desc&visibility=public`.
-The top-starred and search helpers always request public repositories; the general
-list operation supports public, internal, or private visibility.
-
-List operations return `{ items, page, perPage, nextPage, previousPage, total,
-totalPages }`. Page size must be between 1 and 100. Missing total headers yield
-`null`. An exposed empty `X-Next-Page` marks the last page. If CORS hides pagination
-headers, a full page enables Next; the subsequent page may be empty, with Previous
-still available to return to the results.
-
-HTTP errors throw `GitLabApiError` with an HTTP `status`. Network errors also use
-that type with `status: null`; abort errors propagate unchanged. For example:
+All operations resolve to `Result<T>`:
 
 ```ts
-try {
-  await listProjects(source)
-} catch (error) {
-  if (error instanceof GitLabApiError) console.error(error.status, error.message)
-}
+type Result<T> =
+  | { success: true; value: T }
+  | { success: false; error: string }
 ```
 
-Request options accept an optional `fetchCall` transport, defaulting to native
-`fetch`. API and App tests pass their mock transport directly; component tests
-pass callbacks returning plain page data. No global fetch or module patching is
-required.
+HTTP, transport, JSON, response-shape, argument-validation, and cancellation
+failures return strings rather than throwing `GitLabApiError`. Consumers must
+check `success` and access `value` or `error`. Canceled requests are ignored by
+UI consumers using their abort signals. `Success`, `Failure`, `bind`, `bindAsync`,
+`map`, `pipe`, and `pipeResult` follow Delight's Result utilities.
 
-Request options also accept an optional runtime `token`, sent using `PRIVATE-TOKEN`.
-The example uses no token and sends no browser session credentials. Never put a
-private token in committed source, a Vite environment variable, or a public bundle.
+List operations return `Result<GitLabPage<T>>`, where the page contains
+`items`, `page`, `perPage`, `nextPage`, `previousPage`, `total`, and `totalPages`.
+Page size is between 1 and 100. Missing total headers yield `null`; an exposed
+empty `X-Next-Page` marks the end. If CORS hides pagination headers, a full page
+enables Next, which may lead to an empty final page with Previous still available.
+`listAllGroups` accumulates every catalogue page into `Result<GitLabGroup[]>`.
 
-Direct browser access requires the chosen instance to allow your app origin via
-CORS. Network/CORS errors are shown with retry controls. Reachability and CORS for
-the reference instance should also be checked in your deployment environment.
-The public top-starred endpoint was verified to return 10 projects with CORS
-enabled and pagination headers exposed during development.
+The API supports an explicit `fetchCall` transport for callers and tests,
+defaulting to native fetch. Project search uses the
+[Projects API](https://docs.gitlab.com/api/projects/), matching names, paths, and
+descriptions, rather than GitLab's authenticated global search endpoint.
 
-## Components
+## Components and callbacks
 
-Each component keeps its implementation, styles, and tests under
-`src/components/<component-name>/`:
+Components keep implementation, styles, and tests under `src/components/`.
 
-- `TopStarredArcs` takes `fetchCall(signal)`, which resolves to an ARC page.
-- `ArcSearch` takes `fetchCall(query, { page, perPage, signal })`, which resolves
-  to an ARC page. It fetches on explicit submission, with new queries starting at
-  page one. Replacing the callback retires the current search; submit again to
-  use the replacement.
-- `ArcList` accepts `projects` and an accessible list `label`.
+- `DataHubDashboard` accepts `fetchTopStarred`, `fetchSearch`, optional `signedIn`,
+  and optional `organisations` callbacks.
+- `TopStarredArcs` accepts `FetchArcs`; `ArcSearch` accepts `SearchArcs`. Both
+  resolve to `Result<ArcPage>`; options include `page`, `perPage`, and `signal`.
+- `OrganisationBrowser` accepts `fetchPublicGroups(signal)`, nullable
+  `fetchMembershipGroups(signal)`, and `fetchGroupProjects(groupId, options)`.
+- `ArcList` renders projects with an accessible list label.
+- `AuthenticationProvider` shares session and login actions; Navbar opens
+  Authentication without routing or gating the dashboard.
 
-The example is composed directly inside `src/App.tsx`. Small, memoized wrappers
-there bind the reference source to the correct GitLab API functions. `App` also
-accepts an optional native-style `fetchCall` transport for integration tests.
-Keep callback identities stable (use `useCallback` when defining them in a parent)
-to avoid restarting requests on unrelated renders.
+App supplies memoized callbacks binding source and credentials. Keep callback
+identities stable to avoid restarting requests on unrelated renders.
+`useResult` and `useProjectPage` share request, cancellation, and retry logic.
 
-A component test supplies mock data directly, without patching the API:
+Tests can supply successful, delayed, or failed Results directly:
 
 ```tsx
-const fetchCall = vi.fn().mockResolvedValue({
-  items: [mockProject],
-  page: 1,
-  perPage: 10,
-  nextPage: null,
-  previousPage: null,
-  total: null,
-  totalPages: null,
-})
-render(<TopStarredArcs fetchCall={fetchCall} />)
-```
+import { Success, Failure } from './src/types/result.ts'
+import type { FetchArcs, SearchArcs } from './src/types/arc.ts'
 
-Callback types live in `src/types/arc.ts`. Shared request state and
-cancellation live under `src/util/`; shared types and configuration have their own
-folders. Requests are canceled on replacement/unmount, and late responses cannot
-overwrite current results.
+const fetchTopStarred = vi.fn<FetchArcs>().mockResolvedValue(Success(mockPage))
+const fetchSearch = vi.fn<SearchArcs>()
+  .mockResolvedValueOnce(Failure('Service unavailable'))
+  .mockResolvedValueOnce(Success(mockPage))
+render(<DataHubDashboard fetchTopStarred={fetchTopStarred} fetchSearch={fetchSearch} />)
+```
 
 ## Checks
 
 ```sh
-npm test             # Vitest run
-npm run test:watch   # Vitest watch mode
-npm run build        # TypeScript and production build
-npm run lint         # Oxlint
+npm test
+npm run test:watch
+npm run build
+npm run lint
 ```
 
-Vitest and React Testing Library run in jsdom. All tests are colocated
-`<file>.test.tsx` files. They receive explicit mock callbacks or transports and do
-not depend on a live GitLab instance.
-Shared test setup supplies jest-dom matchers, explicit cleanup, mock restoration,
-and Primer's required `matchMedia` shim.
-Vitest processes CSS so Primer's hidden responsive action copies are excluded
-from accessible queries.
-
-API tests cover source handling, encoding, filters, ranking, pagination, HTTP and
-network errors, and cancellation. Component and App tests cover observable ARC
-information, submission, pagination, retries, callback changes, stale responses,
-StrictMode, and independence of the two sections.
+Vitest and React Testing Library run in jsdom with explicit mock callbacks or
+transports; tests do not depend on a live GitLab instance. Shared setup supplies
+jest-dom, cleanup, browser API shims required by Primer, and mock restoration.
+CSS is processed so hidden responsive action copies are excluded from accessible
+queries. Follow `AGENTS.md`: focus on realistic workflows and practical failures.

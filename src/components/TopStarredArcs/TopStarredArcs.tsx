@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { useCallback, useId } from 'react'
 import { Banner, Heading, Spinner, Stack, Text } from '@primer/react'
 import type { FetchArcs } from '../../types/arc.ts'
 import { useProjectPage } from '../../util/useProjectPage.ts'
@@ -7,7 +7,8 @@ import styles from './TopStarredArcs.module.css'
 
 export function TopStarredArcs({ fetchCall }: { fetchCall: FetchArcs }) {
   const headingId = useId()
-  const state = useProjectPage(fetchCall)
+  const load = useCallback((signal: AbortSignal) => fetchCall({ page: 1, perPage: 10, signal }), [fetchCall])
+  const state = useProjectPage(load)
 
   return (
     <section className={styles.section} aria-labelledby={headingId}>

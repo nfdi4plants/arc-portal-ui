@@ -6,7 +6,7 @@ import { useProjectPage } from '../../util/useProjectPage.ts'
 import { ArcList } from '../ArcList/ArcList.tsx'
 import styles from './ArcSearch.module.css'
 
-export function ArcSearch({ fetchCall }: { fetchCall: SearchArcs }) {
+export function ArcSearch({ fetchCall, signedIn = false }: { fetchCall: SearchArcs; signedIn?: boolean }) {
   const headingId = useId()
   const [input, setInput] = useState('')
   const [request, setRequest] = useState<{ fetchCall: SearchArcs; query: string; page: number } | null>(null)
@@ -29,7 +29,9 @@ export function ArcSearch({ fetchCall }: { fetchCall: SearchArcs }) {
   return (
     <section className={styles.section} aria-labelledby={headingId}>
       <Heading as="h2" variant="medium" id={headingId} className={styles.heading}>Search ARCs</Heading>
-      <Text as="p" size="medium" className={styles.subtitle}>Find public research contexts by name, path, or description.</Text>
+      <Text as="p" size="medium" className={styles.subtitle}>{signedIn
+        ? 'Find research contexts you can access by name, path, or description.'
+        : 'Find public research contexts by name, path, or description.'}</Text>
       <form onSubmit={submit} className={styles.form} role="search" aria-label="Search ARCs">
         <FormControl className={styles.field}>
           <FormControl.Label>Search term</FormControl.Label>
