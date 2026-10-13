@@ -38,7 +38,7 @@ function Portal() {
       pageState.type === "arc-dashboard" ? (
         <ArcDashboard url={pageState.data.url} name={pageState.data.name} onBack={() => setPageState({ type: "datahub-dashboard" })} />
       ) :
-      <DataHubDashboard 
+      <DataHubDashboard
         onArcClick={(url, name) => setPageState({ type: "arc-dashboard", data: { url, name } })}
         fetchTopStarred={getTopStarredProjects} fetchSearch={searchProjects} tokens={tokens}
         organisations={{ fetchPublicGroups, fetchMembershipGroups, fetchGroupProjects: getGroupProjects }} />
