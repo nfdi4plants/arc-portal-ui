@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { ACTIONS } from '../../contracts/input'
-import type { Action, Binding, Bindings, InputFrame } from '../../contracts/input'
+import type { Action, Bindings, InputFrame } from '../../contracts/input'
+import { bindingId } from '../../model/input'
 
 export interface InputLayer {
   // Call once per fixed step. Edges collect between calls, so a tap shorter than a step still
@@ -9,10 +10,6 @@ export interface InputLayer {
   setBindings(bindings: Bindings): void
   setEnabled(enabled: boolean): void
   destroy(): void
-}
-
-function inputId(binding: Binding): string {
-  return binding.device === 'key' ? `key:${binding.code}` : `mouse:${binding.button}`
 }
 
 // Reads keys and mouse buttons with DOM listeners on the game canvas. Phaser's keyboard plugin
@@ -40,7 +37,7 @@ export function createInputLayer(scene: Phaser.Scene, bindings: Bindings): Input
     actionsByInput = new Map()
     inputsByAction = new Map()
     for (const action of ACTIONS) {
-      const ids = b[action].map(inputId)
+      const ids = b[action].map(bindingId)
       inputsByAction.set(action, ids)
       for (const id of ids) actionsByInput.set(id, [...(actionsByInput.get(id) ?? []), action])
     }
@@ -80,13 +77,15 @@ export function createInputLayer(scene: Phaser.Scene, bindings: Bindings): Input
     if (actionsByInput.has(id)) event.preventDefault()
     release(id)
   }
-  const onPointerDown = (event: PointerEvent) => {
+  // Mouse events fire once per button. Pointer events fire pointerdown only for the first button of
+  // a chord and pointerup only for the last, so the second button would be lost.
+  const onMouseDown = (event: MouseEvent) => {
     // Phaser cancels mousedown, which stops the browser from focusing the canvas on click.
     canvas.focus()
     if (!enabled || event.button > 2) return
     press(`mouse:${event.button}`)
   }
-  const onPointerUp = (event: PointerEvent) => {
+  const onMouseUp = (event: MouseEvent) => {
     if (event.button > 2) return
     release(`mouse:${event.button}`)
   }
@@ -95,11 +94,11 @@ export function createInputLayer(scene: Phaser.Scene, bindings: Bindings): Input
   mapBindings(bindings)
   canvas.addEventListener('keydown', onKeyDown)
   canvas.addEventListener('keyup', onKeyUp)
-  canvas.addEventListener('pointerdown', onPointerDown)
-  canvas.addEventListener('pointerup', onPointerUp)
+  canvas.addEventListener('mousedown', onMouseDown)
+  canvas.addEventListener('mouseup', onMouseUp)
   canvas.addEventListener('contextmenu', onContextMenu)
   canvas.addEventListener('blur', releaseAll)
-  window.addEventListener('pointerup', onPointerUp)
+  window.addEventListener('mouseup', onMouseUp)
   window.addEventListener('blur', releaseAll)
 
   return {
@@ -135,11 +134,11 @@ export function createInputLayer(scene: Phaser.Scene, bindings: Bindings): Input
     destroy() {
       canvas.removeEventListener('keydown', onKeyDown)
       canvas.removeEventListener('keyup', onKeyUp)
-      canvas.removeEventListener('pointerdown', onPointerDown)
-      canvas.removeEventListener('pointerup', onPointerUp)
+      canvas.removeEventListener('mousedown', onMouseDown)
+      canvas.removeEventListener('mouseup', onMouseUp)
       canvas.removeEventListener('contextmenu', onContextMenu)
       canvas.removeEventListener('blur', releaseAll)
-      window.removeEventListener('pointerup', onPointerUp)
+      window.removeEventListener('mouseup', onMouseUp)
       window.removeEventListener('blur', releaseAll)
     },
   }

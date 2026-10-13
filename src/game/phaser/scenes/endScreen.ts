@@ -11,10 +11,15 @@ const CHOICES = [
 const BUTTON_W = 96
 const BUTTON_H = 22
 const GAP = 8
+// R is also the default key of ability 3, so the player is often still pressing it when the screen
+// opens. Keydowns in the first 400 ms after the screen opens are ignored.
+const KEY_DELAY_MS = 400
 
 // Retry, New path and Menu, by click or by key. Returns a function that places the row centred
-// on (x, y).
+// on (x, y). A key acts on a fresh keydown only. onCanvasKey drops auto-repeats, which is all that a
+// key held since before the screen opened produces.
 export function addEndButtons(scene: Phaser.Scene, ctx: RunContext): (x: number, y: number) => void {
+  const openedAt = performance.now()
   let chosen = false
   const pick = (choice: (typeof CHOICES)[number]['choice']) => {
     if (chosen) return
@@ -23,6 +28,7 @@ export function addEndButtons(scene: Phaser.Scene, ctx: RunContext): (x: number,
   }
   const buttons = CHOICES.map(({ choice, label }) => addButton(scene, label, BUTTON_W, BUTTON_H, () => pick(choice)))
   onCanvasKey(scene, (code) => {
+    if (performance.now() - openedAt < KEY_DELAY_MS) return
     const match = CHOICES.find((entry) => entry.code === code)
     if (match) pick(match.choice)
   })

@@ -3,7 +3,7 @@ import { PALETTE, SCENE } from '../../contracts/constants'
 import type { PowerUpCard, Rarity } from '../../contracts/progression'
 import type { View } from '../view'
 import type { RunContext } from './context'
-import { addText, onCanvasKey, overlayView } from './ui'
+import { addText, onCanvasKey, onClick, overlayView } from './ui'
 
 const MAX_CARDS = 4
 const RARITY_COLOR: Record<Rarity, number> = {
@@ -55,7 +55,7 @@ export class LevelUpScene extends Phaser.Scene {
     this.title = addText(this, '', 14, { bold: true }).setOrigin(0.5, 0)
     this.cards = Array.from({ length: MAX_CARDS }, (_, i) => {
       const box = this.add.rectangle(0, 0, 1, 1, PALETTE.cream).setOrigin(0, 0)
-      box.on('pointerup', () => this.choose(i))
+      onClick(this, box, () => this.choose(i))
       box.on('pointerover', () => box.setFillStyle(0xffffff))
       box.on('pointerout', () => box.setFillStyle(PALETTE.cream))
       return {

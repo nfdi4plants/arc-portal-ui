@@ -74,7 +74,7 @@ export const saveBindings: SaveBindings = (bindings) => {
   }
 }
 
-function bindingId(binding: Binding): string {
+export function bindingId(binding: Binding): string {
   return binding.device === 'key' ? `key:${binding.code}` : `mouse:${binding.button}`
 }
 
