@@ -1,0 +1,35 @@
+.dashlet {
+  width: 100%;
+  min-width: 0;
+  max-height: calc(var(--dashboard-window-height, 100dvh) / 3);
+  margin: 0 auto;
+}
+
+.dashlet > .dashboard-component {
+  display: flex;
+  flex-direction: column;
+  max-height: inherit;
+}
+
+.dashlet .dashboard-window-bar {
+  flex-shrink: 0;
+}
+
+.dashlet .dashboard-component-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+@media (max-height: 480px) {
+  .dashlet .dashboard-window-bar {
+    min-height: 28px;
+  }
+
+  .dashlet .dashboard-component-content {
+    padding: 8px;
+  }
+}

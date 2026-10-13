@@ -2,6 +2,7 @@ import '@primer/primitives/dist/css/functional/themes/light.css'
 import '@primer/css/dist/primer.css'
 import {WebViewer} from '@nfdi4plants/arc-web-view'
 import {Component, useCallback, useEffect, useRef, useState, type ReactNode} from 'react'
+import './arcViewer.css'
 
 const defaultArcUrl = `${import.meta.env.BASE_URL}sample-arcs/facultative-cam-in-talinum/ro-crate-metadata.json`
 
@@ -65,13 +66,20 @@ function ExpandedWebViewer({ provideJson }: { provideJson: () => Promise<string>
 }
 
 
-function ArcViewer() {
+export interface ArcViewerProps {
+  jsonString?: string
+  embedded?: boolean
+}
+
+function ArcViewer({ jsonString, embedded = false }: ArcViewerProps) {
   const [document, setDocument] = useState<{name: string; json: string} | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
-  const provideJson = useCallback(async () => document?.json ?? '', [document])
+  const arcJson = jsonString ?? document?.json
+  const provideJson = useCallback(async () => arcJson ?? '', [arcJson])
 
   useEffect(() => {
+    if (jsonString !== undefined) return
     const controller = new AbortController()
     async function loadDefaultArc() {
       try {
@@ -91,21 +99,21 @@ function ArcViewer() {
     }
     void loadDefaultArc()
     return () => controller.abort()
-  }, [])
+  }, [jsonString])
 
-  return (
-    <main className="arc-portal">
-      <header className="portal-header">
+  const contents = (
+    <>
+      {!embedded && <header className="portal-header">
         <div>
           <h1>ARC web viewer</h1>
           <p>Explore an Annotated Research Context and its metadata.</p>
           <a href={defaultArcUrl} download>Download source ARC JSON</a>
         </div>
-      </header>
-      {error && <p className="portal-error" role="alert">{error}</p>}
-      {document ? (
+      </header>}
+      {!jsonString && error && <p className="portal-error" role="alert">{error}</p>}
+      {arcJson ? (
         <section aria-label="ARC contents" className="arc-viewer">
-          <ViewerErrorBoundary key={document.json}>
+          <ViewerErrorBoundary key={arcJson}>
             <ExpandedWebViewer provideJson={provideJson} />
           </ViewerErrorBoundary>
         </section>
@@ -115,8 +123,12 @@ function ArcViewer() {
           <p>{loading ? 'Loading the ARC metadata and file view.' : 'Please refresh the page to try again.'}</p>
         </section>
       )}
-    </main>
+    </>
   )
+
+  return embedded
+    ? <div className="arc-portal arc-portal-embedded">{contents}</div>
+    : <main className="arc-portal">{contents}</main>
 }
 
 export default ArcViewer

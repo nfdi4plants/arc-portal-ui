@@ -1,15 +1,12 @@
 import { Heading, Label, Link, Text } from '@primer/react'
-import { ExpandableText } from '../Primitive Components'
 import type { ExternalLink } from '../types'
 import { formatBytes } from '../../../../util/formatBytes'
 import type { GitLabVisibility } from '../../../../types/gitlab'
 
 export function InvestigationHeader(props: {
-  identifier: string
   title: string
-  description?: string
+  label?: string
   dataHubLinks?: ExternalLink[]
-  githubLinks?: ExternalLink[]
   releaseLink?: ExternalLink
   archiveSizeBytes?: number
   visibility?: GitLabVisibility
@@ -21,7 +18,7 @@ export function InvestigationHeader(props: {
   return (
     <header className="investigation-header investigation-header-layout">
       <div className="investigation-header-main">
-        <Label variant="secondary">Investigation</Label>
+        <Label variant="secondary">{props.label ?? 'Investigation'}</Label>
         <Heading as="h1" className="investigation-title">
           {props.title}
         </Heading>
@@ -42,34 +39,11 @@ export function InvestigationHeader(props: {
         {props.releaseLink && (
           <nav className="investigation-header-links investigation-release" aria-label="ARC release">
             <Text as="span">Release</Text>
-            <div>
-              <Link href={props.releaseLink.url} target="_blank" rel="noreferrer">
-                {props.releaseLink.name}
-              </Link>
-              <Text as="small" className="investigation-release-size">
-                {props.archiveSizeBytes === undefined ? 'Archive size unavailable' : `Archive size: ${formatBytes(props.archiveSizeBytes)}`}
-              </Text>
-            </div>
+            <Link href={props.releaseLink.url} target="_blank" rel="noreferrer">
+              {props.releaseLink.name}
+            </Link>
           </nav>
         )}
-        {!!props.githubLinks?.length && (
-          <nav className="investigation-header-links" aria-label="GitHub links">
-            <Text as="span">GitHub</Text>
-            <ul>
-              {props.githubLinks.map((link) => (
-                <li key={link.url}>
-                  <Link href={link.url} target="_blank" rel="noreferrer">
-                    {link.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        )}
-        <Text as="p" className="investigation-identifier">
-          {props.identifier}
-        </Text>
-        {props.description && <ExpandableText className="investigation-description">{props.description}</ExpandableText>}
       </div>
       <aside className="investigation-header-meta" aria-label="ARC ownership and visibility">
         <span className="investigation-visibility" data-visibility={props.visibility ?? 'unknown'} role="img" aria-label={visibilityLabel} title={visibilityLabel}>
@@ -94,6 +68,11 @@ export function InvestigationHeader(props: {
             <Text as="span" className="investigation-meta-label">Owner</Text>
             {props.owner.url ? <Link href={props.owner.url} target="_blank" rel="noreferrer">{props.owner.name}</Link> : <Text as="span">{props.owner.name}</Text>}
           </div>
+        )}
+        {(props.releaseLink || props.archiveSizeBytes !== undefined) && (
+          <Text as="small" className="investigation-archive-size">
+            {props.archiveSizeBytes === undefined ? 'Archive size unavailable' : `Archive size: ${formatBytes(props.archiveSizeBytes)}`}
+          </Text>
         )}
       </aside>
     </header>

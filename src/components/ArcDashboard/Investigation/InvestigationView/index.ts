@@ -1,1 +1,0 @@
-export { InvestigationView } from './InvestigationView'
