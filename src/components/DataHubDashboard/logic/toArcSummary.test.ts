@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { groupNamesFrom, toArcSummary } from './toArcSummary.ts'
-import { dataHubs } from '../../../config/gitlab.ts'
-import { gitLabProjectFull } from '../../../test/helpers.tsx'
+import { gitLabProjectFull, plantdatahub } from '../../../test/helpers.tsx'
 
-const hub = dataHubs[0]
+const hub = plantdatahub
 const groups = new Map([['ceplas', 'CEPLAS']])
 
 const nested = {
@@ -14,7 +13,7 @@ const nested = {
 describe('toArcSummary', () => {
   it('maps a nested group project to its top-level working group', () => {
     const arc = toArcSummary(gitLabProjectFull({ ...nested, default_branch: 'main' }), hub, groups, true)
-    expect(arc.group).toEqual({ key: 'nfdi4plants/ceplas', label: 'CEPLAS', hubId: 'nfdi4plants', personal: false })
+    expect(arc.group).toEqual({ key: 'plantdatahub/ceplas', label: 'CEPLAS', hubId: 'plantdatahub', personal: false })
     expect(arc.key).toBe('git.nfdi4plants.org/ceplas/sub/x@main')
     expect(arc.projectId).toBe(5)
     expect(arc.title).toBe('X')
@@ -26,11 +25,11 @@ describe('toArcSummary', () => {
     expect(arc.group.label).toBe('ceplas')
   })
 
-  it('puts user namespaces into one Personal group', () => {
+  it('puts user namespaces into one Personal Sandbox group', () => {
     const arc = toArcSummary(gitLabProjectFull({
       namespace: { id: 9, name: 'Jane', path: 'jane', kind: 'user', full_path: 'jane' },
     }), hub, groups, true)
-    expect(arc.group).toEqual({ key: 'nfdi4plants/~personal', label: 'Personal', hubId: 'nfdi4plants', personal: true })
+    expect(arc.group).toEqual({ key: 'plantdatahub/~personal', label: 'Personal Sandbox', hubId: 'plantdatahub', personal: true })
   })
 
   it.each([['public', 'public'], ['internal', 'private'], ['private', 'private']] as const)(

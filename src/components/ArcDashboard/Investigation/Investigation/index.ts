@@ -1,0 +1,1 @@
+export { Investigation } from './Investigation'

@@ -1,12 +1,13 @@
 import { useId, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Banner, Button, FormControl, Heading, Spinner, Stack, Text, TextInput } from '@primer/react'
+import { Banner, Button, FormControl, Heading, Stack, Text, TextInput } from '@primer/react'
 import type { SearchArcs } from '../../types/arc.ts'
 import { useProjectPage } from '../../util/useProjectPage.ts'
 import { ArcList } from '../ArcList/ArcList.tsx'
+import { ArcListSkeleton } from '../ArcList/ArcListSkeleton.tsx'
 import styles from './ArcSearch.module.css'
 
-export function ArcSearch({ fetchCall, signedIn = false, onArcClick }: { fetchCall: SearchArcs; signedIn?: boolean; onArcClick: (url: string, name: string) => void }) {
+export function ArcSearch({ fetchCall, signedIn = false, onArcClick }: { fetchCall: SearchArcs; signedIn?: boolean; onArcClick?: (url: string, name: string) => void }) {
   const headingId = useId()
   const [input, setInput] = useState('')
   const [request, setRequest] = useState<{ fetchCall: SearchArcs; query: string; page: number } | null>(null)
@@ -41,11 +42,7 @@ export function ArcSearch({ fetchCall, signedIn = false, onArcClick }: { fetchCa
         <Button type="submit" variant="primary" disabled={!input.trim()} className={styles.submit}>Search</Button>
       </form>
       {state.status === 'idle' && <Text as="p" size="medium" className={styles.status}>Enter a term to discover ARCs.</Text>}
-      {state.status === 'loading' && (
-        <Stack role="status" direction="horizontal" gap="condensed" align="center" className={styles.status}>
-          <Spinner size="small" /><Text size="medium">Searching ARCs…</Text>
-        </Stack>
-      )}
+      {state.status === 'loading' && <ArcListSkeleton label="Searching ARCs…" />}
       {state.status === 'error' && (
         <Banner variant="critical" role="alert" className={styles.error}
           primaryAction={<Banner.PrimaryAction onClick={state.retry}>Retry search</Banner.PrimaryAction>}>

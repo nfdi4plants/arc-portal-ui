@@ -1,11 +1,12 @@
 import { useCallback, useId } from 'react'
-import { Banner, Heading, Spinner, Stack, Text } from '@primer/react'
+import { Banner, Heading, Text } from '@primer/react'
 import type { FetchArcs } from '../../types/arc.ts'
 import { useProjectPage } from '../../util/useProjectPage.ts'
 import { ArcList } from '../ArcList/ArcList.tsx'
+import { ArcListSkeleton } from '../ArcList/ArcListSkeleton.tsx'
 import styles from './TopStarredArcs.module.css'
 
-export function TopStarredArcs({ fetchCall, onArcClick }: { fetchCall: FetchArcs, onArcClick: (url: string, name: string) => void }) {
+export function TopStarredArcs({ fetchCall, onArcClick }: { fetchCall: FetchArcs; onArcClick?: (url: string, name: string) => void }) {
   const headingId = useId()
   const load = useCallback((signal: AbortSignal) => fetchCall({ page: 1, perPage: 10, signal }), [fetchCall])
   const state = useProjectPage(load)
@@ -14,11 +15,7 @@ export function TopStarredArcs({ fetchCall, onArcClick }: { fetchCall: FetchArcs
     <section className={styles.section} aria-labelledby={headingId}>
       <Heading as="h2" variant="medium" id={headingId} className={styles.heading}>Most-starred ARCs</Heading>
       <Text as="p" size="medium" className={styles.subtitle}>Explore the 10 most-starred public research contexts.</Text>
-      {state.status === 'loading' && (
-        <Stack role="status" direction="horizontal" gap="condensed" align="center" className={styles.status}>
-          <Spinner size="small" /><Text size="medium">Loading most-starred ARCs…</Text>
-        </Stack>
-      )}
+      {state.status === 'loading' && <ArcListSkeleton label="Loading most-starred ARCs…" />}
       {state.status === 'error' && (
         <Banner variant="critical" role="alert" className={styles.error}
           primaryAction={<Banner.PrimaryAction onClick={state.retry}>Retry most-starred ARCs</Banner.PrimaryAction>}>

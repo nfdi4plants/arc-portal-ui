@@ -5,8 +5,8 @@ import { fakeConnection, gitLabProjectFull } from '../../../test/helpers.tsx'
 import { Failure, Success } from '../../../types/result.ts'
 import type { DataHubConnection } from '../../../types/dashboard.ts'
 
-const hubA = { id: 'a', name: 'Alpha', source: 'https://a.example' }
-const hubB = { id: 'b', name: 'Beta', source: 'https://b.example' }
+const hubA = { id: 'a', name: 'Alpha', url: 'https://a.example' }
+const hubB = { id: 'b', name: 'Beta', url: 'https://b.example' }
 
 function connection(hub: typeof hubA, fetchProjects?: DataHubConnection['fetchProjects']) {
   return fakeConnection({

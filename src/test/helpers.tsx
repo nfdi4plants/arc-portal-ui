@@ -1,11 +1,12 @@
 import type { ReactElement } from 'react'
-import { render } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
+import type userEvent from '@testing-library/user-event'
 import { BaseStyles } from '@primer/react'
 import { ThemeProvider } from '@primer/react/next'
-import type { GitLabProject } from '../types/gitlab.ts'
+import { vi } from 'vitest'
+import type { GitLabInstance, GitLabProject } from '../types/gitlab.ts'
 import type { ArcPage } from '../types/arc.ts'
 import type { ArcSummary, DataHubConnection } from '../types/dashboard.ts'
-import { dataHubs } from '../config/gitlab.ts'
 import { Success } from '../types/result.ts'
 
 export function renderWithTheme(element: ReactElement, strictMode = false) {
@@ -13,6 +14,11 @@ export function renderWithTheme(element: ReactElement, strictMode = false) {
     reactStrictMode: strictMode,
     wrapper: ({ children }) => <ThemeProvider><BaseStyles>{children}</BaseStyles></ThemeProvider>,
   })
+}
+
+export async function openAccountMenu(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: 'Account menu' }))
+  return within(await screen.findByRole('dialog', { name: 'Signed-in accounts' }))
 }
 
 export function project(overrides: Partial<GitLabProject> = {}): GitLabProject {
@@ -49,14 +55,18 @@ export function arcResult(items: GitLabProject[] = [project()], overrides: Parti
   return Success(arcPage(items, overrides))
 }
 
+export const plantdatahub: GitLabInstance = {
+  id: 'plantdatahub', name: 'PLANTdataHUB (official)', url: 'https://git.nfdi4plants.org',
+}
+
 export function arcSummary(overrides: Partial<ArcSummary> = {}): ArcSummary {
   return {
     key: 'git.nfdi4plants.org/ceplas/arabidopsis@main',
     projectId: 1,
-    hubId: 'nfdi4plants',
+    hubId: 'plantdatahub',
     title: 'Arabidopsis study',
     description: 'A study of plant growth.',
-    group: { key: 'nfdi4plants/ceplas', label: 'CEPLAS', hubId: 'nfdi4plants', personal: false },
+    group: { key: 'plantdatahub/ceplas', label: 'CEPLAS', hubId: 'plantdatahub', personal: false },
     access: 'public',
     createdAt: '2026-03-01T10:00:00Z',
     lastActivityAt: '2026-10-10T10:00:00Z',
@@ -82,7 +92,7 @@ export function gitLabProjectFull(overrides: Partial<GitLabProject> = {}): GitLa
 /** Every callback resolves with an empty success unless overridden. */
 export function fakeConnection(overrides: Partial<DataHubConnection> = {}): DataHubConnection {
   return {
-    hub: dataHubs[0],
+    hub: plantdatahub,
     includesPrivate: false,
     fetchProjects: async () => Success([]),
     fetchGroups: async () => Success([]),
@@ -90,4 +100,18 @@ export function fakeConnection(overrides: Partial<DataHubConnection> = {}): Data
     fetchLatestCommit: async () => Success(null),
     ...overrides,
   }
+}
+
+type GitLabFetchHandler = (url: URL, init?: RequestInit) => Response | Promise<Response>
+
+/**
+ * A fetch stub that routes GitLab requests by host, so each configured DataHUB can
+ * answer (or fail) independently. `overrides` replace the handler for one host.
+ */
+export function stubGitLabFetch(handler: GitLabFetchHandler, overrides: Record<string, GitLabFetchHandler> = {}) {
+  return vi.fn<typeof fetch>(async (input, init) => {
+    const url = new URL(String(input))
+    const respond = overrides[url.host] ?? handler
+    return respond(url, init)
+  })
 }

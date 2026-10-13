@@ -1,0 +1,1 @@
+export { PublicationList } from './PublicationList'

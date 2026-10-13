@@ -2,13 +2,12 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import DataHubDashboard from './DataHubDashboard.tsx'
-import { dataHubs } from '../../config/gitlab.ts'
-import { fakeConnection, gitLabProjectFull, renderWithTheme } from '../../test/helpers.tsx'
+import { fakeConnection, gitLabProjectFull, plantdatahub, renderWithTheme } from '../../test/helpers.tsx'
 import { Failure, Success } from '../../types/result.ts'
 import type { DataHubConnection } from '../../types/dashboard.ts'
 
 const now = () => new Date('2026-10-13T12:00:00Z')
-const otherHub = { id: 'other', name: 'Other Hub', source: 'https://other.example' }
+const otherHub = { id: 'other', name: 'Other Hub', url: 'https://other.example' }
 
 function proj(id: number, name: string, lastActivity: string, extra: Parameters<typeof gitLabProjectFull>[0] = {}) {
   return gitLabProjectFull({
@@ -29,7 +28,7 @@ const otherProjects = [
 
 function connections(overrides: Partial<DataHubConnection>[] = []): DataHubConnection[] {
   return [
-    fakeConnection({ hub: dataHubs[0], fetchProjects: async () => Success(plantProjects), ...overrides[0] }),
+    fakeConnection({ hub: plantdatahub, fetchProjects: async () => Success(plantProjects), ...overrides[0] }),
     fakeConnection({ hub: otherHub, fetchProjects: async () => Success(otherProjects), ...overrides[1] }),
   ]
 }
@@ -70,7 +69,7 @@ describe('DataHubDashboard overview', () => {
 
   it('counts ARCs per DataHUB and working group', async () => {
     setup()
-    expect(await screen.findByRole('button', { name: 'DataPLANT: 3 ARCs' })).toBeVisible()
+    expect(await screen.findByRole('button', { name: 'PLANTdataHUB (official): 3 ARCs' })).toBeVisible()
     expect(screen.getByRole('button', { name: 'Other Hub: 2 ARCs' })).toBeVisible()
     expect(screen.getByRole('button', { name: 'ceplas: 3 ARCs' })).toBeVisible()
     expect(screen.getByRole('img', { name: 'New ARCs per month: 5 in the last 12 months' })).toBeInTheDocument()
@@ -100,10 +99,10 @@ describe('DataHubDashboard overview', () => {
     const failing = vi.fn<DataHubConnection['fetchProjects']>(async () => Failure('Network down'))
     const healthy = vi.fn<DataHubConnection['fetchProjects']>(async () => Success(otherProjects))
     setup({ connections: connections([{ fetchProjects: failing }, { fetchProjects: healthy }]) })
-    expect(await screen.findByText('Could not load ARCs from DataPLANT')).toBeVisible()
+    expect(await screen.findByText('Could not load ARCs from PLANTdataHUB (official)')).toBeVisible()
     expect(screen.getByText('Network down')).toBeVisible()
     expect(await screen.findByRole('button', { name: 'Open Delta ARC' })).toBeVisible()
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Retry DataPLANT' }))
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Retry PLANTdataHUB (official)' }))
     expect(failing).toHaveBeenCalledTimes(2)
     expect(healthy).toHaveBeenCalledTimes(1)
   })
@@ -123,10 +122,10 @@ describe('DataHubDashboard filters', () => {
   it('narrows to a DataHUB from its bar while the other bars keep their counts', async () => {
     setup()
     const user = userEvent.setup()
-    const bar = await screen.findByRole('button', { name: 'DataPLANT: 3 ARCs' })
+    const bar = await screen.findByRole('button', { name: 'PLANTdataHUB (official): 3 ARCs' })
     await user.click(bar)
     expect(bar).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: 'Remove filter DataHUB: DataPLANT' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Remove filter DataHUB: PLANTdataHUB (official)' })).toBeVisible()
     showing('Showing 3 of 5 ARCs')
     expect(screen.getByRole('button', { name: 'Other Hub: 2 ARCs' })).toBeVisible()
     expect(screen.queryByRole('button', { name: 'Open Delta ARC' })).not.toBeInTheDocument()
@@ -137,7 +136,7 @@ describe('DataHubDashboard filters', () => {
     setup({ connections: connections([{ fetchProjects: async () => Success([
       ...plantProjects, proj(6, 'Zeta ARC', '2026-08-01T12:00:00Z', { visibility: 'private' })]) }]), signedIn: true })
     const user = userEvent.setup()
-    await user.click(await screen.findByRole('button', { name: 'DataPLANT: 4 ARCs' }))
+    await user.click(await screen.findByRole('button', { name: 'PLANTdataHUB (official): 4 ARCs' }))
     await user.click(screen.getByRole('button', { name: /Shared publicly/ }))
     expect(screen.getByRole('button', { name: 'Remove filter Shared publicly' })).toBeVisible()
     showing('Showing 3 of 6 ARCs')
@@ -149,8 +148,8 @@ describe('DataHubDashboard filters', () => {
   it('removes a single filter from its chip', async () => {
     setup()
     const user = userEvent.setup()
-    await user.click(await screen.findByRole('button', { name: 'DataPLANT: 3 ARCs' }))
-    await user.click(screen.getByRole('button', { name: 'Remove filter DataHUB: DataPLANT' }))
+    await user.click(await screen.findByRole('button', { name: 'PLANTdataHUB (official): 3 ARCs' }))
+    await user.click(screen.getByRole('button', { name: 'Remove filter DataHUB: PLANTdataHUB (official)' }))
     showing('Showing 5 of 5 ARCs')
   })
 
@@ -183,7 +182,7 @@ describe('DataHubDashboard table paging', () => {
   it('returns to the first page when logging out changes the list', async () => {
     const many = Array.from({ length: 30 }, (_, index) => proj(100 + index, `Paged ${String(index).padStart(2, '0')}`,
       new Date(Date.UTC(2026, 9, 12, 12 - index)).toISOString()))
-    const connection = [fakeConnection({ hub: dataHubs[0], fetchProjects: async () => Success(many) })]
+    const connection = [fakeConnection({ hub: plantdatahub, fetchProjects: async () => Success(many) })]
     const element = (signedIn: boolean) => (
       <DataHubDashboard connections={connection} signedIn={signedIn} onArcClick={vi.fn()} now={now} />)
     const { rerender } = renderWithTheme(element(true))

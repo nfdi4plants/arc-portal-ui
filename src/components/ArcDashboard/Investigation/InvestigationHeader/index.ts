@@ -1,0 +1,1 @@
+export { InvestigationHeader } from './InvestigationHeader'

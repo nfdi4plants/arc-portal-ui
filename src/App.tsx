@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react'
 import { ThemeProvider } from '@primer/react/next'
 import DataHubDashboard from './components/DataHubDashboard/DataHubDashboard.tsx'
 import { listAllGroups, listAllProjects } from './api/gitlab/index.ts'
-import { dataHubs, isReferenceHub, referenceGitLab } from './config/gitlab.ts'
+import { availableDataHubs } from './config/gitlab.ts'
 import type { DataHubConnection } from './types/dashboard.ts'
 import { Success } from './types/result.ts'
 import { AuthenticationProvider } from './auth/AuthenticationProvider.tsx'
@@ -27,23 +27,25 @@ type PageState =
   };
 
 function Portal() {
-  const { session } = useAuthentication()
+  const { accounts } = useAuthentication()
   const [pageState, setPageState] = useState<PageState>({ type: "datahub-dashboard" })
-  const token = session?.token
-  // A new array identity (login/logout) makes the dashboard abort and reload every DataHUB.
-  const connections = useMemo<DataHubConnection[]>(() => dataHubs.map(hub => {
-    // Only the reference DataHUB shares the portal login.
-    const hubToken = isReferenceHub(hub) ? token : undefined
-    return {
-      hub,
-      includesPrivate: !!hubToken,
-      fetchProjects: signal => listAllProjects(hub.source, { token: hubToken, signal }),
-      fetchGroups: signal => listAllGroups(hub.source, { allAvailable: true, token: hubToken, signal }),
-      // Contributor details arrive with the people features.
-      fetchContributors: async () => Success([]),
-      fetchLatestCommit: async () => Success(null),
-    }
-  }), [token])
+  const tokenSignature = JSON.stringify(availableDataHubs.map(hub => accounts[hub.id]?.session?.token ?? null))
+  // Rebuilt only when a token changes; `accounts` also changes on `checking`/`error` updates.
+  const connections = useMemo<DataHubConnection[]>(() => {
+    const tokens: (string | null)[] = JSON.parse(tokenSignature)
+    return availableDataHubs.map((hub, index) => {
+      const token = tokens[index] ?? undefined
+      return {
+        hub,
+        includesPrivate: !!token,
+        fetchProjects: signal => listAllProjects(hub.url, { token, signal }),
+        fetchGroups: signal => listAllGroups(hub.url, { allAvailable: true, token, signal }),
+        // Contributor details arrive with the people features.
+        fetchContributors: async () => Success([]),
+        fetchLatestCommit: async () => Success(null),
+      }
+    })
+  }, [tokenSignature])
 
   return <>
     <Navbar />
@@ -51,7 +53,7 @@ function Portal() {
       pageState.type === "arc-dashboard" ? (
         <ArcDashboard url={pageState.data.url} name={pageState.data.name} onBack={() => setPageState({ type: "datahub-dashboard" })} />
       ) :
-      <DataHubDashboard connections={connections} signedIn={!!session}
+      <DataHubDashboard connections={connections} signedIn={connections.some(c => c.includesPrivate)}
         onArcClick={(url, name) => setPageState({ type: "arc-dashboard", data: { url, name } })} />
     }
   </>
@@ -59,6 +61,6 @@ function Portal() {
 
 export default function App() {
   return <ThemeProvider><BaseStyles>
-    <AuthenticationProvider source={referenceGitLab.source}><Portal /></AuthenticationProvider>
+    <AuthenticationProvider><Portal /></AuthenticationProvider>
   </BaseStyles></ThemeProvider>
 }

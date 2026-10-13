@@ -1,5 +1,5 @@
 import type { ArcKey } from '../arc/types.ts'
-import type { DataHub } from '../config/gitlab.ts'
+import type { GitLabInstance } from './gitlab.ts'
 import type { GitLabCommit, GitLabContributor, GitLabGroup, GitLabProject } from './gitlab.ts'
 import type { Result } from './result.ts'
 
@@ -41,7 +41,7 @@ export interface ArcDetails {
 export type DetailsMap = Map<string, ArcDetails | 'unavailable'>
 
 export interface HubState {
-  hub: DataHub
+  hub: GitLabInstance
   status: 'loading' | 'loaded' | 'failed'
   /** Keeps the last successful value during a reload. */
   arcs: ArcSummary[]
@@ -68,7 +68,7 @@ export type ExtraColumn = 'topics' | 'created' | 'stars' | 'description' | 'link
 
 /** One configured DataHUB with its data callbacks injected by `App`. */
 export interface DataHubConnection {
-  hub: DataHub
+  hub: GitLabInstance
   /** True only when the request carries the session token. */
   includesPrivate: boolean
   fetchProjects: (signal: AbortSignal) => Promise<Result<GitLabProject[]>>

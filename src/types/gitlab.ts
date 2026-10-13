@@ -1,3 +1,10 @@
+export interface GitLabInstance {
+  id: string
+  name: string
+  url: string
+  description?: string
+}
+
 /** Project fields used by the ARC portal; GitLab names stay intact. */
 export interface GitLabProject {
   id: number
@@ -62,6 +69,7 @@ export interface GitLabUser {
   id: number
   name: string
   username: string
+  avatar_url?: string | null
 }
 
 export interface GitLabGroup {

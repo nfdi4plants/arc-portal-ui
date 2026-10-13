@@ -2,6 +2,13 @@
 .content { max-width: 1120px; margin: 0 auto; padding: 16px 24px; display: flex; gap: 16px; align-items: center; justify-content: space-between; }
 .brand { font-weight: 600; color: var(--fgColor-default, #1f2328); }
 .account { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 12px; }
-.identity { display: flex; flex-direction: column; text-align: right; overflow-wrap: anywhere; }
+.avatarButton { width: 40px; height: 40px; padding: 4px; border-radius: 50%; }
+.overlay { padding: 16px; max-width: calc(100vw - 32px); }
+.profile { display: flex; align-items: center; gap: 12px; }
+.identity { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
 .username { color: var(--fgColor-muted, #59636e); }
+.source { margin-top: 4px; font-size: 12px; }
+.otherAccounts { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+.accountsLabel { margin: 0; color: var(--fgColor-muted, #59636e); }
+.actions { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--borderColor-muted, #d8dee4); }
 @media (max-width: 760px) { .content { padding: 12px 16px; } .brand { max-width: 140px; } .account { gap: 8px; } }

@@ -9,4 +9,5 @@ export interface OrganisationBrowserProps {
   fetchPublicGroups: FetchGroups
   fetchMembershipGroups: FetchGroups | null
   fetchGroupProjects: FetchGroupArcs
+  onArcClick?: (url: string, name: string) => void
 }
