@@ -1,7 +1,7 @@
 import '@primer/primitives/dist/css/functional/themes/light.css'
 import '@primer/css/dist/primer.css'
-import { BaseStyles, Button } from '@primer/react'
-import { lazy, Suspense, useCallback, useState } from 'react'
+import { BaseStyles } from '@primer/react'
+import { useCallback, useState } from 'react'
 import { ThemeProvider } from '@primer/react/next'
 import DataHubDashboard from './components/DataHubDashboard/DataHubDashboard.tsx'
 import { getGroupProjects, getTopStarredProjects, listAllGroups, searchProjects } from './api/gitlab/index.ts'
@@ -12,12 +12,10 @@ import { AuthenticationProvider } from './auth/AuthenticationProvider.tsx'
 import { useAuthentication } from './auth/context.ts'
 import { Navbar } from './components/Navbar/Navbar.tsx'
 import ArcDashboard from './components/ArcDashboard/ArcDashboard.tsx'
-const ArcViewer = lazy(() => import('./ArcViewer.tsx'))
 
 const fetchPublicGroups: FetchGroups = signal => listAllGroups(referenceGitLab.source, { visibility: 'public', signal })
 
 type PageState =
-  | { type: "arc-web-viewer" }
   | {
     type: "datahub-dashboard";
   }
@@ -44,13 +42,7 @@ function Portal() {
 
   return <>
     <Navbar />
-    <div style={{padding: '16px 32px'}}>
-      <Button onClick={() => setPageState({type: pageState.type === 'arc-web-viewer' ? 'datahub-dashboard' : 'arc-web-viewer'})}>
-        {pageState.type === 'arc-web-viewer' ? 'Back to DataHub' : 'ARC web viewer'}
-      </Button>
-    </div>
     {
-      pageState.type === "arc-web-viewer" ? <Suspense fallback={<p role="status">Loading ARC viewer…</p>}><ArcViewer /></Suspense> :
       pageState.type === "arc-dashboard" ? (
         <ArcDashboard url={pageState.data.url} name={pageState.data.name} onBack={() => setPageState({ type: "datahub-dashboard" })} />
       ) :

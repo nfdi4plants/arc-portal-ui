@@ -3,7 +3,7 @@ import '@primer/css/dist/primer.css'
 import {WebViewer} from '@nfdi4plants/arc-web-view'
 import {Component, useCallback, useEffect, useRef, useState, type ReactNode} from 'react'
 
-const defaultArcUrl = `${import.meta.env.BASE_URL}arc-ro-crate-metadata.json`
+const defaultArcUrl = `${import.meta.env.BASE_URL}sample-arcs/facultative-cam-in-talinum/ro-crate-metadata.json`
 
 function validateCrate(json: string) {
   const parsed: unknown = JSON.parse(json)
@@ -80,7 +80,7 @@ function ArcViewer() {
           throw new Error(`Could not load the bundled ARC (HTTP ${response.status}). Please refresh the page to try again.`)
         }
         const json = validateCrate(await response.text())
-        if (!controller.signal.aborted) setDocument({name: 'Project 42 / arc-ro-crate-metadata.json', json})
+        if (!controller.signal.aborted) setDocument({name: 'Facultative CAM in Talinum / ro-crate-metadata.json', json})
       } catch (cause) {
         if (!controller.signal.aborted) setError(cause instanceof TypeError
           ? 'The local ARC file could not be loaded. Please refresh the page to try again.'
