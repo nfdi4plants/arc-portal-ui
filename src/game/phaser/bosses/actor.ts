@@ -33,6 +33,8 @@ export interface ActorConfig {
   hp: number
   phases: readonly PhaseConfig[]
   killerFor(phase: number): KillerInfo
+  // False keeps the art unmirrored when the boss faces left (the final boss has its title written on it).
+  mirror?: boolean
   deps: BossDeps
   arena: Arena
 }
@@ -528,7 +530,7 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
     if (destroyed) return
     const now = scene.time.now
     const facing = body.facing
-    const mirrored = facing < 0
+    const mirrored = config.mirror !== false && facing < 0
     const y = floorY - body.lift
 
     let alpha = body.alpha

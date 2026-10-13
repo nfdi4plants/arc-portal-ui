@@ -14,8 +14,13 @@ export function deathText(killer: KillerInfo): { headline: string; detail: strin
       return { headline: `Slain by ${killer.label}`, detail: '' }
     case 'boss': {
       const n = killer.segment.annotations.length
+      const headline = `Defeated by ${killer.spec.label}`
+      // A fully annotated step already gives the longest warnings, so asking for more would read oddly.
+      if (killer.segment.quality >= 1) {
+        return { headline, detail: `${killer.segment.processName} has ${plural(n, 'annotation')}, so this boss warns before every big attack. Watch for the warnings and try again.` }
+      }
       const count = n > 0 && killer.segment.quality < 0.5 ? `only ${plural(n, 'annotation')}` : plural(n, 'annotation')
-      return { headline: `Defeated by ${killer.spec.label}`, detail: `${killer.segment.processName} has ${count}. ${ANNOTATE_HINT}` }
+      return { headline, detail: `${killer.segment.processName} has ${count}. ${ANNOTATE_HINT}` }
     }
     case 'finalBoss':
       return { headline: `The ARC ${killer.title} stood firm in phase ${killer.phase + 1}.`, detail: '' }

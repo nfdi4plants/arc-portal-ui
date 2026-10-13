@@ -96,6 +96,7 @@ export function spawnFinalBoss(scene: Phaser.Scene, spec: FinalBossSpec, plan: R
     hp: spec.hp,
     phases: finalPhases(spec, plan),
     killerFor: (phase) => ({ kind: 'finalBoss', title: spec.title, phase }),
+    mirror: false,
     deps,
     arena,
   })
