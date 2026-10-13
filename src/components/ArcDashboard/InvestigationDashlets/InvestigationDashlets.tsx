@@ -13,10 +13,14 @@ import './investigationDashlets.css'
 
 const ArcViewer = lazy(() => import('../ArcViewer/ArcViewer'))
 
-export function InvestigationDashlets({ metadata, arcJson, classNamePrefix }: {
+export type InvestigationDashletId = 'description' | 'contacts' | 'organizations' | 'publications' | 'assays' | 'studies' | 'webview'
+
+export function InvestigationDashlets({ metadata, arcJson, classNamePrefix, ids, interactive = false }: {
   metadata: InvestigationMetadata
   arcJson: string
   classNamePrefix: string
+  ids?: readonly InvestigationDashletId[]
+  interactive?: boolean
 }) {
   const dashlets = [
     {
@@ -63,12 +67,13 @@ export function InvestigationDashlets({ metadata, arcJson, classNamePrefix }: {
     },
   ]
 
-  return dashlets.map(({ id, title, description, symbol, content }) => (
+  return dashlets.filter(({ id }) => !ids || ids.some(selected => selected === id)).map(({ id, title, description, symbol, content }) => (
     <PopupDashlet
       key={id}
       title={title}
       description={description}
-      symbol={symbol}
+      symbol={interactive ? undefined : symbol}
+      expandOnClick={!interactive}
       label={title === 'Description' ? title : `${title} dashlet`}
       className={`investigation-dashlet ${classNamePrefix}-tile ${classNamePrefix}-${id}`}
     >

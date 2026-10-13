@@ -1,0 +1,136 @@
+.combined-dashboard {
+  container: combined-dashboard / inline-size;
+  display: flex;
+  flex-direction: column;
+  height: var(--dashboard-window-height);
+  min-height: 0;
+  gap: 16px;
+  color: var(--fgColor-default);
+}
+
+.combined-dashboard-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.combined-dashboard-layout {
+  display: grid;
+  flex: 1;
+  grid-template-rows: 50% minmax(0, 1fr);
+  min-height: 0;
+  gap: 16px;
+}
+
+.combined-dashboard-top {
+  display: grid;
+  grid-template-columns: calc(100% / 3) minmax(0, 1fr);
+  gap: 16px;
+  min-height: 0;
+}
+
+.combined-dashboard-details {
+  display: grid;
+  grid-template-rows: minmax(0, 1.5fr) repeat(2, minmax(0, 1fr));
+  min-width: 0;
+  min-height: 0;
+  gap: 6px;
+}
+
+.combined-dashboard-details > .arc-details {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.combined-dashboard-details .investigation-header-layout {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+}
+
+.combined-dashboard-details .investigation-title {
+  margin-bottom: 4px;
+  font-size: 1rem;
+}
+
+.combined-dashboard-details .investigation-header-links {
+  margin-top: 4px;
+  font-size: 0.75rem;
+}
+
+.combined-dashboard-details .investigation-header-meta {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  padding-top: 0;
+  font-size: 0.75rem;
+  text-align: left;
+}
+
+.combined-dashboard-details .investigation-owner {
+  display: flex;
+  gap: 4px;
+}
+
+.combined-dashboard-details .investigation-meta-label { margin-bottom: 0; }
+
+.combined-dashboard-row {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(34px, 1fr));
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+.combined-dashboard-row > .combined-dashboard-tile {
+  grid-row: 1;
+  position: relative;
+  min-height: 0;
+}
+
+.combined-dashboard-row > .combined-dashboard-tile:nth-child(1) { grid-column: 1 / span 4; }
+.combined-dashboard-row > .combined-dashboard-tile:nth-child(2) { grid-column: 4 / span 4; }
+.combined-dashboard-row > .combined-dashboard-tile:nth-child(3) { grid-column: 7 / span 4; }
+
+/* Keep titles, controls, and symbols inside each card's exposed part. */
+.combined-dashboard-row > .combined-dashboard-tile:not(:last-child) > .popup-dashlet-panel:not([data-expanded]):not([data-preview]) > :is(.popup-dashlet-bar, .popup-dashlet-symbol) {
+  width: 75%;
+}
+
+.combined-dashboard-row .popup-dashlet-panel:not([data-expanded]):not([data-preview]) > .popup-dashlet-bar {
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+}
+
+.combined-dashboard-row .popup-dashlet-panel:not([data-expanded]):not([data-preview]) .dashboard-window-title {
+  font-size: 0.75rem;
+}
+
+.combined-dashboard-row .popup-dashlet-panel:not([data-expanded]):not([data-preview]) .popup-dashlet-toggle {
+  min-width: 24px;
+  min-height: 24px;
+  padding: 2px;
+}
+
+.combined-dashboard-row .popup-dashlet-symbol svg { width: 24px; height: 24px; }
+
+.combined-dashboard-row .dashboard-window-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.combined-dashboard-webview,
+.combined-dashboard-graphview {
+  min-width: 0;
+  min-height: 0;
+}
+
+.combined-dashboard-graphview .dashboard-component-content {
+  padding: 0;
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}
+
