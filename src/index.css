@@ -1,111 +1,162 @@
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
-
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
-
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: #1f2328;
+  background: #ffffff;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
+body { margin: 0; font-size: 0.875rem; }
+#root { min-height: 100vh; }
+.arc-portal { padding: 32px; max-width: 1800px; margin: 0 auto; }
+.portal-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
+.portal-header h1 { font-size: 24px; margin: 0 0 8px; }
+.portal-header p, .empty-state p, .file-name { color: #59636e; }
+.portal-header p { margin: 0; }
+.empty-state { padding: 64px 24px; text-align: center; border: 1px solid #d1d9e0; border-radius: 12px; }
+.empty-state h2 { font-size: 20px; }
+.portal-error { padding: 16px; border: 1px solid #cf222e; border-radius: 6px; color: #a40e26; }
+/* Match the embedded Files panel in archigator3.0. */
+.arc-viewer {
+  --stack-gap: initial;
+  --stack-padding: initial;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--borderColor-default, #d1d9e0);
+  border-radius: 8px;
+  background: var(--bgColor-default, #fff);
 }
-
-#root {
-  width: 1126px;
+.arc-viewer { min-height: 210px; }
+.arc-viewer .position-sticky button[data-component="IconButton"][data-variant="danger"] {
+  display: none !important;
+}
+.arc-viewer [data-component="SplitPageLayout.Content"] > [data-width] {
   max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
+  padding: 0;
+  min-width: 0;
+}
+
+.arc-viewer [data-position="start"][data-is-hidden="false"] ~ [data-component="SplitPageLayout.Content"] > [data-width] {
+  padding-inline-start: 20px;
+}
+
+/* Keep the embedded viewer's toolbar and file list compact and full width. */
+.arc-viewer [data-component="SplitPageLayout"] {
+  width: 100%;
+  min-width: 0;
+}
+
+.arc-viewer [data-component="SplitPageLayout.Content"] > [data-width] > [data-component="Stack"] {
+  gap: 24px;
+}
+
+.arc-viewer .position-sticky {
+  position: static;
+  padding-block: 0;
+}
+
+.arc-viewer .position-sticky > [data-component="Stack"] {
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  min-height: 32px;
+}
+
+.arc-viewer .position-sticky .d-flex {
   display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
+  align-items: center;
 }
 
-body {
-  margin: 0;
+.arc-viewer .position-sticky [data-component="FormControl"] {
+  width: 165px;
 }
 
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
+.arc-viewer .position-sticky input {
+  min-width: 0;
 }
 
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
-  margin: 0;
+.arc-viewer .position-sticky nav {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
 }
 
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
+.arc-viewer [class*="prc-DataTable-TableContainer-"] {
+  width: 100%;
+  border: 1px solid var(--borderColor-default, #d1d9e0);
+  border-radius: 6px;
+  overflow: hidden;
 }
 
-code {
-  font-size: 15px;
-  line-height: 135%;
+.arc-viewer [class*="prc-DataTable-Table-"] {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.arc-viewer [class*="prc-DataTable-Table-"] thead th {
+  height: 28px;
   padding: 4px 8px;
-  background: var(--code-bg);
+  background: var(--bgColor-muted, #f6f8fa);
+  color: var(--fgColor-muted, #59636e);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.arc-viewer [class*="prc-DataTable-Table-"] tbody :is(td, th) {
+  height: 38px;
+  padding: 8px;
+  border-top: 1px solid var(--borderColor-default, #d1d9e0);
+  background: var(--bgColor-default, #fff);
+}
+
+.arc-viewer [class*="prc-DataTable-Table-"] tr > :first-child {
+  width: 50px;
+  text-align: center;
+}
+
+.arc-viewer [class*="prc-DataTable-Table-"] tr > :nth-child(2),
+.arc-viewer [class*="prc-DataTable-Table-"] tr > :nth-child(3):nth-last-child(3) {
+  text-align: left;
+}
+
+.arc-viewer [class*="prc-DataTable-Table-"] tbody th a {
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.arc-viewer [class*="prc-DataTable-Table-"] tbody th a:hover {
+  text-decoration: underline;
+}
+
+.arc-viewer {
+  --underlineNav-borderColor-active: var(--button-primary-bgColor-rest, #1f883d);
+}
+
+/* Hide the embedded search input's keyboard shortcut badge. */
+.arc-viewer span:has(> input[role="combobox"] kbd) {
+  display: none;
+}
+
+/* Override alignment supplied by the embedded viewer's table columns. */
+.arc-viewer table th,
+.arc-viewer table td {
+  text-align: left !important;
+}
+
+.arc-viewer table th > *,
+.arc-viewer table td > * {
+  text-align: left;
+  justify-content: flex-start;
+}
+
+.arc-viewer [role="tabpanel"] {
+  padding-top: var(--base-size-16, 16px);
+}
+
+@media (max-width: 600px) {
+  .arc-portal { padding: 16px; }
+  .portal-header { align-items: flex-start; flex-direction: column; }
 }
