@@ -6,7 +6,7 @@ import type { ProvenanceIndex } from '../../../arc/provenance/types'
 import { Dashlet, DashboardWindow } from '../../DashboardWindow'
 import { ArcDetails, type ArcDetailsProps } from '../ArcDetails'
 import { InvestigationDetails } from '../Investigation/InvestigationDetails'
-import { ProvenanceExplorer } from '../Provenance/ProvenanceExplorer'
+import { GraphviewDashlet } from '../Provenance/GraphviewDashlet'
 import { selectInvestigationMetadata } from '../Investigation/selectInvestigationMetadata'
 import type { InvestigationMetadata } from '../Investigation/types'
 import '../Investigation/investigation.css'
@@ -36,13 +36,7 @@ export function DashboardContent({ metadata, provenance, actions, ...props }: Da
           <ArcViewer jsonString={props.arcJson} embedded />
         </Suspense>
       </Dashlet>
-      {provenance && (
-        <Dashlet label="Provenance">
-          <div className="provenance-dashlet">
-            <ProvenanceExplorer index={provenance} />
-          </div>
-        </Dashlet>
-      )}
+      {provenance && <GraphviewDashlet index={provenance} />}
     </main>
   )
 }

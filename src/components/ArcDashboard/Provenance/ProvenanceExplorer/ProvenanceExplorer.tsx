@@ -236,7 +236,7 @@ const focusElement = (element: HTMLElement | null) => element?.focus()
 
 // The index comes ready-built from the parent. The explorer runs the queries itself, one per level.
 // The parent box must have a height. The card fills it and the graph scrolls inside the card.
-export function ProvenanceExplorer({ index }: { index: ProvenanceIndex }) {
+export function ProvenanceExplorer({ index, embedded = false }: { index: ProvenanceIndex; embedded?: boolean }) {
   const [nav, setNav] = useState<Navigation>(START)
   // After the first navigation, whatever replaces the view takes focus, because the clicked node
   // or crumb is gone.
@@ -361,7 +361,7 @@ export function ProvenanceExplorer({ index }: { index: ProvenanceIndex }) {
       : null
 
   return (
-    <section className={styles.root} aria-label="Provenance explorer">
+    <section className={styles.root} data-embedded={embedded || undefined} aria-label="Provenance explorer">
       <header className={styles.header}>
         <Breadcrumbs
           crumbs={crumbs}
