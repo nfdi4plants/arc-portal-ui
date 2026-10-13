@@ -1,6 +1,6 @@
 import { PortalContext, registerPortalRoot } from '@primer/react'
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { PopupDashletExpandedContext } from './PopupDashletContext'
+import { PopupDashletModeContext, type PopupDashletMode } from './PopupDashletContext'
 import surfaces from '../DashboardWindow/dashboardSurface.module.css'
 import '../DashboardWindow/dashboardWindow.css'
 import '../DashboardWindow/dashlet.css'
@@ -13,19 +13,25 @@ export interface PopupDashletProps {
   className?: string
   showHeader?: boolean
   expandOnClick?: boolean
+  /** Replace compact content with a symbol; preserve the content's state while hidden. */
+  symbol?: ReactNode
   children: ReactNode
 }
 
-export function PopupDashlet({ title, description, label, className, showHeader = true, expandOnClick = true, children }: PopupDashletProps) {
-  const [expanded, setExpanded] = useState(false)
+export function PopupDashlet({ title, description, label, className, showHeader = true, expandOnClick = true, symbol, children }: PopupDashletProps) {
+  const [mode, setMode] = useState<PopupDashletMode>('compact')
+  const expanded = mode === 'expanded'
+  const focused = mode !== 'compact'
   const [collapsing, setCollapsing] = useState(false)
   const [bounds, setBounds] = useState<CSSProperties>()
   const tile = useRef<HTMLDivElement>(null)
   const panel = useRef<HTMLDialogElement>(null)
   const toggle = useRef<HTMLButtonElement>(null)
   const closing = useRef(false)
-  const wasExpanded = useRef(false)
-  const headerVisible = showHeader || expanded
+  const previousMode = useRef<PopupDashletMode>('compact')
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const previewOrigin = useRef({ x: 0, y: 0 })
+  const headerVisible = showHeader || focused
   const Controls = headerVisible ? 'header' : 'div'
   const portalName = useId()
   const portalContext = useMemo(() => ({ portalContainerName: portalName }), [portalName])
@@ -33,17 +39,29 @@ export function PopupDashlet({ title, description, label, className, showHeader 
     if (root) registerPortalRoot(root, portalName)
   }, [portalName])
 
-  const fitDashboard = useCallback(() => {
+  const dashboardBounds = useCallback(() => {
     const dashboard = tile.current?.closest('.dashboard-window')
     const rect = dashboard?.getBoundingClientRect()
     const top = Math.max(12, (rect?.top ?? 0) + 12)
     const left = Math.max(12, (rect?.left ?? 0) + 12)
-    setBounds({
+    return {
       top, left,
       width: Math.max(0, Math.min(window.innerWidth - 12, (rect?.right ?? window.innerWidth) - 12) - left),
       height: Math.max(0, Math.min(window.innerHeight - 12, (rect?.bottom ?? window.innerHeight) - 12) - top),
-    })
+    }
   }, [])
+
+  const fitDashboard = useCallback(() => {
+    const full = dashboardBounds()
+    if (mode === 'preview') {
+      const width = full.width / 3
+      const height = full.height / 3
+      setBounds({ width, height,
+        left: Math.max(8, Math.min(window.innerWidth - width - 8, previewOrigin.current.x - width / 2)),
+        top: Math.max(8, Math.min(window.innerHeight - height - 8, previewOrigin.current.y - height / 2)),
+      })
+    } else setBounds(full)
+  }, [dashboardBounds, mode])
 
   const animatePopup = useCallback((shrinking: boolean) => {
     const dialog = panel.current
@@ -62,18 +80,20 @@ export function PopupDashlet({ title, description, label, className, showHeader 
   }, [])
 
   const expand = () => {
-    fitDashboard()
-    setExpanded(true)
+    clearTimeout(hoverTimer.current)
+    setBounds(dashboardBounds())
+    setMode('expanded')
   }
 
   const shrink = () => {
+    if (!expanded) { setMode('compact'); return }
     if (closing.current) return
     closing.current = true
     setCollapsing(true)
     const finish = () => {
       closing.current = false
       setCollapsing(false)
-      setExpanded(false)
+      setMode('compact')
     }
     const animation = animatePopup(true)
     if (animation) void animation.finished.then(finish, finish)
@@ -83,45 +103,80 @@ export function PopupDashlet({ title, description, label, className, showHeader 
   useLayoutEffect(() => {
     const dialog = panel.current
     if (!dialog) return
+    if (previousMode.current === 'preview') dialog.hidePopover()
     if (expanded) {
       // The same dialog and content move into the browser's modal layer.
       dialog.close()
       dialog.showModal()
       animatePopup(false)
-      wasExpanded.current = true
-    } else if (wasExpanded.current) {
+    } else if (mode === 'preview') {
+      fitDashboard()
+      const activeElement = document.activeElement
+      dialog.showPopover()
+      // Dialog popovers focus their first control; a mouse preview must not steal focus.
+      if (activeElement instanceof HTMLElement && activeElement !== document.body) activeElement.focus({ preventScroll: true })
+      else if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+    } else if (previousMode.current === 'expanded') {
       dialog.close()
       dialog.show()
       toggle.current?.focus({ preventScroll: true })
     }
-  }, [expanded, animatePopup])
+    previousMode.current = mode
+  }, [mode, expanded, animatePopup, fitDashboard])
 
   useEffect(() => {
-    if (!expanded) return
+    if (!focused) return
     window.addEventListener('resize', fitDashboard)
     return () => window.removeEventListener('resize', fitDashboard)
-  }, [expanded, fitDashboard])
+  }, [focused, fitDashboard])
+
+  useEffect(() => () => clearTimeout(hoverTimer.current), [])
+
+  useEffect(() => {
+    if (mode !== 'preview') return
+    const dismissOutside = (event: PointerEvent) => {
+      const dialog = panel.current
+      if (!dialog || (event.target instanceof Node && dialog.contains(event.target))) return
+      const rect = dialog.getBoundingClientRect()
+      if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) setMode('compact')
+    }
+    const dismiss = () => setMode('compact')
+    document.addEventListener('pointermove', dismissOutside)
+    document.addEventListener('pointerleave', dismiss)
+    return () => {
+      document.removeEventListener('pointermove', dismissOutside)
+      document.removeEventListener('pointerleave', dismiss)
+    }
+  }, [mode])
 
   return (
-    <div ref={tile} className={`dashlet popup-dashlet${className ? ` ${className}` : ''}`}>
+    <div ref={tile} className={`dashlet popup-dashlet${className ? ` ${className}` : ''}`}
+      onPointerEnter={(event) => {
+        if (mode !== 'compact' || !expandOnClick || event.pointerType !== 'mouse') return
+        previewOrigin.current = { x: event.clientX, y: event.clientY }
+        hoverTimer.current = setTimeout(() => setMode('preview'), 1500)
+      }}
+      onPointerLeave={() => clearTimeout(hoverTimer.current)}
+    >
       <dialog
         ref={panel}
         open
-        role={expanded ? 'dialog' : 'region'}
-        aria-label={expanded ? title : label ?? title}
+        popover="manual"
+        role={focused ? 'dialog' : 'region'}
+        aria-label={focused ? title : label ?? title}
+        aria-description={description}
         aria-modal={expanded || undefined}
         data-expanded={expanded || undefined}
+        data-preview={mode === 'preview' || undefined}
         data-expand-on-click={expandOnClick || undefined}
         className={`popup-dashlet-panel dashboard-component ${surfaces.card}`}
-        style={expanded ? bounds : undefined}
-        title={expanded ? undefined : description}
+        style={focused ? bounds : undefined}
         onCancel={(event) => { event.preventDefault(); shrink() }}
         onClick={(event) => {
           if (!expanded) {
             if (!expandOnClick) return
-            // Embedded viewers may activate their own controls during initialization.
-            // A user's click on the inert preview targets the panel instead.
-            if (event.target instanceof Element && event.target.closest('a, button, input, select, textarea')) return
+            // Viewer controls and portalled sidebars handle their own interactions.
+            if (event.target instanceof Element && event.target.closest('a, button, input, select, textarea, [role="button"], [role="treeitem"], .popup-dashlet-overlays')) return
             expand()
           }
           else if (event.target === event.currentTarget || (
@@ -134,25 +189,30 @@ export function PopupDashlet({ title, description, label, className, showHeader 
           }
         }}
       >
-        <div ref={registerOverlays} className="popup-dashlet-overlays" inert={(!expanded && expandOnClick) || collapsing} />
+        <div ref={registerOverlays} className="popup-dashlet-overlays" inert={(!focused && expandOnClick) || collapsing} />
         <Controls className={headerVisible ? 'dashboard-window-bar popup-dashlet-bar' : 'popup-dashlet-floating-controls'}>
-          {showHeader && !expanded && <h2 className="dashboard-window-title">{title}</h2>}
-          <button
-            ref={toggle}
-            type="button"
-            className="popup-dashlet-toggle"
-            aria-label={`${expanded ? 'Shrink' : 'Expand'} ${title}`}
-            aria-expanded={expanded}
-            onClick={(event) => { event.stopPropagation(); if (expanded) shrink(); else expand() }}
-          >
-            {expanded ? 'Smaller' : <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M10 2h4v4M14 2l-5 5M6 14H2v-4M2 14l5-5" /></svg>}
-          </button>
+          {headerVisible && <h2 className="dashboard-window-title">{title}</h2>}
+          <div className="popup-dashlet-actions">
+            <button
+              ref={toggle}
+              type="button"
+              className="popup-dashlet-toggle"
+              aria-label={`${expanded ? 'Shrink' : 'Expand'} ${title}`}
+              aria-expanded={expanded}
+              onClick={(event) => { event.stopPropagation(); if (expanded) shrink(); else expand() }}
+            >
+              <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d={expanded ? 'M14 6h-4V2M10 6l4-4M2 10h4v4M6 10l-4 4' : 'M10 2h4v4M14 2l-5 5M6 14H2v-4M2 14l5-5'} />
+              </svg>
+            </button>
+          </div>
         </Controls>
-        <PopupDashletExpandedContext.Provider value={expanded && !collapsing}>
+        <PopupDashletModeContext.Provider value={collapsing ? 'compact' : mode}>
           <PortalContext.Provider value={portalContext}>
-            <div className="dashboard-component-content" inert={!expanded && expandOnClick}>{children}</div>
+            {!focused && symbol && <div className="popup-dashlet-symbol" role="img" aria-label={`${title} symbol`}>{symbol}</div>}
+            <div className="dashboard-component-content" hidden={!focused && !!symbol} inert={!focused && expandOnClick}>{children}</div>
           </PortalContext.Provider>
-        </PopupDashletExpandedContext.Provider>
+        </PopupDashletModeContext.Provider>
       </dialog>
     </div>
   )

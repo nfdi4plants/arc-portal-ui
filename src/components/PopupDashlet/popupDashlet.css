@@ -32,15 +32,18 @@
   z-index: 2;
 }
 
-.popup-dashlet > .popup-dashlet-panel[data-expanded] {
+.popup-dashlet > .popup-dashlet-panel[data-expanded],
+.popup-dashlet > .popup-dashlet-panel[data-preview] {
   position: fixed;
   --dashlet-content-padding: 20px;
   box-shadow: var(--shadow-floating-large);
 }
 
 .popup-dashlet-panel::backdrop {
-  background: rgb(0 0 0 / 35%);
+  background: transparent;
 }
+
+.popup-dashlet-panel[data-expanded]::backdrop { background: rgb(0 0 0 / 35%); }
 
 .popup-dashlet-overlays {
   position: relative;
@@ -64,9 +67,24 @@
   margin: 0;
 }
 
-.popup-dashlet-panel[data-expanded] > .popup-dashlet-bar {
-  justify-content: flex-end;
+.popup-dashlet-actions { display: flex; gap: 4px; }
+
+.popup-dashlet-panel[data-preview] > .popup-dashlet-bar {
+  flex-wrap: wrap;
+  padding: 6px 8px;
 }
+
+.popup-dashlet-panel[data-preview] .dashboard-window-title { white-space: normal; }
+
+.popup-dashlet-symbol {
+  display: grid;
+  flex: 1;
+  min-height: 0;
+  place-items: center;
+  color: var(--fgColor-muted);
+}
+
+.popup-dashlet-panel > .dashboard-component-content[hidden] { display: none; }
 
 .popup-dashlet-toggle {
   display: inline-flex;

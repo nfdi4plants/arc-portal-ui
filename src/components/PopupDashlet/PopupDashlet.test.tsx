@@ -1,8 +1,9 @@
-import { screen, within } from '@testing-library/react'
+import { fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Dialog } from '@primer/react'
 import { useState } from 'react'
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import '../../test/nativeDialog'
 import { renderWithTheme } from '../../test/helpers'
 import ArcViewer from '../ArcDashboard/ArcViewer/ArcViewer'
 import { PopupDashlet } from './PopupDashlet'
@@ -24,38 +25,20 @@ vi.mock('@nfdi4plants/arc-web-view', () => ({ WebViewer: () => {
   )
 } }))
 
-// jsdom has no native dialog methods. Browser checks cover its modal layer and backdrop.
-const methods = ['showModal', 'show', 'close'] as const
-const originalMethods = methods.map(method => Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, method))
-beforeAll(() => {
-  Object.defineProperties(HTMLDialogElement.prototype, {
-    showModal: { configurable: true, value() { this.open = true; this.querySelector('button')?.focus() } },
-    show: { configurable: true, value() { this.open = true } },
-    close: { configurable: true, value() { this.open = false } },
-  })
-})
-afterAll(() => {
-  methods.forEach((method, index) => {
-    const original = originalMethods[index]
-    if (original) Object.defineProperty(HTMLDialogElement.prototype, method, original)
-    else delete (HTMLDialogElement.prototype as unknown as Record<string, unknown>)[method]
-  })
-})
-
 describe('PopupDashlet', () => {
   it('expands a clicked preview and preserves content when shrunk and reopened', async () => {
     const user = userEvent.setup()
     renderWithTheme(
-      <PopupDashlet title="Webview" description="Browse ARC files." label="Webview dashlet">
+      <PopupDashlet title="Webview" description="Browse ARC files." label="Webview dashlet" symbol={<span>W</span>}>
         <p>ARC files preview</p>
         <label>Filter files<input /></label>
       </PopupDashlet>,
     )
 
-    await user.click(screen.getByText('ARC files preview'))
+    await user.click(screen.getByRole('button', { name: 'Expand Webview' }))
     const popup = screen.getByRole('dialog', { name: 'Webview' })
     expect(popup).toHaveAttribute('aria-modal', 'true')
-    expect(within(popup).queryByRole('heading', { name: 'Webview' })).not.toBeInTheDocument()
+    expect(within(popup).getByRole('heading', { name: 'Webview' })).toBeVisible()
     await user.type(within(popup).getByRole('textbox', { name: 'Filter files' }), 'assays')
     await user.click(within(popup).getByRole('button', { name: 'Shrink Webview' }))
 
@@ -98,11 +81,40 @@ describe('PopupDashlet', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Expand Graphview' }))
     const popup = screen.getByRole('dialog', { name: 'Graphview' })
+    expect(within(popup).getByRole('heading', { name: 'Graphview' })).toBeVisible()
     expect(within(popup).getByText('Selected study')).toBeVisible()
     await user.click(within(popup).getByRole('button', { name: 'Shrink Graphview' }))
     expect(screen.getByText('Selected study')).toBeVisible()
     expect(screen.queryByRole('heading', { name: 'Graphview' })).not.toBeInTheDocument()
   })
+
+  it('shows a symbol compactly, dismisses the hover preview on leaving, and expands it with its only control', async () => {
+    const user = userEvent.setup()
+    renderWithTheme(<PopupDashlet title="Studies" description="ARC studies." symbol={<span>S</span>}><p>Study list</p></PopupDashlet>)
+    expect(screen.getByRole('img', { name: 'Studies symbol' })).toBeVisible()
+    expect(screen.getByText('Study list')).not.toBeVisible()
+    const expand = screen.getByRole('button', { name: 'Expand Studies' })
+    expand.focus()
+    await user.hover(screen.getByRole('region', { name: 'Studies' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    const preview = await screen.findByRole('dialog', { name: 'Studies' }, { timeout: 4000 })
+    expect(preview).toHaveAttribute('data-preview')
+    expect(preview).not.toHaveAttribute('aria-modal')
+    expect(within(preview).queryByRole('button', { name: 'Shrink Studies' })).not.toBeInTheDocument()
+    expect(within(preview).getByText('Study list')).toBeVisible()
+    expect(expand).toHaveFocus()
+    fireEvent(document, new MouseEvent('pointermove', { bubbles: true, clientX: 1000, clientY: 1000 }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Studies symbol' })).toBeVisible()
+    await user.unhover(screen.getByRole('region', { name: 'Studies' }))
+    await user.hover(screen.getByRole('region', { name: 'Studies' }))
+    await screen.findByRole('dialog', { name: 'Studies' }, { timeout: 4000 })
+    await user.click(screen.getByRole('button', { name: 'Expand Studies' }))
+    expect(screen.getByRole('dialog', { name: 'Studies' })).toHaveAttribute('aria-modal', 'true')
+    expect(screen.getByText('Study list')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Shrink Studies' }))
+    expect(screen.getByRole('img', { name: 'Studies symbol' })).toBeVisible()
+  }, 10000)
 
   it.each([{ desktop: true, name: 'desktop pane' }, { desktop: false, name: 'mobile dialog' }])(
     'keeps the Webview $name in the popup and closes it when the popup shrinks', async ({ desktop }) => {

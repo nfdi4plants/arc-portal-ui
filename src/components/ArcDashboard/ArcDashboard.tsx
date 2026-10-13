@@ -29,7 +29,7 @@ function LoadedArc({ arc, name, url, onBack, dataHubData }: { arc: ARC } & Pick<
     const Content = layout === 'radial' ? NewDashboardContent : layout === 'stacked' ? StackedDashboardContent : DashboardContent
 
     return (
-        <DashboardWindow label="ARC-Dashboard" fillHeight={layout !== 'classic'}>
+        <DashboardWindow label="ARC-Dashboard" fillHeight={layout === 'radial'}>
             <Content
                 metadata={metadata}
                 provenance={provenance}

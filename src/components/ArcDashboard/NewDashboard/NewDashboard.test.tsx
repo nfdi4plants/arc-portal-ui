@@ -1,4 +1,6 @@
 import { screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import '../../../test/nativeDialog'
 import { describe, expect, it, vi } from 'vitest'
 import { crateJson, sampleCrateSource } from '../../../../tests/helpers/sampleCrate'
 import { ArcProvider } from '../../../arc/ArcProvider'
@@ -10,6 +12,7 @@ vi.mock('@nfdi4plants/arc-web-view', () => ({ WebViewer: () => <p>ARC contents p
 
 describe('NewDashboard', () => {
   it('shows the complete header in the hub and every investigation section without tab switching', async () => {
+    const user = userEvent.setup()
     const store = createArcStore(sampleCrateSource())
     await store.load()
     renderWithTheme(
@@ -38,19 +41,27 @@ describe('NewDashboard', () => {
     expect(within(hub).getByRole('img', { name: 'Public ARC' })).toBeVisible()
     expect(within(hub).getByText('Archive size: 2 KiB')).toBeVisible()
 
-    expect(within(screen.getByRole('region', { name: 'Description' })).getByText(/^Drought tolerance/)).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Expand Description' }))
+    expect(within(screen.getByRole('dialog', { name: 'Description' })).getByText(/^Drought tolerance/)).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Shrink Description' }))
     for (const [name, count] of [['Contacts', 12], ['Organizations', 4], ['Publications', 2], ['Assays', 3], ['Studies', 2]] as const) {
       const dashlet = screen.getByRole('region', { name: `${name} dashlet` })
       expect(dashlet).toBeVisible()
-      expect(within(dashlet).getAllByRole('listitem')).toHaveLength(count)
+      expect(within(dashlet).getByRole('img', { name: `${name} symbol` })).toBeVisible()
+      await user.click(within(dashlet).getByRole('button', { name: `Expand ${name}` }))
+      expect(within(screen.getByRole('dialog', { name })).getAllByRole('listitem')).toHaveLength(count)
+      if (name === 'Publications') expect(screen.getByRole('link', { name: /^Reversible Burst/ })).toHaveAttribute('href', 'https://doi.org/10.1104/pp.15.01076')
+      await user.click(screen.getByRole('button', { name: `Shrink ${name}` }))
     }
-    expect(screen.getByRole('link', { name: /^Reversible Burst/ })).toHaveAttribute('href', 'https://doi.org/10.1104/pp.15.01076')
     expect(within(dashboard).queryByRole('tab')).not.toBeInTheDocument()
     expect(within(dashboard).queryByRole('region', { name: 'ARC overview' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Expand Webview' }))
     expect(await screen.findByText('ARC contents preview', {}, { timeout: 5000 })).toBeVisible()
-    expect(within(screen.getByRole('region', { name: 'Webview dashlet' })).getByRole('region', { name: 'ARC contents' })).toBeVisible()
-    expect(within(screen.getByRole('region', { name: 'Graphview dashlet' })).getByRole('region', { name: 'Provenance explorer' })).toBeVisible()
-  })
+    expect(within(screen.getByRole('dialog', { name: 'Webview' })).getByRole('region', { name: 'ARC contents' })).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Shrink Webview' }))
+    await user.click(screen.getByRole('button', { name: 'Expand Graphview' }))
+    expect(within(screen.getByRole('dialog', { name: 'Graphview' })).getByRole('region', { name: 'Provenance explorer' })).toBeVisible()
+  }, 15000)
 
   it('shows loading while an ARC is being opened', () => {
     const store = createArcStore(sampleCrateSource())

@@ -1,4 +1,5 @@
 import { Banner, Spinner, Stack, Text } from '@primer/react'
+import { GraphIcon } from '@primer/octicons-react'
 import type { ReactNode } from 'react'
 import { useArcSelector, useArcStatus } from '../../../arc/hooks'
 import { buildProvenanceIndex } from '../../../arc/provenance/buildIndex'
@@ -25,7 +26,7 @@ function OrbitDashlet({ title, description, className, children }: {
   children: ReactNode
 }) {
   return (
-    <PopupDashlet title={title} description={description} label={title === 'Description' ? title : `${title} dashlet`} className={`new-dashboard-tile ${className}`}>
+    <PopupDashlet title={title} description={description} symbol={<GraphIcon size={48} />} label={title === 'Description' ? title : `${title} dashlet`} className={`new-dashboard-tile ${className}`}>
       {children}
     </PopupDashlet>
   )

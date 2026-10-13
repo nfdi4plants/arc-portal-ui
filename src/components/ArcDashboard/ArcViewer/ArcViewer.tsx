@@ -2,7 +2,7 @@ import '@primer/primitives/dist/css/functional/themes/light.css'
 import '@primer/css/dist/primer.css'
 import {WebViewer} from '@nfdi4plants/arc-web-view'
 import {Component, useCallback, useContext, useEffect, useRef, useState, type ReactNode} from 'react'
-import { PopupDashletExpandedContext } from '../../PopupDashlet/PopupDashletContext'
+import { PopupDashletModeContext } from '../../PopupDashlet/PopupDashletContext'
 import './arcViewer.css'
 
 const defaultArcUrl = `${import.meta.env.BASE_URL}sample-arcs/facultative-cam-in-talinum/ro-crate-metadata.json`
@@ -32,7 +32,8 @@ class ViewerErrorBoundary extends Component<{children: ReactNode}, {failed: bool
 function ExpandedWebViewer({ provideJson }: { provideJson: () => Promise<string> }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const initialized = useRef(false);
-  const popupExpanded = useContext(PopupDashletExpandedContext);
+  const popupMode = useContext(PopupDashletModeContext);
+  const popupExpanded = popupMode === undefined ? undefined : popupMode === 'expanded';
 
   useEffect(() => {
     const container = containerRef.current;
@@ -72,7 +73,7 @@ function ExpandedWebViewer({ provideJson }: { provideJson: () => Promise<string>
       observer.disconnect();
       desktop.removeEventListener('change', openSidebar);
     };
-  }, [popupExpanded]);
+  }, [popupExpanded, popupMode]);
 
   return <div ref={containerRef} className="viewer-content"><WebViewer jsonString={provideJson} /></div>;
 }

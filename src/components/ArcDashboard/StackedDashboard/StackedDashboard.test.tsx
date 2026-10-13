@@ -27,7 +27,8 @@ describe('StackedDashboard', () => {
     expect(within(screen.getByRole('region', { name: 'Graphview' })).getByRole('region', { name: 'Provenance explorer' })).toBeVisible()
     expect(within(cards).queryByRole('region', { name: 'Graphview' })).not.toBeInTheDocument()
     expect(within(dashboard).queryByRole('tab', { name: 'Overview' })).not.toBeInTheDocument()
-    expect(await screen.findByText('ARC contents preview', {}, { timeout: 5000 })).toBeVisible()
+    expect(await screen.findByText('ARC contents preview', {}, { timeout: 5000 })).not.toBeVisible()
+    expect(within(cards).getByRole('img', { name: 'Webview symbol' })).toBeVisible()
   })
 
   it('shows loading while an ARC is being opened', () => {

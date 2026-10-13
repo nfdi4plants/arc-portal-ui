@@ -53,7 +53,7 @@ export function StackedDashboard(props: StackedDashboardProps) {
   const provenance = useArcSelector(buildProvenanceIndex, sameIndex)
 
   return (
-    <DashboardWindow label="StackedDashboard" fillHeight>
+    <DashboardWindow label="StackedDashboard">
       {status.kind === 'error' ? (
         <div className="investigation-feedback">
           <Banner variant="critical" title="Could not load ARC" description={status.error instanceof Error ? status.error.message : String(status.error)} />
