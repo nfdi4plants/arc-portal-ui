@@ -103,7 +103,7 @@ export const SmallBox: Story = {
 export const Expanded: Story = {
   play: async ({ canvasElement }) => {
     await toDetail(canvasElement)
-    const [more] = await within(canvasElement).findAllByRole('button', { name: /^Show \d+ more properties$/ }, LAYOUT_TIMEOUT)
+    const [more] = await within(canvasElement).findAllByRole('button', { name: /^Show \d+ more properties of / }, LAYOUT_TIMEOUT)
     await userEvent.click(more)
   },
 }

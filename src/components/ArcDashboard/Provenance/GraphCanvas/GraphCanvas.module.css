@@ -12,6 +12,11 @@
   color: var(--fgColor-default, #1f2328);
 }
 
+/* The container takes focus after a navigation. The ring would sit on the whole view, so it stays off. */
+.root:focus {
+  outline: none;
+}
+
 .status {
   margin: 0;
   padding: 18px 14px;
@@ -47,7 +52,7 @@
 }
 
 .accent {
-  --canvas-color: var(--fgColor-accent, #0969da);
+  --canvas-color: var(--borderColor-accent-emphasis, #0969da);
 }
 
 .arrowHead {

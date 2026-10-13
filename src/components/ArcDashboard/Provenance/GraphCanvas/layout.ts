@@ -70,6 +70,8 @@ const ELK_OPTIONS = {
   'org.eclipse.elk.layered.edgeLabels.sideSelection': 'SMART_DOWN',
   'org.eclipse.elk.randomSeed': '1',
   'org.eclipse.elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
+  // Separate components are packed into rows by size, so widening one label would move whole nodes between layers.
+  'org.eclipse.elk.separateConnectedComponents': 'false',
 }
 
 const LABEL_OPTIONS = {
@@ -77,9 +79,15 @@ const LABEL_OPTIONS = {
   'org.eclipse.elk.edgeLabels.inline': 'true',
 }
 
-// ELK is a large bundle, so it loads with the first layout and not with the page.
+// ELK is a large bundle, so it loads on the first layout. A failed import is dropped from the cache and the next layout retries it.
 let elkPromise: Promise<ELK> | undefined
-const getElk = () => (elkPromise ??= import('elkjs/lib/elk.bundled.js').then((m) => new m.default()))
+const getElk = () =>
+  (elkPromise ??= import('elkjs/lib/elk.bundled.js')
+    .then((m) => new m.default())
+    .catch((error) => {
+      elkPromise = undefined
+      throw error
+    }))
 
 function shortText(text: string, max: number): string {
   return text.length <= max ? text : `${text.slice(0, max - 1)}…`

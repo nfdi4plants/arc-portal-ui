@@ -10,6 +10,8 @@ export const PILL_GAP = 6
 const TEXT_BUDGET = 36
 const VALUE_LIMIT = 24
 const MIN_NAME_BUDGET = 8
+// Process names are the longest pill text, so they get their own limit.
+const PROCESS_LIMIT = 28
 
 const MONO_FAMILY = 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace'
 
@@ -51,24 +53,30 @@ export interface PillText {
   namePart: string
   valuePart: string
   empty: boolean
-  // Full text for the tooltip and the accessible name. Only property pills have one.
-  tooltip: string | null
+  // "name: value unit" in full, without a category. Screen reader labels of nodes and edges use it.
+  fullText: string
+  // Hover text and accessible name. Property pills add their category. Process and count pills
+  // use the tooltip of the pill and fall back to the full text.
+  tooltip: string
 }
 
 export function describePill(pill: CanvasPill): PillText {
   const empty = pill.value === null || pill.value === ''
   const valueText = empty ? '(empty)' : `${pill.value}${pill.unit ? ` ${pill.unit}` : ''}`
-  if (pill.kind !== 'property') return { namePart: '', valuePart: valueText, empty, tooltip: null }
+  if (pill.kind !== 'property') {
+    const shown = pill.kind === 'process' && valueText.length > PROCESS_LIMIT ? cut(valueText, PROCESS_LIMIT - 1) : valueText
+    return { namePart: '', valuePart: shown, empty, fullText: valueText, tooltip: pill.tooltip ?? valueText }
+  }
 
   const name = pill.name ?? ''
-  const full = name ? `${name}: ${valueText}` : valueText
-  // "(empty)" is never cut.
-  const shown = empty ? { name, value: valueText } : truncateProperty(name, valueText)
+  const fullText = name ? `${name}: ${valueText}` : valueText
+  const shown = truncateProperty(name, valueText)
   return {
     namePart: shown.name ? `${shown.name}: ` : '',
     valuePart: shown.value,
     empty,
-    tooltip: pill.category ? `${categoryLabel(pill.category)} · ${full}` : full,
+    fullText,
+    tooltip: pill.category ? `${categoryLabel(pill.category)} · ${fullText}` : fullText,
   }
 }
 
@@ -80,7 +88,8 @@ export interface PillView {
   namePart: string
   valuePart: string
   empty: boolean
-  tooltip: string | null
+  fullText: string
+  tooltip: string
   toggle?: 'more' | 'less'
   width: number
 }
@@ -100,6 +109,7 @@ function toggleView(key: string, toggle: 'more' | 'less', text: string, label: s
     namePart: '',
     valuePart: text,
     empty: false,
+    fullText: label,
     tooltip: label,
     toggle,
     width: Math.ceil(measure(text, 400, 11)) + 14,

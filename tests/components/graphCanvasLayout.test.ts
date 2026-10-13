@@ -29,6 +29,17 @@ function gaps(layout: GraphLayout): number[] {
   return layout.nodes.slice(1).map((next, i) => next.x - (layout.nodes[i].x + layout.nodes[i].width))
 }
 
+// Three disconnected components: A has 4 targets, B has 2 and C has 2. Every edge hides two pills.
+const fanSources = ['A', 'B', 'C']
+const fanTargets = ['t1', 't2', 't3', 't4', 't5', 't6', 't7', 't8']
+const fanNodes = [...fanSources, ...fanTargets].map(node)
+const fanEdges = fanTargets.map((target, i) =>
+  edge(`e${i}`, fanSources[i < 4 ? 0 : i < 6 ? 1 : 2], target, [property('p1', 'temperature', '20 C')], [
+    property('p2', 'duration', '2 h'),
+    property('p3', 'volume', '5 ml'),
+  ]),
+)
+
 describe('layoutGraph', () => {
   it('widens only the gap of an expanded edge', async () => {
     const collapsed = await layoutGraph(nodes, edges, new Set(), measure)
@@ -39,6 +50,22 @@ describe('layoutGraph', () => {
     expect(bcExpanded).toBeGreaterThan(bc)
     expect(abExpanded).toBe(ab)
     expect(cdExpanded).toBe(cd)
+  })
+
+  it('keeps every node on its row and layer while one edge of disconnected components expands', async () => {
+    const xOf = (layout: GraphLayout, ids: string[]) => [...new Set(layout.nodes.filter(({ node }) => ids.includes(node.id)).map(({ x }) => x))]
+    const base = await layoutGraph(fanNodes, fanEdges, new Set(), measure)
+    expect(xOf(base, fanSources)).toHaveLength(1)
+    expect(xOf(base, fanTargets)).toHaveLength(1)
+
+    for (const { id } of fanEdges) {
+      const expanded = await layoutGraph(fanNodes, fanEdges, new Set([id]), measure)
+
+      expect(expanded.nodes.map(({ y }) => y)).toEqual(base.nodes.map(({ y }) => y))
+      expect(xOf(expanded, fanSources)).toEqual(xOf(base, fanSources))
+      expect(xOf(expanded, fanTargets)).toHaveLength(1)
+      expect(xOf(expanded, fanTargets)[0]).toBeGreaterThan(xOf(base, fanTargets)[0])
+    }
   })
 
   it('places the pill run on the horizontal segment of its edge', async () => {

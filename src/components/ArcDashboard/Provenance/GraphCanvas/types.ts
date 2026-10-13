@@ -1,7 +1,8 @@
 import type { AnnotationCategory, DatasetKind } from '../../../../arc/provenance/types'
 
-// Generic input of the graph canvas. The canvas knows nothing about ARCs:
-// the explorer maps provenance query results onto these shapes.
+// Input of the graph canvas. Colors use the DatasetKind of the provenance model and pill
+// categories use its AnnotationCategory. Everything else is plain data, and the explorer
+// maps provenance query results onto these shapes.
 
 export type CanvasColor = DatasetKind | 'neutral'
 
@@ -30,7 +31,8 @@ export interface CanvasNode {
   pills?: CanvasPill[]
   tooltip?: string
   ariaLabel: string
-  // Nodes that can't be clicked render without button semantics.
+  // Set to false to render the node without button semantics. Without an onNodeClick
+  // handler no node is a button.
   clickable?: boolean
 }
 

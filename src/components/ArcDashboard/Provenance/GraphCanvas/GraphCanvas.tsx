@@ -52,10 +52,12 @@ function stripePath(height: number): string {
 interface PillProps {
   placed: PlacedPill
   highlighted?: boolean
+  // "<from> to <to>" of the edge. Toggle pills name it, because several edges have the same toggle.
+  owner?: string
   onToggle?: () => void
 }
 
-function Pill({ placed, highlighted = false, onToggle }: PillProps) {
+function Pill({ placed, highlighted = false, owner, onToggle }: PillProps) {
   const { view } = placed
   const hasDot = view.category !== undefined
   const valueClass = view.kind === 'process' ? styles.pillStrong : view.empty ? styles.pillEmpty : styles.pillValue
@@ -67,7 +69,7 @@ function Pill({ placed, highlighted = false, onToggle }: PillProps) {
       : view.category && CATEGORY_CLASS[view.category]
   const content = (
     <>
-      {view.tooltip && <title>{view.tooltip}</title>}
+      <title>{view.tooltip}</title>
       <rect className={styles.pillBox} width={view.width} height={PILL_HEIGHT} rx={PILL_HEIGHT / 2} />
       {hasDot && <circle className={styles.pillDot} cx={10} cy={PILL_HEIGHT / 2} r={3} />}
       <text className={styles.pillText} x={hasDot ? 17 : 7} y={PILL_HEIGHT / 2} dominantBaseline="central">
@@ -89,7 +91,8 @@ function Pill({ placed, highlighted = false, onToggle }: PillProps) {
         transform={transform}
         role="button"
         tabIndex={0}
-        aria-label={view.tooltip ?? undefined}
+        aria-label={owner ? `${view.tooltip} of ${owner}` : view.tooltip}
+        aria-expanded={view.toggle === 'less'}
         onClick={activate}
         onKeyDown={(event) => {
           if (!isActivationKey(event)) return
@@ -101,9 +104,8 @@ function Pill({ placed, highlighted = false, onToggle }: PillProps) {
       </g>
     )
   }
-  const accessible = view.kind === 'property' && view.tooltip ? { role: 'img', 'aria-label': view.tooltip } : {}
   return (
-    <g className={cx(styles.pill, colorClassName)} transform={transform} {...accessible}>
+    <g className={cx(styles.pill, colorClassName)} transform={transform} role="img" aria-label={view.tooltip}>
       {content}
     </g>
   )
@@ -116,7 +118,9 @@ interface NodeProps {
 
 function NodeShape({ laid, onClick }: NodeProps) {
   const { node, width, height } = laid
-  const clickable = node.clickable !== false
+  const clickable = onClick !== undefined && node.clickable !== false
+  // The pills and the tooltip hold information that a screen reader would otherwise miss.
+  const label = [node.ariaLabel, ...laid.pills.map(({ view }) => view.fullText), node.tooltip].filter(Boolean).join(', ')
   const classes = cx(
     colorClass(node.color, styles.nodeNeutral),
     node.dashed && styles.dashed,
@@ -128,16 +132,16 @@ function NodeShape({ laid, onClick }: NodeProps) {
     ? {
         role: 'button',
         tabIndex: 0,
-        onClick: () => onClick?.(node.id),
+        onClick: () => onClick(node.id),
         onKeyDown: (event: KeyboardEvent) => {
           if (!isActivationKey(event)) return
           event.preventDefault()
-          onClick?.(node.id)
+          onClick(node.id)
         },
       }
     : { role: 'group' }
   return (
-    <g className={classes} transform={`translate(${laid.x} ${laid.y})`} aria-label={node.ariaLabel} {...interaction}>
+    <g className={classes} transform={`translate(${laid.x} ${laid.y})`} aria-label={label} {...interaction}>
       <title>{node.tooltip ?? node.title}</title>
       <rect className={styles.nodeFill} width={width} height={height} rx={NODE_RADIUS} />
       <path className={styles.stripe} d={stripePath(height)} />
@@ -178,18 +182,21 @@ export function GraphCanvas({ nodes, edges, ariaLabel, onNodeClick, centerNodeId
   const scrolledFor = useRef<string | null>(null)
   const markerPrefix = useId().replace(/:/g, '')
 
-  // Expanded edges belong to one resetKey. A new key reads as no expansion without an extra render.
+  // Expanded edges belong to one resetKey. React lets a component reset state while it
+  // renders, so a changed key drops the old expansion before anything is drawn. Returning to an
+  // earlier key therefore starts collapsed.
   const [expansion, setExpansion] = useState({ resetKey, ids: NO_EXPANSION })
+  if (expansion.resetKey !== resetKey) setExpansion({ resetKey, ids: NO_EXPANSION })
   const expanded = expansion.resetKey === resetKey ? expansion.ids : NO_EXPANSION
   const toggle = useCallback(
     (edgeId: string) => {
       setExpansion((current) => {
-        const ids = new Set(current.resetKey === resetKey ? current.ids : NO_EXPANSION)
+        const ids = new Set(current.ids)
         if (!ids.delete(edgeId)) ids.add(edgeId)
-        return { resetKey, ids }
+        return { resetKey: current.resetKey, ids }
       })
     },
-    [resetKey],
+    [],
   )
 
   // The previous drawing stays until the next layout resolves, unless it belongs to another view.
@@ -201,7 +208,8 @@ export function GraphCanvas({ nodes, edges, ariaLabel, onNodeClick, centerNodeId
       (layout) => {
         if (current) setOutcome({ resetKey, layout })
       },
-      () => {
+      (error: unknown) => {
+        console.error('Could not lay out the graph canvas', error)
         if (current) setOutcome({ resetKey, layout: null })
       },
     )
@@ -212,12 +220,27 @@ export function GraphCanvas({ nodes, edges, ariaLabel, onNodeClick, centerNodeId
 
   const shown = outcome && outcome.resetKey === resetKey ? outcome : null
   const layout = shown?.layout ?? null
+  const titles = new Map((layout?.nodes ?? []).map((laid) => [laid.node.id, laid.node.title]))
+
+  // After a navigation the container takes focus, because the focused node is gone. The first
+  // mount leaves focus alone.
+  const lastKey = useRef(resetKey)
+  const focusOnDraw = useRef(false)
+  useLayoutEffect(() => {
+    if (lastKey.current === resetKey) return
+    lastKey.current = resetKey
+    focusOnDraw.current = true
+  }, [resetKey])
 
   // A new view starts at the top left, or on centerNodeId. Expanding an edge keeps the scroll position.
   useLayoutEffect(() => {
     const root = rootRef.current
     if (!root || !layout || scrolledFor.current === resetKey) return
     scrolledFor.current = resetKey
+    if (focusOnDraw.current) {
+      focusOnDraw.current = false
+      root.focus({ preventScroll: true })
+    }
     root.scrollLeft = 0
     root.scrollTop = 0
     const target = centerNodeId ? layout.nodes.find((laid) => laid.node.id === centerNodeId) : undefined
@@ -228,7 +251,7 @@ export function GraphCanvas({ nodes, edges, ariaLabel, onNodeClick, centerNodeId
   }, [layout, resetKey, centerNodeId])
 
   return (
-    <div ref={rootRef} className={styles.root}>
+    <div ref={rootRef} className={styles.root} role="region" aria-label={ariaLabel} tabIndex={-1}>
       {layout ? (
         <svg
           className={styles.svg}
@@ -255,36 +278,42 @@ export function GraphCanvas({ nodes, edges, ariaLabel, onNodeClick, centerNodeId
               </marker>
             ))}
           </defs>
-          {layout.edges.map((laid) =>
-            laid.path ? (
-              <path
+          {layout.edges.map((laid) => {
+            const owner = `${titles.get(laid.edge.from) ?? laid.edge.from} to ${titles.get(laid.edge.to) ?? laid.edge.to}`
+            const texts = laid.pills.filter(({ view }) => view.kind !== 'toggle').map(({ view }) => view.fullText)
+            return (
+              <g
                 key={laid.edge.id}
-                className={cx(
-                  styles.edge,
-                  colorClass(laid.edge.color, styles.edgeNeutral),
-                  laid.edge.highlighted && styles.highlighted,
-                )}
-                d={laid.path}
-                markerEnd={`url(#${markerPrefix}-${arrowName(laid)})`}
+                role="group"
+                aria-label={`From ${owner}${texts.length ? `: ${texts.join(', ')}` : ''}`}
               >
-                {laid.edge.tooltip && <title>{laid.edge.tooltip}</title>}
-              </path>
-            ) : null,
-          )}
+                {laid.path && (
+                  <path
+                    className={cx(
+                      styles.edge,
+                      colorClass(laid.edge.color, styles.edgeNeutral),
+                      laid.edge.highlighted && styles.highlighted,
+                    )}
+                    d={laid.path}
+                    markerEnd={`url(#${markerPrefix}-${arrowName(laid)})`}
+                  >
+                    {laid.edge.tooltip && <title>{laid.edge.tooltip}</title>}
+                  </path>
+                )}
+                {laid.pills.map((placed) => (
+                  <Pill
+                    key={placed.view.key}
+                    placed={placed}
+                    highlighted={laid.edge.highlighted}
+                    owner={owner}
+                    onToggle={() => toggle(laid.edge.id)}
+                  />
+                ))}
+              </g>
+            )
+          })}
           {layout.nodes.map((laid) => (
             <NodeShape key={laid.node.id} laid={laid} onClick={onNodeClick} />
-          ))}
-          {layout.edges.map((laid) => (
-            <g key={laid.edge.id}>
-              {laid.pills.map((placed) => (
-                <Pill
-                  key={placed.view.key}
-                  placed={placed}
-                  highlighted={laid.edge.highlighted}
-                  onToggle={() => toggle(laid.edge.id)}
-                />
-              ))}
-            </g>
           ))}
         </svg>
       ) : shown ? (

@@ -25,8 +25,10 @@ function renderExplorer(index: ProvenanceIndex = sampleIndex) {
   return user
 }
 
-// The real canvas lays out asynchronously, so a view is ready once its graph group exists.
-const canvas = async () => within(await screen.findByRole('group'))
+// The canvas region is there while the layout runs, so a view is ready once its svg group exists.
+// The edges are groups named "From X to Y". The svg is the only other group.
+const canvas = async () => within(await screen.findByRole('group', { name: (name) => !name.startsWith('From ') }))
+const noCanvas = () => screen.queryByRole('region', { name: (name) => name !== 'Provenance explorer' })
 const crumbs = () => within(screen.getByRole('navigation', { name: 'Breadcrumb' }))
 const crumbTexts = () =>
   crumbs()
@@ -34,7 +36,7 @@ const crumbTexts = () =>
     .map((item) => item.querySelector('button, [aria-current]')?.textContent)
 const legend = () => within(screen.getByRole('list', { name: 'Legend' }))
 
-// Nodes are buttons named "<title>, ... select to ...". Edge toggles are buttons too and are not nodes.
+// Nodes are buttons named "<title>, ... select to ..., <tooltip>". Edge toggles are buttons too and are not nodes.
 async function nodeLabels() {
   const view = await canvas()
   return view.getAllByRole('button', { name: /select/ }).map((button) => button.getAttribute('aria-label'))
@@ -162,12 +164,12 @@ describe('ProvenanceExplorer', () => {
 
     expect(crumbTexts()).toEqual(['Datasets', 'GCqTOF_targets', 'gas_chromatography'])
     expect(await nodeLabels()).toEqual([
-      'Inputs A, 3 samples, select to list its nodes',
-      'Inputs B, 6 samples, select to list its nodes',
-      'Outputs A, 4 samples, select to list its nodes',
-      'Outputs B, 4 samples, select to list its nodes',
-      'Outputs C, 6 samples, select to list its nodes',
-      'Outputs D, 6 samples, select to list its nodes',
+      expect.stringContaining('Inputs A, 3 samples, select to list its nodes'),
+      expect.stringContaining('Inputs B, 6 samples, select to list its nodes'),
+      expect.stringContaining('Outputs A, 4 samples, select to list its nodes'),
+      expect.stringContaining('Outputs B, 4 samples, select to list its nodes'),
+      expect.stringContaining('Outputs C, 6 samples, select to list its nodes'),
+      expect.stringContaining('Outputs D, 6 samples, select to list its nodes'),
     ])
   })
 
@@ -179,7 +181,9 @@ describe('ProvenanceExplorer', () => {
     expect(crumbTexts()).toEqual(['Datasets', 'GCqTOF_targets', 'gas_chromatography', 'Inputs A'])
     expect(screen.getByText('processDetail(index, groupId)')).toBeInTheDocument()
     expect(screen.getByText('Select a node to see its lineage.')).toBeInTheDocument()
-    expect(await nodeLabels()).toContain('Std. Mix 5µM, sample, member of Inputs A, select to show its lineage')
+    expect(await nodeLabels()).toContainEqual(
+      expect.stringContaining('Std. Mix 5µM, sample, member of Inputs A, select to show its lineage'),
+    )
   })
 
   it('opens the lineage of a clicked node and keeps navigating inside it', async () => {
@@ -237,7 +241,7 @@ describe('ProvenanceExplorer', () => {
 
     expect(screen.getByText('This dataset has no annotated processes.')).toBeInTheDocument()
     expect(legend().getByText('Run')).toBeInTheDocument()
-    expect(screen.queryByRole('group')).not.toBeInTheDocument()
+    expect(noCanvas()).not.toBeInTheDocument()
   })
 
   it('tells that a process whose rows have no inputs and outputs has none', async () => {
@@ -271,7 +275,7 @@ describe('ProvenanceExplorer', () => {
 
     expect(screen.getByText('This ARC has no datasets.')).toBeInTheDocument()
     expect(legend().getByText('Study')).toBeInTheDocument()
-    expect(screen.queryByRole('group')).not.toBeInTheDocument()
+    expect(noCanvas()).not.toBeInTheDocument()
   })
 
   it('shows the 80 nodes nearest to the selected one of a larger lineage and says so', async () => {
