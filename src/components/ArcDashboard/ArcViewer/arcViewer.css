@@ -154,3 +154,17 @@
 
 .arc-portal-embedded { padding: 0; max-width: none; width: 100%; flex-shrink: 0; }
 .arc-portal-embedded .arc-viewer { padding: 0; border: 0; }
+
+.dashlet .arc-portal-embedded [data-component="SplitPageLayout.Content"] > [data-width] > [data-component="Stack"] {
+  padding-inline: var(--dashlet-content-padding);
+  padding-bottom: var(--dashlet-content-padding);
+}
+
+.dashlet .arc-portal-embedded .position-sticky {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 2 !important;
+  margin-inline: calc(-1 * var(--dashlet-content-padding));
+  padding: calc(var(--dashlet-content-padding) + 8px) var(--dashlet-content-padding) 8px !important;
+  background: var(--bgColor-default, #fff);
+}

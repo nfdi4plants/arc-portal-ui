@@ -131,21 +131,23 @@ function DataHubDashboard({ dataHubs = availableDataHubs, tokens, fetchProjects,
                   onToggle={value => dispatch({ type: 'toggleGroup', value })} />
                 <MonthlyChart months={months} />
               </div>
-              <Stack>
-                <ArcFilterBar query={queryInput} onQueryChange={setQueryInput} recent={filters.recent}
-                  onRecentToggle={() => dispatch({ type: 'toggleRecent' })}
-                  chips={chips} onRemoveChip={removeChip} onClearAll={clearAll} shown={filtered.length} total={arcs.length} />
-                <ArcsTable 
-                  arcs={sorted} 
-                  hubNames={hubNames} 
-                  sort={sort} 
-                  now={current} 
-                  details={details}
-                  onSortChange={next => dispatch({ type: 'setSort', sort: next })}
-                  resetKey={JSON.stringify(filters) + JSON.stringify(sort)}
-                  onClearFilters={filtering ? clearAll : undefined}
-                  onOpen={arc => onArcClick(arc.url, arc.title, arc.projectId, connectionsByHub.get(arc.hubId)!.hub)} />
-              </Stack>
+              <div className={styles.tableCard}>
+                <Stack>
+                  <ArcFilterBar query={queryInput} onQueryChange={setQueryInput} recent={filters.recent}
+                    onRecentToggle={() => dispatch({ type: 'toggleRecent' })}
+                    chips={chips} onRemoveChip={removeChip} onClearAll={clearAll} shown={filtered.length} total={arcs.length} />
+                  <ArcsTable
+                    arcs={sorted}
+                    hubNames={hubNames}
+                    sort={sort}
+                    now={current}
+                    details={details}
+                    onSortChange={next => dispatch({ type: 'setSort', sort: next })}
+                    resetKey={JSON.stringify(filters) + JSON.stringify(sort)}
+                    onClearFilters={filtering ? clearAll : undefined}
+                    onOpen={arc => onArcClick(arc.url, arc.title, arc.projectId, connectionsByHub.get(arc.hubId)!.hub)} />
+                </Stack>
+              </div>
             </div>
           </div>
         </>}

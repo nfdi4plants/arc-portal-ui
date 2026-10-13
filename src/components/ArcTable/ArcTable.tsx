@@ -133,12 +133,13 @@ export function ArcsTable({ arcs, hubNames, sort, onSortChange, now, onOpen, res
 
   return (
     <Table.Container>
-      <DataTable 
-        aria-labelledby="arc-table-title" 
-        data={rows} 
-        columns={columns} 
+      <Table.Title as="h2" id="arc-table-title" className={styles.hidden}>ARCs</Table.Title>
+      <DataTable
+        aria-labelledby="arc-table-title"
+        data={rows}
+        columns={columns}
         externalSorting
-        initialSortColumn={sort.column} 
+        initialSortColumn={sort.column}
         initialSortDirection={sort.direction}
         onToggleSort={(column, direction) => {
           if (SORT_COLUMNS.includes(column as SortState['column'])) onSortChange({ column: column as SortState['column'], direction })
@@ -148,3 +149,5 @@ export function ArcsTable({ arcs, hubNames, sort, onSortChange, now, onOpen, res
     </Table.Container>
   )
 }
+
+export { ArcsTable as ArcTable }

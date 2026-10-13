@@ -1,9 +1,9 @@
-.main { margin: 0 auto; display: flex; flex-direction: column; gap: 12px; padding: 16px; }
+.main { composes: layout from '../DashboardWindow/dashboardSurface.module.css'; }
 .loading { margin: 0; color: var(--fgColor-muted); }
 .grid { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 16px; align-items: start; }
 .content { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .charts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.tableCard { background: var(--bgColor-default); border: 1px solid var(--borderColor-default); border-radius: 6px; padding: 12px; }
+.tableCard { composes: card from '../DashboardWindow/dashboardSurface.module.css'; padding: 12px; }
 @media (max-width: 760px) {
   .grid { grid-template-columns: minmax(0, 1fr); }
   .charts { grid-template-columns: minmax(0, 1fr); }

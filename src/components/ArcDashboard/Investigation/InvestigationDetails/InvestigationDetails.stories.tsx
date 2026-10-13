@@ -1,14 +1,14 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { Dashlet } from '../../../DashboardWindow'
+import { Dashlet, DashboardWindow } from '../../../DashboardWindow'
 import { TalinumStory } from '../../../../storybook/TalinumStory'
 import { InvestigationDetails } from './InvestigationDetails'
 
 function SampleInvestigationDetails() {
   return (
     <TalinumStory>{(metadata) => (
-      <div className="dashboard-window-container">
-        <Dashlet title={metadata.title} maxWidth={620}><InvestigationDetails metadata={metadata} /></Dashlet>
-      </div>
+      <DashboardWindow label="Investigation preview" maxWidth={620}>
+        <Dashlet label="Investigation details"><InvestigationDetails metadata={metadata} /></Dashlet>
+      </DashboardWindow>
     )}</TalinumStory>
   )
 }
@@ -16,7 +16,7 @@ function SampleInvestigationDetails() {
 const meta = {
   title: 'InvestigationDetails',
   component: SampleInvestigationDetails,
-  parameters: { docs: { description: { component: 'Investigation dashlet titled with the ARC title, with Overview, Contacts, Organizations, and Publications tabs. All lists reuse MetadataList.' } } },
+  parameters: { docs: { description: { component: 'Investigation dashlet with clickable Overview previews and full Description, Contacts, Organizations, Publications, Assays, and Studies tabs. All lists reuse MetadataList.' } } },
 } satisfies Meta<typeof SampleInvestigationDetails>
 
 export default meta

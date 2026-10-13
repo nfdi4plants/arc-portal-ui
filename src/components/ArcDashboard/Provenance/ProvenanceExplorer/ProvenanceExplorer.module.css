@@ -32,6 +32,11 @@
   --prov-component: #f78166;
 }
 
+.root[data-embedded='true'] {
+  border: 0;
+  border-radius: 0;
+}
+
 @media (prefers-color-scheme: dark) {
   :global([data-color-mode='auto']) .root {
     --prov-characteristic: #39c5cf;
