@@ -25,7 +25,6 @@ export function ArcDetails({ metadata, repository, dataHubLinks, dataHubData }: 
   return (
     <div className="arc-details">
       <InvestigationHeader
-        label="ARC"
         title={metadata.title}
         visibility={dataHubData?.visibility}
         owner={dataHubData?.owner}

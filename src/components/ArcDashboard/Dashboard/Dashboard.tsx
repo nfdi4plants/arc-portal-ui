@@ -15,7 +15,7 @@ export function Dashboard(props: DashboardProps) {
   const metadata = useArcSelector(selectInvestigationMetadata)
 
   return (
-    <DashboardWindow title="ARC-Dashboard" fillHeight>
+    <DashboardWindow label="ARC-Dashboard" fillHeight>
       {status.kind === 'error' ? (
         <div className="investigation-feedback">
           <Banner
@@ -32,10 +32,10 @@ export function Dashboard(props: DashboardProps) {
       ) : (
         <main className="arc-dashboard-layout">
           <ArcDetails {...props} metadata={metadata} />
-          <Dashlet title={metadata.title}>
+          <Dashlet label="Investigation details">
             <InvestigationDetails metadata={metadata} />
           </Dashlet>
-          <Dashlet title="ArcWebView">
+          <Dashlet label="ArcWebView">
             <ArcViewer jsonString={props.arcJson} embedded />
           </Dashlet>
         </main>

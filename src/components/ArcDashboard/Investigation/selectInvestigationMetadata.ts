@@ -70,5 +70,7 @@ export function selectInvestigationMetadata(arc: ARC): InvestigationMetadata {
     }),
     githubLinks: collectGithubLinks(arc),
     organizations: organizations.map((name) => ({ identifier: name, name })),
+    assays: arc.Assays.map((assay) => ({ identifier: assay.Identifier, name: nonEmpty(assay.Title) ?? assay.Identifier })),
+    studies: arc.Studies.map((study) => ({ identifier: study.Identifier, name: nonEmpty(study.Title) ?? study.Identifier })),
   }
 }
