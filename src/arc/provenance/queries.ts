@@ -21,12 +21,6 @@ import type {
 
 type SharedNodeEdge = DatasetGraph['edges'][number]
 
-interface Handover {
-  nodeId: string
-  producer: ProvenanceRow
-  consumer: ProvenanceRow
-}
-
 interface RowLink {
   row: ProvenanceRow
   from: string
@@ -49,41 +43,38 @@ function ioKindOf(index: ProvenanceIndex, nodeId: string): IoKind {
   return index.nodeById.get(nodeId)?.kind ?? 'data'
 }
 
-// Every (node, producing row, consuming row) triple, in the order of `producedBy`.
-function handovers(index: ProvenanceIndex): Handover[] {
-  const result: Handover[] = []
-  for (const [nodeId, producerIds] of index.producedBy) {
-    const consumerIds = index.consumedBy.get(nodeId) ?? []
-    for (const producerId of producerIds) {
-      const producer = index.rowById.get(producerId)
-      if (!producer) continue
-      for (const consumerId of consumerIds) {
-        const consumer = index.rowById.get(consumerId)
-        if (consumer) result.push({ nodeId, producer, consumer })
-      }
-    }
-  }
-  return result
-}
-
 // Edges between the owners of producing and consuming rows, with the distinct nodes passed along.
+// Per node the distinct owners are collected first and crossed afterwards, so N producing rows
+// and N consuming rows cost about 2N lookups.
 function sharedNodeEdges(
   index: ProvenanceIndex,
   ownerOf: (row: ProvenanceRow) => string,
   keep: (from: string, to: string) => boolean,
 ): SharedNodeEdge[] {
-  const edges = new Map<string, { id: string; from: string; to: string; shared: Set<string> }>()
-  for (const { nodeId, producer, consumer } of handovers(index)) {
-    const from = ownerOf(producer)
-    const to = ownerOf(consumer)
-    if (from === to || !keep(from, to)) continue
-    const id = `${from}->${to}`
-    let edge = edges.get(id)
-    if (!edge) {
-      edge = { id, from, to, shared: new Set() }
-      edges.set(id, edge)
+  const ownersOf = (rowIds: string[] | undefined) => {
+    const owners = new Set<string>()
+    for (const rowId of rowIds ?? []) {
+      const row = index.rowById.get(rowId)
+      if (row) owners.add(ownerOf(row))
     }
-    edge.shared.add(nodeId)
+    return owners
+  }
+
+  const edges = new Map<string, { id: string; from: string; to: string; shared: Set<string> }>()
+  for (const [nodeId, producerIds] of index.producedBy) {
+    const consumers = ownersOf(index.consumedBy.get(nodeId))
+    for (const from of ownersOf(producerIds)) {
+      for (const to of consumers) {
+        if (from === to || !keep(from, to)) continue
+        const id = `${from}->${to}`
+        let edge = edges.get(id)
+        if (!edge) {
+          edge = { id, from, to, shared: new Set() }
+          edges.set(id, edge)
+        }
+        edge.shared.add(nodeId)
+      }
+    }
   }
   return Array.from(edges.values(), ({ id, from, to, shared }) => ({ id, from, to, sharedNodeIds: [...shared] }))
 }
