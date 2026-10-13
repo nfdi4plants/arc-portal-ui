@@ -102,7 +102,7 @@ describe('useArcDetails', () => {
     rerender({ arcs, connections: new Map([['a', connA], ['b', secondB]]) })
     expect(signalsB[0].aborted).toBe(true)
     await act(async () => { pendingB[0].resolve(Success([jane])) })
-    await waitFor(() => expect(result.current.details.get('b/arc-2')).toEqual({ people: [{ id: 'new@example.org', name: 'New Person' }], lastChangeBy: null }))
+    await waitFor(() => expect(result.current.details.get('b/arc-2')).toEqual({ people: [{ id: 'new@example.org', name: 'New Person' }], lastChangeBy: 'Jane Doe' }))
     expect(result.current.details.has('a/arc-1')).toBe(true)
   })
 

@@ -210,7 +210,7 @@ describe('DataHubDashboard expired login', () => {
     expect(await screen.findByText(/Your login for .* has expired/)).toBeVisible()
     expect(summary.getByRole('group', { name: 'private' })).toHaveTextContent('–')
     expect(summary.getByRole('group', { name: 'private' })).toHaveTextContent('log in to see')
-    expect(screen.queryByText(/only\./)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Private ARCs are included/)).not.toBeInTheDocument()
     expect(screen.queryByText(/Could not load your memberships/)).not.toBeInTheDocument()
   })
 })

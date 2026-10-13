@@ -75,7 +75,7 @@ export function ArcTable({ arcs, hubNames, sort, onSortChange, now, onOpen, rese
   const rows: Row[] = arcs.slice(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE).map(arc => ({ ...arc, id: arc.key }))
   const columns: Column<Row>[] = [
     {
-      id: 'title', header: 'Title', sortBy: true, rowHeader: true, width: 'grow',
+      id: 'title', header: 'Title', sortBy: true, rowHeader: true, width: 'growCollapse',
       renderCell: arc => (
         <div className={styles.title}>
           <Link as="button" className={styles.titleLink} onClick={() => onOpen(arc)}>{arc.title}</Link>
