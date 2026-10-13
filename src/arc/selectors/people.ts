@@ -3,11 +3,11 @@ import { useArcSelector } from '../hooks'
 import { fullName, nonEmpty, toOntologyTerms, toPersonSummary, type PersonSummary } from './common'
 
 // Example of combining existing arctrl accessors: everyone mentioned anywhere
-// in the ARC (investigation contacts, study contacts, assay performers),
+// in the ARC (investigation/study/workflow contacts and assay/run performers),
 // merged into one entry per person with where they appear.
 
 export interface Involvement {
-  kind: 'investigation' | 'study' | 'assay'
+  kind: 'investigation' | 'study' | 'assay' | 'run' | 'workflow'
   identifier: string
 }
 
@@ -50,6 +50,8 @@ export function selectAllPeople(arc: ARC): PersonWithInvolvement[] {
   visit(arc.Contacts, { kind: 'investigation', identifier: arc.Identifier })
   for (const study of arc.Studies) visit(study.Contacts, { kind: 'study', identifier: study.Identifier })
   for (const assay of arc.Assays) visit(assay.Performers, { kind: 'assay', identifier: assay.Identifier })
+  for (const run of arc.Runs) visit(run.Performers, { kind: 'run', identifier: run.Identifier })
+  for (const workflow of arc.Workflows) visit(workflow.Contacts, { kind: 'workflow', identifier: workflow.Identifier })
 
   return people
 }

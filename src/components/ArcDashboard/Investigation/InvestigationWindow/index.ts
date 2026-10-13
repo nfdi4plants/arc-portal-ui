@@ -1,0 +1,1 @@
+export { InvestigationWindow } from './InvestigationWindow'

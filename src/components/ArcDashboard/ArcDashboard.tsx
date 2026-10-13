@@ -12,7 +12,7 @@ type ArcDashboardProps = {
 function ArcDashboard({ name, url, onBack }: ArcDashboardProps) {
     return (
         <div>
-            Arc Dashboard: {name} - 
+            Arc Dashboard: {name} -
             <a href={url}>Link</a>
             <Button onClick={onBack}>Back</Button>
             <Suspense fallback={<p role="status">Loading ARC viewer…</p>}>

@@ -68,7 +68,7 @@ describe('combined access functions', () => {
     expect(people).toHaveLength(12)
 
     const brilhaus = people.find((person) => person.orcid === '0000-0001-9021-3197')
-    expect(brilhaus?.involvedIn).toHaveLength(6)
+    expect(brilhaus?.involvedIn).toHaveLength(10)
 
     // Listed with an ORCID as a contact but only by name elsewhere.
     const winter = people.filter((person) => person.name === 'Klaus Winter')
