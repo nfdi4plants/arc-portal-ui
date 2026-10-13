@@ -41,6 +41,17 @@ function setup(props: Partial<React.ComponentProps<typeof DataHubDashboard>> = {
 }
 
 describe('DataHubDashboard overview', () => {
+  it('shows no stats, charts or table while the first load is still running', async () => {
+    const pending = new Promise<never>(() => {})
+    const conns = [fakeConnection({ hub: plantdatahub, fetchProjects: () => pending })]
+    renderWithTheme(<DataHubDashboard connections={conns} signedIn={false} onArcClick={vi.fn()} now={now} />)
+    expect(screen.getByRole('status')).toHaveTextContent('Loading ARCs from 1 DataHUBs…')
+    expect(screen.queryByRole('region', { name: 'Summary' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'ARCs per DataHUB' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: /New ARCs per month/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('table', { name: 'ARCs' })).not.toBeInTheDocument()
+  })
+
   it('shows the summary cards for every loaded ARC', async () => {
     setup()
     const summary = await screen.findByRole('region', { name: 'Summary' })
@@ -179,19 +190,31 @@ describe('DataHubDashboard filters', () => {
 })
 
 describe('DataHubDashboard table paging', () => {
-  it('returns to the first page when logging out changes the list', async () => {
+  it('returns to a valid page when a reload shrinks the list', async () => {
     const many = Array.from({ length: 30 }, (_, index) => proj(100 + index, `Paged ${String(index).padStart(2, '0')}`,
       new Date(Date.UTC(2026, 9, 12, 12 - index)).toISOString()))
-    const connection = [fakeConnection({ hub: plantdatahub, fetchProjects: async () => Success(many) })]
-    const element = (signedIn: boolean) => (
-      <DataHubDashboard connections={connection} signedIn={signedIn} onArcClick={vi.fn()} now={now} />)
-    const { rerender } = renderWithTheme(element(true))
+    const few = many.slice(0, 5)
+    const fetchProjects = vi.fn<DataHubConnection['fetchProjects']>()
+      .mockResolvedValueOnce(Success(many))
+      .mockResolvedValue(Success(few))
+    const element = () => {
+      // A fresh connection object per render stands for a login change.
+      const connection = [fakeConnection({ hub: plantdatahub, fetchProjects })]
+      return <DataHubDashboard connections={connection} signedIn={false} onArcClick={vi.fn()} now={now} />
+    }
+    const { rerender } = renderWithTheme(element())
     const user = userEvent.setup()
     await screen.findByRole('button', { name: 'Open Paged 00' })
-    console.log('NAV', document.querySelector('nav')?.outerHTML.slice(0,1500))
-    await user.click(await screen.findByRole('button', { name: 'Next page' }))
+    // Primer's pagination labels contain non-breaking spaces that testing-library cannot match,
+    // so drive the second page through its DOM button.
+    const pageTwo = [...document.querySelectorAll('nav[aria-label="ARC pages"] button')]
+      .find(button => button.textContent?.includes('2'))
+    expect(pageTwo).toBeDefined()
+    await user.click(pageTwo!)
     expect(screen.queryByRole('button', { name: 'Open Paged 00' })).not.toBeInTheDocument()
-    rerender(element(false))
+    // Replacing the connection reloads the DataHUB with fewer ARCs; the table must not stay stranded past its last page.
+    rerender(element())
     expect(await screen.findByRole('button', { name: 'Open Paged 00' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Open Paged 04' })).toBeVisible()
   })
 })

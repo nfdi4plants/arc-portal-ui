@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Button, Label, Link } from '@primer/react'
 import { DataTable, Table, type Column } from '@primer/react/experimental'
 import type { ArcSummary, SortState } from '../../types/dashboard.ts'
-import { relativeTime } from '../DataHubDashboard/logic/time.ts'
+import { relativeTime } from '../../util/time.ts'
 import styles from './ArcTable.module.css'
 
 export interface ArcTableProps {
@@ -31,6 +31,9 @@ export function ArcTable({ arcs, hubNames, sort, onSortChange, now, onOpen, rese
     setSeenKey(resetKey)
     setPageIndex(0)
   }
+  // A shrinking list (e.g. after a reload with fewer ARCs) must not strand the table past its last page.
+  const maxPage = Math.max(0, Math.ceil(arcs.length / PAGE_SIZE) - 1)
+  if (pageIndex > maxPage) setPageIndex(maxPage)
 
   const rows: Row[] = arcs.slice(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE).map(arc => ({ ...arc, id: arc.key }))
   const columns: Column<Row>[] = [

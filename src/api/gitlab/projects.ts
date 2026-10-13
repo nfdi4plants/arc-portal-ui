@@ -2,9 +2,9 @@ import type {
   GitLabPage, GitLabProject, GitLabRequestOptions, ListProjectsOptions,
   SearchProjectsOptions, TopStarredProjectsOptions,
 } from '../../types/gitlab.ts'
-import { Failure, map, Success, type Result } from '../../types/result.ts'
+import { Failure, map, type Result } from '../../types/result.ts'
 import { requestGitLab } from './client.ts'
-import { requestPage, validIdentifier } from './page.ts'
+import { listAllPages, requestPage, validIdentifier } from './page.ts'
 
 export function isProject(data: unknown): data is GitLabProject {
   return typeof data === 'object' && data !== null
@@ -47,17 +47,7 @@ export async function searchProjects(source: string, query: string, options: Sea
 
 /** Loads every project the caller can see; anonymous callers only get public ones. */
 export async function listAllProjects(source: string, options: GitLabRequestOptions = {}): Promise<Result<GitLabProject[]>> {
-  const projects: GitLabProject[] = []
-  let page: number | null = 1
-  while (page !== null) {
-    if (options.signal?.aborted) return Failure('GitLab request canceled.')
-    const result = await listProjects(source, {
-      ...options, page, perPage: 100, orderBy: 'last_activity_at', sort: 'desc',
-      visibility: options.token ? undefined : 'public',
-    })
-    if (result.success === false) return Failure(result.error)
-    projects.push(...result.value.items)
-    page = result.value.nextPage
-  }
-  return Success(projects)
+  const params = new URLSearchParams({ order_by: 'last_activity_at', sort: 'desc' })
+  if (!options.token) params.set('visibility', 'public')
+  return listAllPages(source, 'projects', params, isProject, 'project', options)
 }

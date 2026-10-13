@@ -88,4 +88,50 @@ describe('useArcIndex', () => {
     await waitFor(() => expect(result.current.updatedAt).toBeInstanceOf(Date))
     expect(result.current.hubs.every(hub => hub.status !== 'loading')).toBe(true)
   })
+
+  it('reloads only the DataHUB whose connection object changed', async () => {
+    const projectsA = vi.fn<DataHubConnection['fetchProjects']>(async () => Success([gitLabProjectFull({ id: 1, name: 'ARC of Alpha' })]))
+    const projectsB = vi.fn<DataHubConnection['fetchProjects']>(async () => Success([gitLabProjectFull({ id: 2, name: 'ARC of Beta' })]))
+    const signals: Record<string, AbortSignal[]> = { a: [], b: [] }
+    const firstA = fakeConnection({ hub: hubA, fetchProjects: (signal) => { signals.a.push(signal); return projectsA(signal) } })
+    const firstB = fakeConnection({ hub: hubB, fetchProjects: (signal) => { signals.b.push(signal); return projectsB(signal) } })
+    const { result, rerender } = renderHook(({ connections }) => useArcIndex(connections),
+      { initialProps: { connections: [firstA, firstB] } })
+    await waitFor(() => expect(result.current.hubs.every(hub => hub.status === 'loaded')).toBe(true))
+
+    const secondB = fakeConnection({ hub: hubB, includesPrivate: true,
+      fetchProjects: (signal) => { signals.b.push(signal); return projectsB(signal) } })
+    rerender({ connections: [firstA, secondB] })
+    expect(signals.a[0].aborted).toBe(false)
+    expect(signals.b[0].aborted).toBe(true)
+    expect(result.current.arcs.map(arc => arc.hubId)).toEqual(['a'])
+    await waitFor(() => expect(projectsB).toHaveBeenCalledTimes(2))
+    expect(projectsA).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(result.current.arcs.map(arc => arc.hubId)).toEqual(['a', 'b']))
+  })
+
+  it('drops the state and ARCs of a removed DataHUB', async () => {
+    const connections = [connection(hubA), connection(hubB)]
+    const { result, rerender } = renderHook(({ connections }) => useArcIndex(connections),
+      { initialProps: { connections } })
+    await waitFor(() => expect(result.current.arcs).toHaveLength(2))
+    rerender({ connections: [connections[0]] })
+    expect(result.current.hubs.map(hub => hub.hub.id)).toEqual(['a'])
+    expect(result.current.arcs.map(arc => arc.hubId)).toEqual(['a'])
+  })
+
+  it('starts no request when the same connection objects arrive in a new array', async () => {
+    const projectsA = vi.fn<DataHubConnection['fetchProjects']>(async () => Success([]))
+    const projectsB = vi.fn<DataHubConnection['fetchProjects']>(async () => Success([]))
+    const connections = [
+      fakeConnection({ hub: hubA, fetchProjects: projectsA }),
+      fakeConnection({ hub: hubB, fetchProjects: projectsB }),
+    ]
+    const { result, rerender } = renderHook(({ connections }) => useArcIndex(connections),
+      { initialProps: { connections } })
+    await waitFor(() => expect(result.current.hubs.every(hub => hub.status === 'loaded')).toBe(true))
+    rerender({ connections: [connections[0], connections[1]] })
+    await waitFor(() => expect(projectsA).toHaveBeenCalledTimes(1))
+    expect(projectsB).toHaveBeenCalledTimes(1)
+  })
 })

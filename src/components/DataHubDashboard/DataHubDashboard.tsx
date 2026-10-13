@@ -55,10 +55,14 @@ function DataHubDashboard({ connections, signedIn, onArcClick, now = () => new D
   }
   const filtering = chips.length > 0
 
-  const numbers = headlineNumbers(filtered)
-  const hubCounts = countBy(hubScoped, 'hub', hubNames)
-  const groupCounts = countBy(groupScoped, 'group', groupNames)
-  const months = arcsPerMonth(filtered, current, 12)
+  const numbers = useMemo(() => headlineNumbers(filtered), [filtered])
+  const totals = useMemo(() => filtering ? headlineNumbers(visible) : undefined, [visible, filtering])
+  const hubCounts = useMemo(() => countBy(hubScoped, 'hub', hubNames), [hubScoped, hubNames])
+  const groupCounts = useMemo(() => countBy(groupScoped, 'group', groupNames, hubNames), [groupScoped, groupNames, hubNames])
+  // The chart buckets depend on the calendar month, not on the clock's time of day.
+  const currentMonth = `${current.getUTCFullYear()}-${String(current.getUTCMonth() + 1).padStart(2, '0')}`
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- the month key, not the Date, drives the buckets.
+  const months = useMemo(() => arcsPerMonth(filtered, current, 12), [filtered, currentMonth])
   const sorted = useMemo(() => sortArcs(filtered, sort, hubNames), [filtered, sort, hubNames])
 
   const clearAll = () => { dispatch({ type: 'clearFilters' }); setQueryInput('') }
@@ -76,7 +80,7 @@ function DataHubDashboard({ connections, signedIn, onArcClick, now = () => new D
       <DashboardHeader hubCount={hubs.length} okCount={hubs.length - failed.length} updatedAt={updatedAt} now={current}
         signedIn={signedIn} accessMode={accessMode} onAccessModeChange={() => {}} onUpdate={reload} updating={updating} />
       {loading && <p role="status" className={styles.loading}>Loading ARCs from {hubs.length} DataHUBs…</p>}
-      {allFailed
+      {loading ? null : allFailed
         ? <Banner variant="critical" title="Could not load ARCs"
           primaryAction={<Banner.PrimaryAction onClick={reload}>Try again</Banner.PrimaryAction>} />
         : <>
@@ -84,7 +88,7 @@ function DataHubDashboard({ connections, signedIn, onArcClick, now = () => new D
             <Banner key={hub.id} variant="warning" title={`Could not load ARCs from ${hub.name}`} description={error}
               primaryAction={<Banner.PrimaryAction onClick={() => retry(hub.id)}>{`Retry ${hub.name}`}</Banner.PrimaryAction>} />
           ))}
-          <SummaryCards numbers={numbers} totals={filtering ? headlineNumbers(visible) : undefined}
+          <SummaryCards numbers={numbers} totals={totals}
             signedIn={signedIn} accessMode={accessMode} activeAccess={filters.access}
             onSelect={kind => kind === 'all' ? clearAll() : dispatch({ type: 'toggleAccess', value: kind })} />
           <div className={styles.charts}>

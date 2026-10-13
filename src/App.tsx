@@ -1,7 +1,7 @@
 import '@primer/primitives/dist/css/functional/themes/light.css'
 import '@primer/css/dist/primer.css'
 import { BaseStyles } from '@primer/react'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { ThemeProvider } from '@primer/react/next'
 import DataHubDashboard from './components/DataHubDashboard/DataHubDashboard.tsx'
 import { listAllGroups, listAllProjects } from './api/gitlab/index.ts'
@@ -30,12 +30,19 @@ function Portal() {
   const { accounts } = useAuthentication()
   const [pageState, setPageState] = useState<PageState>({ type: "datahub-dashboard" })
   const tokenSignature = JSON.stringify(availableDataHubs.map(hub => accounts[hub.id]?.session?.token ?? null))
+  // A DataHUB's connection object is reused while its token is unchanged, so
+  // login changes on one DataHUB reload only that DataHUB (research R4).
+  const connectionsCache = useRef(new Map<string, { token?: string; connection: DataHubConnection }>())
   // Rebuilt only when a token changes; `accounts` also changes on `checking`/`error` updates.
   const connections = useMemo<DataHubConnection[]>(() => {
     const tokens: (string | null)[] = JSON.parse(tokenSignature)
+    /* oxlint-disable react/refs */
+    const cache = connectionsCache.current
     return availableDataHubs.map((hub, index) => {
       const token = tokens[index] ?? undefined
-      return {
+      const cached = cache.get(hub.id)
+      if (cached && cached.token === token) return cached.connection
+      const connection: DataHubConnection = {
         hub,
         includesPrivate: !!token,
         fetchProjects: signal => listAllProjects(hub.url, { token, signal }),
@@ -44,7 +51,10 @@ function Portal() {
         fetchContributors: async () => Success([]),
         fetchLatestCommit: async () => Success(null),
       }
+      cache.set(hub.id, { token, connection })
+      return connection
     })
+    /* oxlint-enable react/refs */
   }, [tokenSignature])
 
   return <>

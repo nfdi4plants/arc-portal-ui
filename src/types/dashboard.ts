@@ -19,7 +19,7 @@ export interface ArcSummary {
   title: string
   description: string
   group: WorkingGroup
-  access: 'public' | 'private'
+  access: Access
   createdAt: string
   lastActivityAt: string
   topics: string[]
@@ -40,6 +40,22 @@ export interface ArcDetails {
 
 export type DetailsMap = Map<string, ArcDetails | 'unavailable'>
 
+export type Access = 'public' | 'private'
+export type FilterKind = 'hub' | 'group' | 'access' | 'query'
+
+export interface HeadlineNumbers {
+  total: number
+  public: number
+  private: number
+  hubs: number
+  /** Filled in once contributor details are loaded. */
+  people: number | null
+}
+
+export interface CountItem { key: string; label: string; count: number }
+
+export interface MonthCount { month: string; count: number }
+
 export interface HubState {
   hub: GitLabInstance
   status: 'loading' | 'loaded' | 'failed'
@@ -54,7 +70,7 @@ export type SearchScope = 'all' | 'title' | 'description' | 'group' | 'topic' | 
 export interface DashboardFilters {
   hubId?: string
   groupKey?: string
-  access?: 'public' | 'private'
+  access?: Access
   query: string
   scope: SearchScope
 }

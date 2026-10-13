@@ -24,6 +24,7 @@ export function BarList({ title, items, activeKey, onToggle, max = 6 }: BarListP
       <ul className={styles.list}>
         {shown.map(item => {
           const dimmed = activeKey !== undefined && item.key !== activeKey
+          const name = item.title ?? item.label
           const content = <>
             <span className={styles.label} title={item.title ?? item.label}>{item.label}</span>
             <span className={styles.track} aria-hidden="true">
@@ -35,7 +36,7 @@ export function BarList({ title, items, activeKey, onToggle, max = 6 }: BarListP
             <li key={item.key} className={dimmed ? styles.dimmed : undefined}>
               {onToggle
                 ? <button type="button" className={styles.row} aria-pressed={item.key === activeKey}
-                  aria-label={`${item.label}: ${item.count} ARCs`} onClick={() => onToggle(item.key)}>{content}</button>
+                  aria-label={`${name}: ${item.count} ARCs`} onClick={() => onToggle(item.key)}>{content}</button>
                 : <div className={styles.row}>{content}</div>}
             </li>
           )

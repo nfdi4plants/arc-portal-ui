@@ -13,6 +13,27 @@ export function validIdentifier(value: number | string) {
   return typeof value === 'number' ? Number.isSafeInteger(value) && value > 0 : !!value.trim()
 }
 
+/** Shared paging loop: follows `nextPage` until `null`, checking `signal` between pages. */
+export async function listAllPages<T>(
+  source: string,
+  resource: string,
+  params: URLSearchParams,
+  isItem: (item: unknown) => item is T,
+  label: string,
+  options: GitLabRequestOptions = {},
+): Promise<Result<T[]>> {
+  const items: T[] = []
+  let page: number | null = 1
+  while (page !== null) {
+    if (options.signal?.aborted) return Failure('GitLab request canceled.')
+    const result: Result<GitLabPage<T>> = await requestPage(source, resource, new URLSearchParams(params), { ...options, page, perPage: 100 }, isItem, label)
+    if (result.success === false) return Failure(result.error)
+    items.push(...result.value.items)
+    page = result.value.nextPage
+  }
+  return Success(items)
+}
+
 /** Shared paging preserves the fallback when CORS hides pagination headers. */
 export async function requestPage<T>(
   source: string,

@@ -1,4 +1,4 @@
-import type { AccessMode, DashboardFilters, ExtraColumn, SearchScope, SortState } from '../../types/dashboard.ts'
+import type { Access, AccessMode, DashboardFilters, ExtraColumn, FilterKind, SearchScope, SortState } from '../../types/dashboard.ts'
 
 export interface DashboardState {
   accessMode: AccessMode
@@ -17,9 +17,9 @@ export const initialDashboardState: DashboardState = {
 export type DashboardAction =
   | { type: 'toggleHub'; value: string }
   | { type: 'toggleGroup'; value: string }
-  | { type: 'toggleAccess'; value: 'public' | 'private' }
+  | { type: 'toggleAccess'; value: Access }
   | { type: 'clearFilters' }
-  | { type: 'removeFilter'; kind: 'hub' | 'group' | 'access' | 'query' }
+  | { type: 'removeFilter'; kind: FilterKind }
   | { type: 'setQuery'; query: string }
   | { type: 'setScope'; scope: SearchScope }
   | { type: 'setAccessMode'; mode: AccessMode }

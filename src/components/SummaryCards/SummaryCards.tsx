@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react'
-import type { HeadlineNumbers } from '../DataHubDashboard/logic/summary.ts'
-import type { AccessMode } from '../../types/dashboard.ts'
+import type { Access, AccessMode, HeadlineNumbers } from '../../types/dashboard.ts'
 import styles from './SummaryCards.module.css'
 
 export interface SummaryCardsProps {
@@ -10,9 +9,9 @@ export interface SummaryCardsProps {
   signedIn: boolean
   accessMode: AccessMode
   /** The access filter currently applied, if any. */
-  activeAccess?: 'public' | 'private'
+  activeAccess?: Access
   /** Called when one of the count cards is clicked; "all" clears the filters. */
-  onSelect?: (kind: 'all' | 'public' | 'private') => void
+  onSelect?: (kind: 'all' | Access) => void
 }
 
 interface CardProps {

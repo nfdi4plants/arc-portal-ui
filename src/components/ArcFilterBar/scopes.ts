@@ -1,6 +1,6 @@
-import type { SearchScope } from '../../types/dashboard.ts'
+import type { FilterKind, SearchScope } from '../../types/dashboard.ts'
 
-export type ChipKind = 'hub' | 'group' | 'access' | 'query'
+export type ChipKind = FilterKind
 
 export const SCOPES: { scope: SearchScope; label: string }[] = [
   { scope: 'all', label: 'Everything' },

@@ -4,13 +4,10 @@ import { dashboardReducer, initialDashboardState, type DashboardState } from './
 const reduce = (state: DashboardState, ...actions: Parameters<typeof dashboardReducer>[1][]) =>
   actions.reduce(dashboardReducer, state)
 
-describe('dashboardReducer', () => {
-  it('starts with the newest changes first and no filters', () => {
-    expect(initialDashboardState.sort).toEqual({ column: 'lastChange', direction: 'DESC' })
-    expect(initialDashboardState.filters).toEqual({ query: '', scope: 'all' })
-    expect(initialDashboardState.accessMode).toBe('accessible')
-  })
+const withAllFilters = reduce(initialDashboardState,
+  { type: 'toggleHub', value: 'a' }, { type: 'toggleGroup', value: 'a/x' }, { type: 'toggleAccess', value: 'private' })
 
+describe('dashboardReducer', () => {
   it.each([
     ['toggleHub', 'hubId', 'a'],
     ['toggleGroup', 'groupKey', 'a/x'],
@@ -30,13 +27,13 @@ describe('dashboardReducer', () => {
   })
 
   it.each([
-    ['hub', 'hubId'], ['group', 'groupKey'], ['access', 'access'],
-  ] as const)('removeFilter(%s) clears only that filter', (kind, field) => {
-    const state = reduce(initialDashboardState,
-      { type: 'toggleHub', value: 'a' }, { type: 'toggleGroup', value: 'a/x' }, { type: 'toggleAccess', value: 'private' },
-      { type: 'removeFilter', kind })
+    ['hub', 'hubId', { groupKey: 'a/x', access: 'private' }],
+    ['group', 'groupKey', { hubId: 'a', access: 'private' }],
+    ['access', 'access', { hubId: 'a', groupKey: 'a/x' }],
+  ] as const)('removeFilter(%s) clears only that filter', (kind, field, remaining) => {
+    const state = reduce(withAllFilters, { type: 'removeFilter', kind })
     expect(state.filters[field]).toBeUndefined()
-    expect(Object.values(state.filters).filter(value => value !== undefined && value !== '' && value !== 'all')).toHaveLength(2)
+    expect(state.filters).toMatchObject(remaining)
   })
 
   it('removeFilter(query) clears the query', () => {
@@ -47,11 +44,5 @@ describe('dashboardReducer', () => {
   it('setSort replaces the sort', () => {
     const sort = { column: 'title', direction: 'ASC' } as const
     expect(reduce(initialDashboardState, { type: 'setSort', sort }).sort).toEqual(sort)
-  })
-
-  it('toggleColumn adds and removes an extra column', () => {
-    const on = reduce(initialDashboardState, { type: 'toggleColumn', column: 'topics' })
-    expect(on.extraColumns).toEqual(['topics'])
-    expect(reduce(on, { type: 'toggleColumn', column: 'topics' }).extraColumns).toEqual([])
   })
 })

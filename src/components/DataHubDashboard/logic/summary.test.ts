@@ -34,6 +34,24 @@ describe('countBy', () => {
     const labels = new Map([['a/x', 'X'], ['a/y', 'Y'], ['a/z', 'A group']])
     expect(countBy(arcs, 'group', labels).map(item => item.label)).toEqual(['A group', 'X', 'Y'])
   })
+
+  it('titles group labels that repeat across DataHUBs with the hub name', () => {
+    const labels = new Map([['a/x', 'CEPLAS'], ['b/x', 'CEPLAS']])
+    const hubNames = new Map([['a', 'Alpha'], ['b', 'Beta']])
+    const items = countBy([
+      arcSummary({ hubId: 'a', group: group('a/x', 'CEPLAS') }),
+      arcSummary({ hubId: 'b', group: group('b/x', 'CEPLAS') }),
+    ], 'group', labels, hubNames)
+    expect(items).toEqual([
+      { key: 'a/x', label: 'CEPLAS', title: 'CEPLAS on Alpha', count: 1 },
+      { key: 'b/x', label: 'CEPLAS', title: 'CEPLAS on Beta', count: 1 },
+    ])
+  })
+
+  it('leaves labels unique to one DataHUB without a title', () => {
+    const items = countBy(arcs, 'group', new Map([['a/x', 'X'], ['a/y', 'Y'], ['a/z', 'A group']]))
+    expect(items.every(item => !('title' in item))).toBe(true)
+  })
 })
 
 describe('arcsPerMonth', () => {

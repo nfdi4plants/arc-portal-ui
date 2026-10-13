@@ -1,6 +1,6 @@
 import { Button, Heading, SegmentedControl, Text } from '@primer/react'
 import type { AccessMode } from '../../types/dashboard.ts'
-import { relativeTime } from '../DataHubDashboard/logic/time.ts'
+import { relativeTime } from '../../util/time.ts'
 import styles from './DashboardHeader.module.css'
 
 export interface DashboardHeaderProps {
