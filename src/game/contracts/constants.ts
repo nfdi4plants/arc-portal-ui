@@ -49,3 +49,5 @@ export const PALETTE = {
 } as const
 
 export const MAGE_TEXTURE = 'arc-mage'
+// Frame of MAGE_TEXTURE trimmed to the visible pixels, added by preloadCoreAssets.
+export const MAGE_FRAME = 'trimmed'
