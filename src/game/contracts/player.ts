@@ -48,7 +48,9 @@ export interface AbilityHandler {
 }
 
 export interface PlayerEvents {
-  attackStarted: { slot: WeaponSlot; comboIndex: number; move: AttackMove }
+  // held is the set of actions held when the attack was pressed, for moves that depend on a
+  // direction (down + heavy in the air).
+  attackStarted: { slot: WeaponSlot; comboIndex: number; move: AttackMove; held: ReadonlySet<Action> }
   attackActive: { slot: WeaponSlot; comboIndex: number; move: AttackMove }
   dashed: { direction: 1 | -1 }
   landed: { fallSpeed: number }
@@ -74,7 +76,7 @@ export interface PlayerHandle extends Combatant {
   abilityCooldownRemainingMs(slot: number): number
   // Return true from the interceptor to cancel a lethal hit (git revert).
   setLethalHitInterceptor(interceptor: ((hit: HitEvent) => boolean) | null): void
-  // Freezes input and physics, for level-up cards and pause.
+  // Freezes input and physics, for hit-stop, level-up cards and pause.
   setFrozen(frozen: boolean): void
   // A shield absorbs the next hit completely. Shield fragments (component monsters) grant one,
   // up to three at a time.

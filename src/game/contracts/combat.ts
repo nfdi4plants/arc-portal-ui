@@ -24,8 +24,10 @@ export interface Combatant {
   // Bottom centre (the feet), the origin of hitbox shapes.
   position(): { x: number; y: number }
   isInvulnerable(): boolean
-  // Applies damage, knockback and flinch.
-  receiveHit(hit: HitEvent): void
+  // Applies damage, knockback and flinch. Returns the damage actually taken after armour, weak
+  // points and similar modifiers, so damage numbers and lifesteal show the real value. Returning
+  // nothing means hit.damage was taken unchanged.
+  receiveHit(hit: HitEvent): number | void
   isDead(): boolean
 }
 
@@ -78,6 +80,10 @@ export interface CombatWorld {
   unregister(combatant: Combatant): void
   spawnHitbox(spec: HitboxSpec): { cancel(): void }
   spawnProjectile(spec: ProjectileSpec, origin: { x: number; y: number }): { cancel(): void }
+  // Cancels every hitbox and projectile the combatant owns, for a boss that is beaten or changes phase.
+  cancelOwnedBy(owner: Combatant): void
+  // Registered combatants of a team that are alive, for effects that target or chain.
+  livingCombatants(team: Team): readonly Combatant[]
   on(event: 'hit' | 'kill', listener: (event: HitEvent) => void): () => void
   // Lets the attacker's build decide crits and damage multipliers before the hit lands.
   setDamageModifier(modifier: ((attacker: Combatant, base: number) => { damage: number; crit: boolean }) | null): void

@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import type { ScribbleArt } from '../../contracts/art'
 import type { CombatWorld, HitEvent } from '../../contracts/combat'
 import { DEPTH, MAGE_FRAME, MAGE_TEXTURE, PALETTE, PLAYER_HEIGHT } from '../../contracts/constants'
-import type { Action } from '../../contracts/input'
+import type { Action, InputFrame } from '../../contracts/input'
 import type { AbilityHandler, AttackContext, PlayerEvents, PlayerHandle, WeaponMoveset } from '../../contracts/player'
 import type { PlayerBuild, PlayerWeaponId, WeaponSlot } from '../../contracts/progression'
 import { EMPTY_MOTOR_INPUT, MOTOR, availableJump, canDash, createMotorState, runSpeed, stepMotor } from '../../model/input/motor'
@@ -103,6 +103,15 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
     pressed: dropPressed,
     released: dropPressed,
   }
+  // The scene reads a new input frame every step, also while the player is frozen. Edges seen
+  // while frozen wait here for the first step that runs, so a press during hit-stop is not lost.
+  const carriedPressed = new Set<Action>()
+  const carriedReleased = new Set<Action>()
+  const mergedPressed = new Set<Action>()
+  const mergedReleased = new Set<Action>()
+  const mergedFrame: InputFrame = { held: mergedPressed, pressed: mergedPressed, released: mergedReleased, aim: { x, y } }
+  // The held set of the step an attack started in, kept past the step for attackStarted listeners.
+  const attackHeld = new Set<Action>()
 
   const emit = <K extends keyof PlayerEvents>(event: K, payload: PlayerEvents[K]) => {
     const set = listeners.get(event)
@@ -168,7 +177,9 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
       return (movesets.get(id) ?? staffMoveset).moves(slot, tier)
     },
     onStart(slot, comboIndex, move) {
-      emit('attackStarted', { slot, comboIndex, move })
+      attackHeld.clear()
+      for (const action of held) attackHeld.add(action)
+      emit('attackStarted', { slot, comboIndex, move, held: attackHeld })
     },
     onActive(slot, comboIndex, move) {
       move.onActive(contextFor(build.weapons[slot].tier))
@@ -187,11 +198,29 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
   let flashing = false
   let ghostMs = 0
 
+  // Held comes from the live frame, so a key released while frozen is no longer held.
+  const mergeCarried = (frame: InputFrame): InputFrame => {
+    mergedPressed.clear()
+    mergedReleased.clear()
+    for (const action of frame.pressed) mergedPressed.add(action)
+    for (const action of carriedPressed) mergedPressed.add(action)
+    for (const action of frame.released) mergedReleased.add(action)
+    for (const action of carriedReleased) mergedReleased.add(action)
+    carriedPressed.clear()
+    carriedReleased.clear()
+    mergedFrame.held = frame.held
+    mergedFrame.aim = frame.aim
+    return mergedFrame
+  }
+
   const onStep = (deltaSeconds: number) => {
     if (destroyed) return
     if (frozen) {
       body.setVelocity(0, 0)
       body.resetFlags()
+      const edges = deps.input.frame()
+      for (const action of edges.pressed) carriedPressed.add(action)
+      for (const action of edges.released) carriedReleased.add(action)
       return
     }
     const dt = deltaSeconds * 1000
@@ -209,7 +238,8 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
     motor.vx = body.velocity.x
     motor.vy = body.velocity.y
 
-    const frame = deps.input.frame()
+    let frame = deps.input.frame()
+    if (carriedPressed.size > 0 || carriedReleased.size > 0) frame = mergeCarried(frame)
     held = frame.held
     aim = frame.aim
     flinchMs = Math.max(0, flinchMs - dt)
@@ -243,7 +273,7 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
     motorEnv.speedScale = 1
     if (attacks.canCancel()) {
       const wantsJump = (input.pressed.has('jump') || motor.jumpBufferMs > 0) && availableJump(motor, motorEnv) !== null
-      const wantsDash = input.pressed.has('dash') && canDash(motor, motorEnv)
+      const wantsDash = (input.pressed.has('dash') || motor.dashBufferMs > 0) && canDash(motor, motorEnv)
       if (wantsJump || wantsDash) attacks.cancel()
     }
     attackPressed.light = controllable && frame.pressed.has('light')
@@ -372,15 +402,21 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
     isInvulnerable: () => motor.dashIframesMs > 0 || damageIframesMs > 0,
     isDead: () => hp <= 0,
     receiveHit(hit) {
-      if (hp <= 0 || handle.isInvulnerable()) return
+      if (hp <= 0 || handle.isInvulnerable()) return 0
       if (shields > 0) {
         shields--
         damageIframesMs = DAMAGE_IFRAMES_MS
         flashMs = 70
-        return
+        return 0
       }
-      if (hit.damage >= hp && interceptor?.(hit)) return
-      hp = Math.max(0, hp - hit.damage)
+      if (hit.damage >= hp && interceptor?.(hit)) {
+        // Without iframes the next shot of the same volley would land the lethal hit after all.
+        damageIframesMs = DAMAGE_IFRAMES_MS
+        flashMs = 70
+        return 0
+      }
+      const taken = Math.min(hp, hit.damage)
+      hp -= taken
       attacks.cancel()
       motor.dashMs = 0
       motor.jumpHeld = false
@@ -389,6 +425,7 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
       damageIframesMs = DAMAGE_IFRAMES_MS
       flashMs = 70
       emit('damaged', { hit })
+      return taken
     },
     getBuild: () => ({ ...build, hp }),
     setBuild(next) {

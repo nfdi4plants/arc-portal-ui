@@ -63,6 +63,8 @@ export function createCombatWorld(scene: Phaser.Scene, options: CombatWorldOptio
   const feedback = createFeedback(scene, art)
   const debugGraphics = options.debug ? scene.add.graphics().setDepth(DEPTH.hud) : null
   const scratch: Rect = { x: 0, y: 0, w: 0, h: 0 }
+  // Reused by livingCombatants, so effects that look for targets every step allocate nothing.
+  const living: Combatant[] = []
   let modifier: DamageModifier | null = null
   let hitStopMs = 0
   let destroyed = false
@@ -81,9 +83,10 @@ export function createCombatWorld(scene: Phaser.Scene, options: CombatWorldOptio
       knockback: mirrorKnockback(attack.spec.knockback, attack.facing),
       tags: [...(attack.spec.tags ?? [])],
     }
-    target.receiveHit(event)
+    const taken = target.receiveHit(event)
+    if (typeof taken === 'number') event.damage = taken
     hitStopMs = Math.max(hitStopMs, attack.spec.hitStopMs)
-    feedback.hit(point, damage, crit)
+    feedback.hit(point, event.damage, crit)
     emit('hit', event)
     if (target.isDead() && !killed.has(target)) {
       killed.add(target)
@@ -279,6 +282,19 @@ export function createCombatWorld(scene: Phaser.Scene, options: CombatWorldOptio
           state.sprite.setVisible(false)
         },
       }
+    },
+    cancelOwnedBy(owner) {
+      for (const box of hitboxes) if (box.owner === owner) box.done = true
+      for (const shot of projectiles) {
+        if (shot.done || shot.owner !== owner) continue
+        shot.done = true
+        shot.sprite.setVisible(false)
+      }
+    },
+    livingCombatants(team) {
+      living.length = 0
+      for (const combatant of combatants) if (combatant.team === team && !combatant.isDead()) living.push(combatant)
+      return living
     },
     on(event, listener) {
       listeners[event].add(listener)
