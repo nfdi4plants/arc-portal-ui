@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { gitLabProjectFull, projectResponse } from './test/helpers.tsx'
+import { availableDataHubs } from './config/gitlab.ts'
 import App from './App.tsx'
 
 const fetchCall = vi.fn<typeof fetch>()
@@ -21,15 +22,17 @@ beforeEach(() => {
 it('lists the public ARCs of every configured DataHUB in the dashboard table', async () => {
   render(<App />)
   expect(await screen.findByRole('button', { name: 'Open git.nfdi4plants.org ARC' })).toBeVisible()
-  const projectsCall = fetchCall.mock.calls.find(call => new URL(String(call[0])).pathname === '/api/v4/projects')!
+  const projectsCall = fetchCall.mock.calls.find(call => new URL(String(call[0])).pathname === '/api/v4/projects'
+    && new URL(String(call[0])).searchParams.get('per_page') === '100')!
   const params = new URL(String(projectsCall[0])).searchParams
   expect(params.get('visibility')).toBe('public')
   expect(params.get('order_by')).toBe('last_activity_at')
   expect(new Headers(projectsCall[1]?.headers).has('PRIVATE-TOKEN')).toBe(false)
-  const hosts = new Set(fetchCall.mock.calls
-    .filter(call => new URL(String(call[0])).pathname === '/api/v4/projects')
-    .map(call => new URL(String(call[0])).host))
-  expect(hosts).toEqual(new Set(['git.nfdi4plants.org', 'gitlab.plantmicrobe.de', 'datahub.rz.rptu.de']))
+  const projectCalls = fetchCall.mock.calls.filter(call => new URL(String(call[0])).pathname === '/api/v4/projects')
+  // One fast count and one project page per hub; no count pagination.
+  expect(projectCalls).toHaveLength(availableDataHubs.length * 2)
+  const hosts = new Set(projectCalls.map(call => new URL(String(call[0])).host))
+  expect(hosts).toEqual(new Set(availableDataHubs.map(hub => new URL(hub.url).host)))
 })
 
 it('opens an ARC using its project id and the URL of its source DataHUB', async () => {

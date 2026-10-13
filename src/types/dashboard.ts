@@ -65,6 +65,8 @@ export interface HubState {
   status: 'loading' | 'loaded' | 'failed'
   /** Keeps the last successful value during a reload. */
   arcs: ArcSummary[]
+  /** Undefined while loading; null when the fast count is unavailable. */
+  projectCount?: number | null
   error?: string
   /** Set when the membership list could not be loaded; "My ARCs" then shows an error. */
   membershipError?: string
@@ -96,6 +98,8 @@ export interface DataHubConnection {
 
 /** Shared fetch callbacks receive the GitLab instance URL and optional token/signal. */
 export interface DataHubFetchers {
+  /** Fast count, capped at 10,000; null if pagination headers are unavailable. */
+  fetchProjectCount?: (source: string, options?: GitLabRequestOptions) => Promise<Result<number | null>>
   fetchProjects: (source: string, options?: GitLabRequestOptions) => Promise<Result<GitLabProject[]>>
   fetchGroups: (source: string, options?: Omit<ListGroupsOptions, 'page' | 'perPage'>) => Promise<Result<GitLabGroup[]>>
   fetchMemberProjectIds: (source: string, options?: GitLabRequestOptions) => Promise<Result<number[]>>

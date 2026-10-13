@@ -104,20 +104,26 @@ describe('useArcIndex', () => {
 
   it('reloads only the DataHUB whose token changes, including logout', async () => {
     const fetchProjects = vi.fn<DataHubFetchers['fetchProjects']>(fetchersForHubs().fetchProjects)
-    const fetchers = fakeDataHubFetchers({ fetchProjects })
+    const fetchProjectCount = vi.fn<NonNullable<DataHubFetchers['fetchProjectCount']>>(async (_source, options) => Success(options?.token ? 8 : 3))
+    const fetchers = fakeDataHubFetchers({ fetchProjects, fetchProjectCount })
     const { result, rerender } = renderHook(({ sessions }) => useArcIndex(sessions, fetchers),
       { initialProps: { sessions: connections } })
     await waitFor(() => expect(result.current.arcs).toHaveLength(2))
+    expect(result.current.hubs[1].projectCount).toBe(3)
     rerender({ sessions: [{ hub: hubA }, { hub: hubB, token: 'beta-token' }] })
     expect(result.current.arcs.map(arc => arc.hubId)).toEqual(['a'])
     await waitFor(() => expect(result.current.arcs).toHaveLength(2))
+    expect(result.current.hubs[1].projectCount).toBe(8)
     expect(fetchProjects.mock.calls.filter(([source]) => source === hubA.url)).toHaveLength(1)
     expect(fetchProjects.mock.calls.filter(([source]) => source === hubB.url)).toHaveLength(2)
     rerender({ sessions: connections })
     expect(result.current.arcs.map(arc => arc.hubId)).toEqual(['a'])
     await waitFor(() => expect(result.current.arcs).toHaveLength(2))
+    expect(result.current.hubs[1].projectCount).toBe(3)
     expect(fetchProjects.mock.calls.filter(([source]) => source === hubA.url)).toHaveLength(1)
     expect(fetchProjects.mock.calls.filter(([source]) => source === hubB.url)).toHaveLength(3)
+    expect(fetchProjectCount.mock.calls.filter(([source]) => source === hubA.url)).toHaveLength(1)
+    expect(fetchProjectCount.mock.calls.filter(([source]) => source === hubB.url)).toHaveLength(3)
   })
 
   it('starts no request when unchanged sessions arrive in a new array', async () => {

@@ -31,7 +31,14 @@ function toggle<T>(current: T | undefined, value: T): T | undefined {
 export function dashboardReducer(state: DashboardState, action: DashboardAction): DashboardState {
   const { filters } = state
   switch (action.type) {
-    case 'toggleHub': return { ...state, filters: { ...filters, hubId: toggle(filters.hubId, action.value) } }
+    case 'toggleHub': {
+      const hubId = toggle(filters.hubId, action.value)
+      return { ...state, filters: {
+        ...filters, hubId,
+        // A group from another DataHUB is no longer selectable after switching hubs.
+        groupKey: hubId !== undefined && !filters.groupKey?.startsWith(`${hubId}/`) ? undefined : filters.groupKey,
+      } }
+    }
     case 'toggleGroup': return { ...state, filters: { ...filters, groupKey: toggle(filters.groupKey, action.value) } }
     case 'toggleAccess': return { ...state, filters: { ...filters, access: toggle(filters.access, action.value) } }
     case 'clearFilters': return { ...state, filters: { query: '', recent: false } }

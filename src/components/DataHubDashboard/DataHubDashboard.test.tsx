@@ -4,7 +4,6 @@ import { describe, expect, it, vi } from 'vitest'
 import DataHubDashboard, { type DataHubDashboardProps } from './DataHubDashboard.tsx'
 import { fakeDataHubFetchers, gitLabProjectFull, plantdatahub, renderWithTheme, deferred } from '../../test/helpers.tsx'
 import { AUTH_FAILED_MESSAGE } from '../../api/gitlab/client.ts'
-import type { getProjectCount } from '../../api/gitlab/index.ts'
 import { Failure, Success, type Result } from '../../types/result.ts'
 import type { GitLabContributor } from '../../types/gitlab.ts'
 import type { DataHubFetchers } from '../../types/dashboard.ts'
@@ -29,45 +28,13 @@ const otherProjects = [
   proj(5, 'Epsilon', 'https://other.example', '2026-07-01T10:00:00Z'),
 ]
 const dashboard = (overrides: Partial<DataHubDashboardProps> = {}): DataHubDashboardProps => ({
-  ...fakeDataHubFetchers(), fetchProjectCount: async () => Success(0), dataHubs: [plantdatahub], onArcClick: vi.fn(), now, ...overrides,
+  ...fakeDataHubFetchers(), dataHubs: [plantdatahub], onArcClick: vi.fn(), now, ...overrides,
 })
 const twoHubs = (overrides: Partial<DataHubDashboardProps> = {}) => dashboard({
   dataHubs: [plantdatahub, otherHub],
   fetchProjects: async source => Success(source === plantdatahub.url ? plantProjects : otherProjects),
   fetchGroups: async () => Success([{ id: 2, name: 'CEPLAS', full_path: 'ceplas' }]),
   ...overrides,
-})
-
-describe('DataHubDashboard project counts', () => {
-  it('starts counts for each hub on mount and logs each completed Result while ARCs load independently', async () => {
-    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
-    const gate = deferred<Result<number>>()
-    const fetchProjectCount = vi.fn<typeof getProjectCount>((source) => source === plantdatahub.url
-      ? gate.promise : Promise.resolve(Failure('Count unavailable')))
-    const props = twoHubs({ fetchProjectCount, tokens: { [plantdatahub.id]: 'runtime-token' } })
-    renderWithTheme(<DataHubDashboard {...props} />)
-    expect(fetchProjectCount).toHaveBeenCalledWith(plantdatahub.url, { token: 'runtime-token', signal: expect.any(AbortSignal) })
-    expect(fetchProjectCount).toHaveBeenCalledWith(otherHub.url, { token: undefined, signal: expect.any(AbortSignal) })
-    expect(await screen.findByRole('button', { name: 'Open Alpha' })).toBeVisible()
-    expect(log).toHaveBeenCalledWith('GitLab project count', otherHub.url, Failure('Count unavailable'))
-    expect(log).not.toHaveBeenCalledWith('GitLab project count', plantdatahub.url, expect.anything())
-    gate.resolve(Success(12_345))
-    await waitFor(() => expect(log).toHaveBeenCalledWith('GitLab project count', plantdatahub.url, Success(12_345)))
-    expect(fetchProjectCount).toHaveBeenCalledTimes(2)
-  })
-
-  it('cancels counts when leaving the dashboard and skips their late logs', async () => {
-    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
-    const gate = deferred<Result<number>>()
-    const fetchProjectCount = vi.fn<typeof getProjectCount>(() => gate.promise)
-    const { unmount } = renderWithTheme(<DataHubDashboard {...dashboard({ fetchProjectCount })} />)
-    const signal = fetchProjectCount.mock.calls[0][1]!.signal!
-    unmount()
-    expect(signal.aborted).toBe(true)
-    gate.resolve(Success(3))
-    await gate.promise
-    expect(log).not.toHaveBeenCalled()
-  })
 })
 
 describe('DataHubDashboard US1 overview', () => {
@@ -124,16 +91,53 @@ describe('DataHubDashboard US2 filtering', () => {
     expect(summary.getByRole('button', { name: 'ARCs accessible' })).toHaveAttribute('aria-pressed', 'true')
   })
 
-  it('filters the rows by search term', async () => {
+  it('applies search only on submission and leaves the overview and fetches unchanged', async () => {
     const user = userEvent.setup()
-    renderWithTheme(<DataHubDashboard {...twoHubs()} onArcClick={vi.fn()} now={now} />)
+    const props = twoHubs()
+    const fetchProjects = vi.fn(props.fetchProjects)
+    const fetchGroups = vi.fn(props.fetchGroups)
+    renderWithTheme(<DataHubDashboard {...props} fetchProjects={fetchProjects} fetchGroups={fetchGroups} />)
     await screen.findByRole('button', { name: 'Open Alpha' })
-    // Paste is one event; typing re-renders the whole dashboard per key, which is slow under load.
-    await user.click(screen.getByRole('searchbox', { name: 'Search ARCs' }))
-    await user.paste('alpha')
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Open Beta' })).not.toBeInTheDocument())
+    const summary = within(screen.getByRole('complementary', { name: 'Summary' }))
+    await waitFor(() => expect(summary.getByRole('group', { name: 'people' })).toHaveTextContent('0'))
+    const hubCard = screen.getByRole('region', { name: 'ARCs per DataHUB' })
+    const groupsCard = screen.getByRole('region', { name: 'ARCs per working group' })
+    const hubContent = hubCard.textContent
+    const groupContent = groupsCard.textContent
+    const input = screen.getByRole('searchbox', { name: 'Search ARCs' })
+    await user.type(input, 'alpha')
+    // Pausing after typing must not apply the old debounced search.
+    await new Promise(resolve => setTimeout(resolve, 250))
+    expect(screen.getByRole('button', { name: 'Open Beta' })).toBeVisible()
+    expect(screen.queryByText('Search: “alpha”')).not.toBeInTheDocument()
+    expect(fetchProjects).toHaveBeenCalledTimes(2)
+    expect(fetchGroups).toHaveBeenCalledTimes(2)
+    expect(hubCard.textContent).toBe(hubContent)
+    expect(groupsCard.textContent).toBe(groupContent)
+
+    await user.click(screen.getByRole('button', { name: 'Search' }))
+    expect(screen.queryByRole('button', { name: 'Open Beta' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Open Alpha' })).toBeVisible()
     expect(screen.getByText('Search: “alpha”')).toBeVisible()
+    expect(screen.getByRole('status')).toHaveTextContent('Showing 1 of 5 ARCs')
+    expect(hubCard.textContent).toBe(hubContent)
+    expect(groupsCard.textContent).toBe(groupContent)
+    expect(summary.getByRole('button', { name: 'ARCs accessible' })).toHaveTextContent('5')
+    expect(screen.getByRole('img', { name: 'New ARCs per month: 5 in the last 12 months' })).toBeVisible()
+    expect(fetchProjects).toHaveBeenCalledTimes(2)
+    expect(fetchGroups).toHaveBeenCalledTimes(2)
+
+    await user.clear(input)
+    await user.type(input, 'delta')
+    expect(screen.getByRole('button', { name: 'Open Alpha' })).toBeVisible()
+    expect(screen.getByText('Search: “alpha”')).toBeVisible()
+    await user.keyboard('{Enter}')
+    expect(screen.getByRole('button', { name: 'Open Delta' })).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Open Alpha' })).not.toBeInTheDocument()
+    await user.clear(input)
+    await user.click(screen.getByRole('button', { name: 'Search' }))
+    expect(screen.getByRole('status')).toHaveTextContent('Showing 5 of 5 ARCs')
+    expect(screen.queryByText('Search: “delta”')).not.toBeInTheDocument()
   })
 
   it('filters the rows to recently changed ARCs', async () => {
@@ -144,6 +148,9 @@ describe('DataHubDashboard US2 filtering', () => {
     expect(screen.getByText('Changed in the last 30 days')).toBeVisible()
     expect(screen.queryByRole('button', { name: 'Open Gamma' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Open Alpha' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'PLANTdataHUB (official): 3 ARCs' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'CEPLAS on PLANTdataHUB (official): 3 ARCs' })).toBeVisible()
+    expect(screen.getByRole('img', { name: 'New ARCs per month: 5 in the last 12 months' })).toBeVisible()
   })
 
   it('shows the empty state when nothing matches', async () => {
@@ -152,9 +159,90 @@ describe('DataHubDashboard US2 filtering', () => {
     await screen.findByRole('button', { name: 'Open Alpha' })
     await user.click(screen.getByRole('searchbox', { name: 'Search ARCs' }))
     await user.paste('nothing matches')
+    await user.click(screen.getByRole('button', { name: 'Search' }))
     expect(await screen.findByText('No ARCs match these filters.')).toBeVisible()
     await user.click(screen.getByRole('button', { name: 'Clear filters' }))
     expect(await screen.findByRole('button', { name: 'Open Alpha' })).toBeVisible()
+    expect(screen.getByRole('searchbox', { name: 'Search ARCs' })).toHaveValue('')
+  })
+})
+
+describe('DataHubDashboard filter direction', () => {
+  const groupedProjects = [plantProjects[0], {
+    ...plantProjects[1], path_with_namespace: 'botany/arc-2',
+    namespace: { id: 3, name: 'Botany', path: 'botany', kind: 'group' as const, full_path: 'botany' },
+  }, plantProjects[2]]
+  const groupedHubs = () => twoHubs({
+    fetchProjects: async source => Success(source === plantdatahub.url ? groupedProjects : otherProjects),
+    fetchGroups: async () => Success([
+      { id: 2, name: 'CEPLAS', full_path: 'ceplas' }, { id: 3, name: 'Botany', full_path: 'botany' },
+    ]),
+  })
+
+  it('combines hub, organisation and submitted search while removing chips clears their active states', async () => {
+    const user = userEvent.setup()
+    renderWithTheme(<DataHubDashboard {...groupedHubs()} />)
+    const plantHub = await screen.findByRole('button', { name: 'PLANTdataHUB (official): 3 ARCs' })
+    await user.type(screen.getByRole('searchbox', { name: 'Search ARCs' }), 'alpha')
+    await user.click(plantHub)
+    expect(plantHub).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('searchbox', { name: 'Search ARCs' })).toHaveValue('alpha')
+    expect(screen.getByRole('status')).toHaveTextContent('Showing 3 of 5 ARCs')
+    expect(screen.queryByRole('button', { name: 'CEPLAS on Other Hub: 2 ARCs' })).not.toBeInTheDocument()
+    const group = screen.getByRole('button', { name: 'CEPLAS: 2 ARCs' })
+    await user.click(group)
+    expect(group).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText('DataHUB: PLANTdataHUB (official)')).toBeVisible()
+    expect(screen.getByText('Working group: CEPLAS')).toBeVisible()
+    expect(screen.getByRole('status')).toHaveTextContent('Showing 2 of 5 ARCs')
+    expect(screen.getByRole('button', { name: 'Botany: 1 ARCs' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Other Hub: 2 ARCs' })).toBeVisible()
+    expect(screen.getByRole('img', { name: 'New ARCs per month: 2 in the last 12 months' })).toBeVisible()
+
+    await user.click(screen.getByRole('button', { name: 'Search' }))
+    expect(screen.getByRole('status')).toHaveTextContent('Showing 1 of 5 ARCs')
+    expect(group).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Botany: 1 ARCs' })).toBeVisible()
+    expect(screen.getByRole('img', { name: 'New ARCs per month: 2 in the last 12 months' })).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Remove filter Search: “alpha”' }))
+    expect(screen.getByRole('searchbox', { name: 'Search ARCs' })).toHaveValue('')
+    expect(screen.getByRole('status')).toHaveTextContent('Showing 2 of 5 ARCs')
+    await user.click(screen.getByRole('button', { name: 'Remove filter Working group: CEPLAS' }))
+    expect(group).toHaveAttribute('aria-pressed', 'false')
+    expect(plantHub).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('status')).toHaveTextContent('Showing 3 of 5 ARCs')
+    await user.click(screen.getByRole('button', { name: 'Remove filter DataHUB: PLANTdataHUB (official)' }))
+    expect(plantHub).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'CEPLAS on Other Hub: 2 ARCs' })).toBeVisible()
+    expect(screen.getByRole('status')).toHaveTextContent('Showing 5 of 5 ARCs')
+  })
+
+  it('keeps hub choices and counts stable when selecting a group, then clears it when switching to another hub', async () => {
+    const user = userEvent.setup()
+    renderWithTheme(<DataHubDashboard {...groupedHubs()} />)
+    await user.click(await screen.findByRole('button', { name: 'Botany: 1 ARCs' }))
+    expect(screen.getByRole('button', { name: 'PLANTdataHUB (official): 3 ARCs' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Other Hub: 2 ARCs' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'CEPLAS on Other Hub: 2 ARCs' })).toBeVisible()
+    expect(screen.getByRole('status')).toHaveTextContent('Showing 1 of 5 ARCs')
+    await user.click(screen.getByRole('button', { name: 'Other Hub: 2 ARCs' }))
+    expect(screen.queryByText('Working group: Botany')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Botany: 1 ARCs' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'CEPLAS: 2 ARCs' })).toBeVisible()
+    expect(screen.getByRole('status')).toHaveTextContent('Showing 2 of 5 ARCs')
+  })
+
+  it('keeps a connected hub with no ARCs visible', async () => {
+    const user = userEvent.setup()
+    renderWithTheme(<DataHubDashboard {...twoHubs({ fetchProjects: async source => Success(source === plantdatahub.url ? plantProjects : []) })} />)
+    const emptyHub = await screen.findByRole('button', { name: 'Other Hub: 0 ARCs' })
+    await user.click(emptyHub)
+    expect(emptyHub).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'PLANTdataHUB (official): 3 ARCs' })).toBeVisible()
+    expect(screen.getByRole('status')).toHaveTextContent('Showing 0 of 3 ARCs')
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }))
+    expect(emptyHub).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('status')).toHaveTextContent('Showing 3 of 3 ARCs')
   })
 })
 
@@ -297,6 +385,7 @@ describe('DataHubDashboard US4 people', () => {
     await waitFor(() => expect(screen.getAllByRole('button', { name: 'Jane Doe' }).length).toBeGreaterThan(0))
     await user.click(screen.getByRole('searchbox', { name: 'Search ARCs' }))
     await user.paste('jane doe')
+    await user.click(screen.getByRole('button', { name: 'Search' }))
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Open Beta' })).not.toBeInTheDocument())
     expect(screen.getByRole('button', { name: 'Open Alpha' })).toBeVisible()
   })
@@ -328,14 +417,59 @@ describe('DataHubDashboard table paging', () => {
 })
 
 describe('DataHubDashboard loading', () => {
-  it('shows no stats, charts or table while the first load is still running', async () => {
+  it('shows connected hubs and skeletons immediately, then counts before the ARC index finishes', async () => {
     const pending = new Promise<never>(() => {})
-    renderWithTheme(<DataHubDashboard {...dashboard({ fetchProjects: () => pending })} />)
-    expect(screen.getByRole('status')).toHaveTextContent('Loading ARCs from 1 DataHUBs…')
+    const count = deferred<Result<number | null>>()
+    renderWithTheme(<DataHubDashboard {...dashboard({ fetchProjects: () => pending, fetchProjectCount: () => count.promise })} />)
+    expect(screen.getByRole('button', { name: 'PLANTdataHUB (official): Loading count' })).toHaveAttribute('aria-busy', 'true')
+    expect(screen.getByRole('region', { name: 'ARCs per DataHUB' })).not.toHaveTextContent('0')
+    expect(screen.getByRole('region', { name: 'Summary' })).toHaveAttribute('aria-busy', 'true')
+    expect(screen.getByRole('region', { name: 'ARCs per working group' })).toHaveAttribute('aria-busy', 'true')
+    expect(screen.getByRole('region', { name: 'New ARCs per month' })).toHaveAttribute('aria-busy', 'true')
     expect(screen.queryByRole('complementary', { name: 'Summary' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('region', { name: 'ARCs per DataHUB' })).not.toBeInTheDocument()
     expect(screen.queryByRole('img', { name: /New ARCs per month/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('table', { name: 'ARCs' })).not.toBeInTheDocument()
+    count.resolve(Success(259))
+    expect(await screen.findByRole('button', { name: 'PLANTdataHUB (official): 259 ARCs' })).toBeVisible()
+    expect(screen.getByRole('region', { name: 'ARCs' })).toHaveAttribute('aria-busy', 'true')
+  })
+
+  it('keeps a slow hub count as a skeleton while another hub and its ARCs are already available', async () => {
+    const pending = new Promise<never>(() => {})
+    const count = deferred<Result<number | null>>()
+    renderWithTheme(<DataHubDashboard {...twoHubs({
+      fetchProjects: async source => source === plantdatahub.url ? Success(plantProjects) : pending,
+      fetchProjectCount: async source => source === plantdatahub.url ? Success(3) : count.promise,
+    })} />)
+    await screen.findByRole('button', { name: 'Open Alpha' })
+    expect(screen.getByRole('button', { name: 'Other Hub: Loading count' })).toHaveAttribute('aria-busy', 'true')
+    expect(screen.queryByRole('button', { name: 'Other Hub: 0 ARCs' })).not.toBeInTheDocument()
+    count.resolve(Success(0))
+    expect(await screen.findByRole('button', { name: 'Other Hub: 0 ARCs' })).toBeVisible()
+  })
+
+  it('marks capped counts with a gradient and keeps them stable when a hub filter is selected', async () => {
+    const user = userEvent.setup()
+    renderWithTheme(<DataHubDashboard {...dashboard({
+      fetchProjects: () => new Promise(() => {}), fetchProjectCount: async () => Success(10_000),
+    })} />)
+    const bar = await screen.findByRole('button', { name: 'PLANTdataHUB (official): 10,000+ ARCs' })
+    expect(bar.querySelector('[class*="capped"]')).not.toBeNull()
+    expect(screen.getByText('Gradient bars show counts of 10,000 or more.')).toBeVisible()
+    await user.click(bar)
+    expect(bar).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText('DataHUB: PLANTdataHUB (official)')).toBeVisible()
+    expect(bar).toHaveAccessibleName('PLANTdataHUB (official): 10,000+ ARCs')
+  })
+
+  it('shows unavailable counts when both requests fail instead of showing zero or an endless skeleton', async () => {
+    renderWithTheme(<DataHubDashboard {...dashboard({
+      fetchProjects: async () => Failure('Offline'), fetchProjectCount: async () => Failure('Offline'),
+    })} />)
+    const bar = await screen.findByRole('button', { name: 'PLANTdataHUB (official): Count unavailable' })
+    expect(bar).not.toHaveAttribute('aria-busy')
+    expect(screen.queryByRole('button', { name: 'PLANTdataHUB (official): 0 ARCs' })).not.toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Summary' })).toHaveTextContent('Data unavailable.')
   })
 
   it('keeps the other DataHUB visible while one reloads after a login', async () => {
@@ -347,7 +481,7 @@ describe('DataHubDashboard loading', () => {
     expect(await screen.findByRole('button', { name: 'Open Alpha' })).toBeVisible()
     expect(screen.queryByRole('button', { name: 'Open Delta' })).not.toBeInTheDocument()
     expect(screen.queryByText(/Loading ARCs/)).not.toBeInTheDocument()
-    expect(screen.getByRole('complementary', { name: 'Summary' })).toBeVisible()
+    expect(screen.getByRole('region', { name: 'Summary' })).toHaveAttribute('aria-busy', 'true')
   })
 
   it('shows ARC rows under StrictMode', async () => {

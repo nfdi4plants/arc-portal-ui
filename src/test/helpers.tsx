@@ -93,6 +93,7 @@ export function gitLabProjectFull(overrides: Partial<GitLabProject> = {}): GitLa
 /** Every callback resolves with an empty success unless overridden. */
 export function fakeDataHubFetchers(overrides: Partial<DataHubFetchers> = {}): DataHubFetchers {
   return {
+    fetchProjectCount: async () => Success(null),
     fetchProjects: async () => Success([]),
     fetchGroups: async () => Success([]),
     fetchMemberProjectIds: async () => Success([]),
