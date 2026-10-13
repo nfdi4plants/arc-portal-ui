@@ -1,9 +1,11 @@
 import { Banner, Spinner, Stack, Text } from '@primer/react'
 import { useArcSelector, useArcStatus } from '../../../arc/hooks'
+import { buildProvenanceIndex } from '../../../arc/provenance/buildIndex'
 import { Dashlet, DashboardWindow } from '../../DashboardWindow'
 import { ArcDetails, type ArcDetailsProps } from '../ArcDetails'
 import { InvestigationDetails } from '../Investigation/InvestigationDetails'
 import ArcViewer from '../ArcViewer/ArcViewer'
+import { ProvenanceExplorer } from '../Provenance/ProvenanceExplorer'
 import { selectInvestigationMetadata } from '../Investigation/selectInvestigationMetadata'
 import '../Investigation/investigation.css'
 import './dashboard.css'
@@ -13,6 +15,8 @@ export type DashboardProps = Omit<ArcDetailsProps, 'metadata'> & { arcJson: stri
 export function Dashboard(props: DashboardProps) {
   const status = useArcStatus()
   const metadata = useArcSelector(selectInvestigationMetadata)
+  // The index holds Maps, so it is compared by identity. It changes only when the ARC changes.
+  const provenance = useArcSelector(buildProvenanceIndex, (a, b) => a === b)
 
   return (
     <DashboardWindow title="ARC-Dashboard" fillHeight>
@@ -38,6 +42,13 @@ export function Dashboard(props: DashboardProps) {
           <Dashlet title="ArcWebView">
             <ArcViewer jsonString={props.arcJson} embedded />
           </Dashlet>
+          {provenance && (
+            <Dashlet title="Provenance">
+              <div className="provenance-dashlet">
+                <ProvenanceExplorer index={provenance} />
+              </div>
+            </Dashlet>
+          )}
         </main>
       )}
     </DashboardWindow>
