@@ -1,15 +1,16 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import '../../../index.css'
+import { talinumArcJson } from '../../../storybook/fixtures/talinumArc'
 import ArcViewer from './ArcViewer'
 
 const meta = {
-  title: 'Dashboard/ArcWebView',
+  title: 'ARCDetails/ArcWebView',
   component: ArcViewer,
+  args: { jsonString: talinumArcJson },
   parameters: {
     layout: 'fullscreen',
     docs: {
       description: {
-        component: 'ARC web viewer using the bundled Talinum ARC, shared with the Investigation story.',
+        component: 'ARC web viewer using the bundled Talinum ARC, shared with the ARCDetails and InvestigationDetails stories.',
       },
     },
   },

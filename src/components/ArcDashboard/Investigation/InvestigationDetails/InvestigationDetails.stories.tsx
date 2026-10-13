@@ -1,52 +1,25 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { useEffect, useState } from 'react'
-import crateJson from '../../../../../public/sample-arcs/facultative-cam-in-talinum/ro-crate-metadata.json?raw'
-import { ArcProvider } from '../../../../arc/ArcProvider'
-import { createArcStore } from '../../../../arc/arcStore'
-import type { ArcSource } from '../../../../arc/types'
-import { referenceGitLab } from '../../../../config/gitlab'
-import { InvestigationDetails, type InvestigationDetailsProps } from './InvestigationDetails'
+import { Dashlet } from '../../../DashboardWindow'
+import { TalinumStory } from '../../../../storybook/TalinumStory'
+import { InvestigationDetails } from './InvestigationDetails'
 
-const sampleSource: ArcSource = {
-  key: 'storybook:facultative-cam-in-talinum',
-  label: 'Facultative CAM in Talinum',
-  fetchROCrate: () => Promise.resolve(crateJson),
-}
-
-function SampleInvestigationDetails(props: InvestigationDetailsProps) {
-  const [store] = useState(() => createArcStore(sampleSource))
-
-  useEffect(() => {
-    void store.load()
-    return () => store.dispose()
-  }, [store])
-
+function SampleInvestigationDetails() {
   return (
-    <ArcProvider store={store}>
-      <InvestigationDetails {...props} />
-    </ArcProvider>
+    <TalinumStory>{(metadata) => (
+      <div className="dashboard-window-container">
+        <Dashlet title={metadata.title} maxWidth={620}><InvestigationDetails metadata={metadata} /></Dashlet>
+      </div>
+    )}</TalinumStory>
   )
 }
 
 const meta = {
-  title: 'Dashboard/Investigation Details',
+  title: 'InvestigationDetails',
   component: SampleInvestigationDetails,
-  args: {
-    repository: {
-      source: referenceGitLab.source,
-      projectPath: 'brilator/Facultative-CAM-in-Talinum',
-    },
-  },
-  parameters: {
-    docs: {
-      description: {
-        component: 'Talinum investigation details with contacts, organization affiliations, publications, and versions. Optional DataHub metadata is supplied by the caller through dataHubData; this component makes no DataHub requests.',
-      },
-    },
-  },
+  parameters: { docs: { description: { component: 'Investigation dashlet titled with the ARC title, with Overview, Contacts, Organizations, and Publications tabs. All lists reuse MetadataList.' } } },
 } satisfies Meta<typeof SampleInvestigationDetails>
 
 export default meta
 type Story = StoryObj<typeof meta>
 
-export const TalinumArc: Story = {}
+export const TalinumArc: Story = { name: 'Talinum ARC' }

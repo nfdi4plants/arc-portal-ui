@@ -1,13 +1,9 @@
 import type { ARC } from '@nfdi4plants/arctrl'
 import { selectAllPeople } from '../../../arc/selectors/people'
 import { nonEmpty } from '../../../arc/selectors/common'
-import type { ExternalLink, InvestigationMetadata, NamedEntity } from './types'
+import type { ExternalLink, InvestigationMetadata } from './types'
 
 const githubUrlPattern = /https?:\/\/(?:www\.)?github\.com\/[\w.-]+\/[\w.-]+(?:\/[\w./#?=&%-]*)?/gi
-
-function namedEntity(identifier: string, title?: string): NamedEntity {
-  return { identifier, name: title?.trim() || identifier }
-}
 
 function collectGithubLinks(arc: ARC): ExternalLink[] {
   const values = [
@@ -73,10 +69,6 @@ export function selectInvestigationMetadata(arc: ARC): InvestigationMetadata {
       }
     }),
     githubLinks: collectGithubLinks(arc),
-    assays: arc.Assays.map((assay) => namedEntity(assay.Identifier, assay.Title)),
-    studies: arc.Studies.map((study) => namedEntity(study.Identifier, study.Title)),
     organizations: organizations.map((name) => ({ identifier: name, name })),
-    runs: arc.Runs.map((run) => namedEntity(run.Identifier, run.Title)),
-    workflows: arc.Workflows.map((workflow) => namedEntity(workflow.Identifier, workflow.Title)),
   }
 }

@@ -36,9 +36,5 @@ export interface InvestigationMetadata {
   publications: PublicationMetadata[]
   contacts: ContactMetadata[]
   githubLinks: ExternalLink[]
-  assays: NamedEntity[]
-  studies: NamedEntity[]
   organizations: NamedEntity[]
-  runs: NamedEntity[]
-  workflows: NamedEntity[]
 }
