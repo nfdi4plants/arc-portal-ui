@@ -173,7 +173,7 @@ export const CARDS: readonly PowerUpCard[] = [
   {
     id: 'mechanic.lifesteal',
     name: 'Lifesteal',
-    description: 'Heal 8% of the damage your own attacks deal. Bonus hits from other effects do not heal.',
+    description: 'Heal 8% of the damage your attacks and bolts deal. Echo, DOI, Ontology and Peer Review bonus hits do not heal.',
     rarity: 'rare',
     kind: 'mechanic',
   },

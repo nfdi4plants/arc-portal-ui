@@ -15,7 +15,8 @@ when the player presses Start run.
 The game reads the `ProvenanceIndex` from `src/arc/provenance`. It never parses the crate a second
 time. `model/run/` turns the index into a `RunPlan`:
 
-1. Path selection. The inputs are the nodes no row produces. They are ranked by the longest path to
+1. Path selection. The inputs are the nodes that no row produces from another node (a row that
+   outputs its own input does not count). They are ranked by the longest path to
    an output, and the run seed picks one from the top 20 % (at least one). The run then follows a
    longest path, and the seed breaks ties.
 2. Segments. Each step `fromNode -> toNode` is one segment. Its annotations are the process
@@ -27,12 +28,14 @@ time. `model/run/` turns the index into a `RunPlan`:
    visible tells (the node's own annotations) and a longer stagger window.
 
 The node after each segment is a boss (`model/content/boss.ts`). The final boss has one phase per
-segment in path order, and each phase uses its segment's telegraph timing. The same annotation always
+segment in path order, and each phase uses its segment's telegraph timing. Every final phase has
+one heavy and two light attacks from its archetype plus the shared Crate Collapse, so a light attack
+always breaks up the heavy ones. The player is healed to full before the final boss. The same annotation always
 has the same look and kind, because the monster is derived from a hash of the annotation. Its
 stats scale with the segment depth, `1 + 0.12 * segmentIndex`.
 
-On the death screen a node boss whose step has 8 or more annotations (quality 1) gets no annotate
-hint, because its attacks already have the longest warnings.
+On the death screen a boss (or final boss phase) whose step has 8 or more annotations (quality 1)
+gets no annotate hint, because its attacks already have the longest warnings.
 
 ## Folder layout
 
@@ -112,7 +115,11 @@ The target is a steady 60 fps on an integrated GPU.
 
 - Textures are drawn at `TEXTURE_SCALE = 2` canvas pixels per world unit (`phaser/art/layout.ts`)
   and cached by spec id. `ScribbleArt.pixelsPerUnit` is 2, so raw texture keys need a scale of 1/2.
-  The stretch scene draws the monster textures behind the intro banner, a few per frame.
+  The stretch scene draws the monster textures, effects and projectiles behind the intro banner, a
+  few per frame.
+- Textures have a limited lifetime. Each stretch frees the monster textures of earlier segments
+  (`releaseMonsters`). Danger zone sizes snap to powers of two, and the boss scenes draw the common
+  zones up front and free them on shutdown (`prewarmTelegraphs`, `releaseTelegraphs`).
 - Projectiles, damage numbers, speech bubbles, dash ghosts and weapon effects come from pools. Do
   not create game objects per hit or per shot.
 - The Phaser config has no `fps.limit`. In Phaser 4.2.1 the limited step passes the accumulated

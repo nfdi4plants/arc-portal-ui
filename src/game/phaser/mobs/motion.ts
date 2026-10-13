@@ -12,7 +12,7 @@ export interface BlinkInput {
   player: Vec
   // Flyers may change height, walkers keep theirs.
   flies: boolean
-  // Land on the far side of the player instead of next to them on the mob's side.
+  // Land on the far side of the player, away from the mob's own side.
   flank: boolean
   // Longest jump, in world units.
   reach: number

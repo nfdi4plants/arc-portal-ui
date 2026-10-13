@@ -109,7 +109,7 @@ export interface Shot {
   hitStopMs?: number
   tags: string[]
   gravity?: number
-  // Rect instead of a circle, for flat shapes such as ground shockwaves.
+  // A rect hit shape for flat attacks such as ground shockwaves. Without it the shot is a circle.
   rect?: { w: number; h: number }
 }
 
