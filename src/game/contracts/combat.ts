@@ -21,6 +21,7 @@ export interface Combatant {
   hurtbox(): Phaser.Geom.Rectangle
   // Which way the combatant faces, for mirroring hitbox shapes.
   facing(): 1 | -1
+  // Bottom centre (the feet), the origin of hitbox shapes.
   position(): { x: number; y: number }
   isInvulnerable(): boolean
   // Applies damage, knockback and flinch.
@@ -40,6 +41,8 @@ export interface HitboxSpec {
   follow: boolean
   activeMs: number
   damage: number
+  // Relative to the owner's facing: positive x pushes away in the direction the owner faces.
+  // The combat world mirrors it, so HitEvent.knockback is in world space.
   knockback: { x: number; y: number }
   hitStopMs: number
   // Infinity for area attacks.

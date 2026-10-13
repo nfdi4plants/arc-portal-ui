@@ -15,7 +15,10 @@ export function baseGameConfig(parent: HTMLElement, scenes: Phaser.Types.Scenes.
       default: 'arcade',
       arcade: { gravity: { x: 0, y: 0 }, fps: PHYSICS_FPS, fixedStep: true, debug: false },
     },
-    input: { mouse: { preventDefaultWheel: false } },
+    input: { mouse: { preventDefaultWheel: false }, keyboard: false },
+    // Below 30 fps the game slows down instead of running many catch-up physics steps per frame,
+    // which would make a slow PC slower still.
+    fps: { min: 30 },
     disableContextMenu: true,
     scene: scenes,
   }
