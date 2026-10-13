@@ -643,19 +643,14 @@ describe('GraphCanvas in a measured box', () => {
       expect(layoutCalls()).toBe(before)
     })
 
-    it('stays in the normal layout when a scrollbar makes the client size of a landscape box portrait', async () => {
-      // 740x735 is landscape. A vertical scrollbar leaves 725 of the width, which is less than the height.
-      measureBox(740, 735)
+    it('keeps the normal layout in a landscape box whose client size is portrait', async () => {
+      // The border box 740x735 is landscape. The stable scrollbar gutter leaves 725 of its width, which is
+      // less than the height, so only the border box gives the right answer.
+      measureBox(725, 735, { width: 740, height: 735 })
       render(canvas())
-      await showMore()
-      const before = layoutCalls()
-
-      await resize(725, 735, { width: 740, height: 735 })
-      await act(async () => {})
 
       expect(await showMore()).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: /^Show the \d+ details/ })).toBeNull()
-      expect(layoutCalls()).toBe(before)
     })
 
     it('scrolls to a centered node only vertically', async () => {

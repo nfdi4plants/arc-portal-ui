@@ -110,12 +110,12 @@
 
 /*
  * In the narrow header the crumb before the current one gives way first. Flex items shrink in
- * proportion to their shrink factor, so the tiny factor of the current crumb keeps it whole until
- * the crumb before it is nearly gone.
+ * proportion to their shrink factor. The factor of the current crumb is so small that its share stays
+ * below a layout pixel, so it keeps its whole text until the crumb before it is gone.
  */
 .crumbShrinking {
   min-width: 0;
-  flex-shrink: 0.02;
+  flex-shrink: 0.0001;
 }
 
 .crumbGivingWay {
