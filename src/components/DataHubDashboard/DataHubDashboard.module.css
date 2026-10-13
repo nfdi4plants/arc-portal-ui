@@ -1,8 +1,4 @@
-.main { max-width: 1120px; margin: 0 auto; padding: 56px 24px; }
-.header { margin-bottom: 32px; max-width: 720px; }
-.eyebrow { color: var(--fgColor-muted, #59636e); letter-spacing: .08em; text-transform: uppercase; margin: 0 0 12px; }
-.title { margin: 0 0 16px; }
-.intro { color: var(--fgColor-muted, #59636e); margin: 0 0 12px; }
-.source { font-size: 14px; }
-.grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: 24px; }
-@media (max-width: 760px) { .main { padding: 32px 16px; } .grid { grid-template-columns: minmax(0, 1fr); gap: 20px; } }
+.main { max-width: 1168px; margin: 0 auto; padding: 24px 16px 56px; display: flex; flex-direction: column; gap: 16px; }
+.charts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.loading { margin: 0; color: var(--fgColor-muted); }
+@media (max-width: 760px) { .charts { grid-template-columns: minmax(0, 1fr); } }

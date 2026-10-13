@@ -3,12 +3,9 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App.tsx'
 import { TOKEN_STORAGE_KEY } from './auth/context.ts'
-import { deferred, project, projectResponse } from './test/helpers.tsx'
+import { deferred, gitLabProjectFull, projectResponse } from './test/helpers.tsx'
 
 const account = { id: 7, name: 'Jane Doe', username: 'jane' }
-const publicMembership = { id: 10, name: 'Shared lab', full_path: 'shared-lab', visibility: 'public' }
-const privateMembership = { id: 20, name: 'Private lab', full_path: 'private-lab', visibility: 'private' }
-const otherPublic = { id: 30, name: 'Public plants', full_path: 'public-plants', visibility: 'public' }
 const fetchCall = vi.fn<typeof fetch>()
 
 function hasToken(init?: RequestInit) { return new Headers(init?.headers).has('PRIVATE-TOKEN') }
@@ -17,17 +14,11 @@ function userCalls() { return fetchCall.mock.calls.filter(call => new URL(String
 beforeEach(() => {
   localStorage.clear()
   fetchCall.mockReset()
-  fetchCall.mockImplementation(async (input, init) => {
+  fetchCall.mockImplementation(async input => {
     const url = new URL(String(input))
     if (url.pathname === '/api/v4/user') return Response.json(account)
-    if (url.pathname === '/api/v4/groups') return Response.json(
-      hasToken(init) ? [publicMembership, privateMembership] : [publicMembership, otherPublic],
-      { headers: { 'X-Next-Page': '' } },
-    )
-    if (url.pathname.startsWith('/api/v4/groups/')) return projectResponse([project({ name: 'Private organisation ARC' })])
-    return projectResponse([project({ name: url.searchParams.has('search')
-      ? hasToken(init) ? 'Private matching ARC' : 'Public matching ARC'
-      : 'Featured public ARC' })])
+    if (url.pathname === '/api/v4/groups') return Response.json([], { headers: { 'X-Next-Page': '' } })
+    return projectResponse([gitLabProjectFull({ name: 'Featured public ARC' })], { 'X-Next-Page': '' })
   })
   vi.stubGlobal('fetch', fetchCall)
 })
@@ -38,11 +29,10 @@ async function openLogin(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('optional login in the portal', () => {
-  it('keeps discovery public, authenticates through Enter, expands search and groups, and clears private results on logout', async () => {
+  it('keeps discovery public, authenticates through Enter and reloads the ARCs with the token', async () => {
     const user = userEvent.setup()
     render(<App />)
-    expect(await screen.findByRole('link', { name: 'Featured public ARC' })).toBeVisible()
-    expect(screen.getByRole('combobox', { name: 'Organisation' })).toBeVisible()
+    expect(await screen.findByRole('button', { name: 'Open Featured public ARC' })).toBeVisible()
     expect(userCalls()).toHaveLength(0)
     const dialog = await openLogin(user)
     expect(dialog.getByRole('button', { name: 'Login' })).toBeDisabled()
@@ -56,28 +46,18 @@ describe('optional login in the portal', () => {
     expect(localStorage.getItem(TOKEN_STORAGE_KEY)).toBe('runtime-token')
     expect(localStorage.length).toBe(1)
 
-    const selector = screen.getByRole('combobox', { name: 'Organisation' })
-    await waitFor(() => expect(within(selector).getByRole('group', { name: 'Your organisations' })).toBeInTheDocument())
-    expect(within(selector).getAllByRole('option', { name: 'shared-lab' })).toHaveLength(1)
-    expect(within(selector).getByRole('group', { name: 'Other public organisations' })).toHaveTextContent('public-plants')
-    await user.selectOptions(selector, '20')
-    expect(await screen.findByRole('link', { name: 'Private organisation ARC' })).toBeVisible()
-    await user.type(screen.getByRole('textbox', { name: 'Search term' }), 'plants{Enter}')
-    expect(await screen.findByRole('link', { name: 'Private matching ARC' })).toBeVisible()
-    const searchCall = fetchCall.mock.calls.find(call => new URL(String(call[0])).searchParams.has('search'))!
-    expect(new URL(String(searchCall[0])).searchParams.has('visibility')).toBe(false)
-    expect(new Headers(searchCall[1]?.headers).get('PRIVATE-TOKEN')).toBe('runtime-token')
+    const projectCalls = () => fetchCall.mock.calls.filter(call => new URL(String(call[0])).pathname === '/api/v4/projects')
+    await waitFor(() => expect(projectCalls().some(call => hasToken(call[1]))).toBe(true))
+    const authenticated = projectCalls().find(call => hasToken(call[1]))!
+    expect(new Headers(authenticated[1]?.headers).get('PRIVATE-TOKEN')).toBe('runtime-token')
+    expect(new URL(String(authenticated[0])).searchParams.has('visibility')).toBe(false)
     expect(fetchCall.mock.calls.every(call => !String(call[0]).includes('runtime-token'))).toBe(true)
 
     await user.click(screen.getByRole('button', { name: 'Logout' }))
     expect(localStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull()
-    expect(screen.queryByRole('link', { name: 'Private matching ARC' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Private organisation ARC' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('option', { name: 'private-lab' })).not.toBeInTheDocument()
-    expect(selector).toHaveValue('')
-    expect(screen.getByRole('textbox', { name: 'Search term' })).toHaveValue('plants')
-    await user.click(screen.getByRole('button', { name: 'Search' }))
-    expect(await screen.findByRole('link', { name: 'Public matching ARC' })).toBeVisible()
+    expect(await screen.findByRole('button', { name: 'Open Featured public ARC' })).toBeVisible()
+    await waitFor(() => expect(new URL(String(projectCalls().at(-1)![0])).searchParams.get('visibility')).toBe('public'))
+    expect(hasToken(projectCalls().at(-1)![1])).toBe(false)
   })
 
   it('shows invalid-token and network failures inline and permits retry without persisting unsuccessful tokens', async () => {
@@ -132,7 +112,7 @@ describe('optional login in the portal', () => {
     fetchCall.mockImplementation((input, init) => new URL(String(input)).pathname === '/api/v4/user'
       ? pending.promise : transport(input, init))
     render(<App />)
-    expect(await screen.findByRole('link', { name: 'Featured public ARC' })).toBeVisible()
+    expect(await screen.findByRole('button', { name: 'Open Featured public ARC' })).toBeVisible()
     expect(screen.getByText('Checking login…')).toBeVisible()
     const discoveryCalls = fetchCall.mock.calls.filter(call => new URL(String(call[0])).pathname !== '/api/v4/user')
     expect(discoveryCalls.every(call => !hasToken(call[1]))).toBe(true)
@@ -150,7 +130,7 @@ describe('optional login in the portal', () => {
     })
     const user = userEvent.setup()
     render(<App />)
-    expect(await screen.findByRole('link', { name: 'Featured public ARC' })).toBeVisible()
+    expect(await screen.findByRole('button', { name: 'Open Featured public ARC' })).toBeVisible()
     await waitFor(() => expect(screen.queryByText('Checking login…')).not.toBeInTheDocument())
     const dialog = await openLogin(user)
     expect(dialog.getByRole('alert')).toHaveTextContent('Unable to reach GitLab')
@@ -160,6 +140,6 @@ describe('optional login in the portal', () => {
     await user.click(dialog.getByRole('button', { name: 'Forget saved login' }))
     expect(localStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull()
     expect(dialog.queryByRole('button', { name: 'Retry saved login' })).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Featured public ARC' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Open Featured public ARC' })).toBeVisible()
   })
 })

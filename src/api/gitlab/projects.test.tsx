@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { getProject, getTopStarredProjects, listProjects, searchProjects } from './index.ts'
+import { getProject, getTopStarredProjects, listAllProjects, listProjects, searchProjects } from './index.ts'
 import { Success, Failure } from '../../types/result.ts'
 import { project, projectResponse } from '../../test/helpers.tsx'
 
@@ -111,5 +111,36 @@ describe('GitLab projects API', () => {
       throw new DOMException('Canceled', 'AbortError')
     }), signal: controller.signal })
     expect(await pending).toEqual(Failure('GitLab request canceled.'))
+  })
+
+  describe('listAllProjects', () => {
+    it('requests public projects by recent activity without a token', async () => {
+      await listAllProjects(source, { fetchCall: fetchMock })
+      expect(Object.fromEntries(requestedUrl().searchParams)).toEqual({
+        visibility: 'public', order_by: 'last_activity_at', sort: 'desc', per_page: '100', page: '1',
+      })
+    })
+
+    it('sends the token and no visibility filter after login', async () => {
+      await listAllProjects(source, { fetchCall: fetchMock, token: 'runtime-token' })
+      expect(requestedUrl().searchParams.has('visibility')).toBe(false)
+      expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get('PRIVATE-TOKEN')).toBe('runtime-token')
+    })
+
+    it('follows the next page and concatenates the items', async () => {
+      fetchMock.mockImplementation(async input => new URL(String(input)).searchParams.get('page') === '1'
+        ? projectResponse([project({ id: 1 })], { 'X-Next-Page': '2' })
+        : projectResponse([project({ id: 2 })], { 'X-Next-Page': '' }))
+      const result = await listAllProjects(source, { fetchCall: fetchMock })
+      expect(result.success && result.value.map(item => item.id)).toEqual([1, 2])
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+    })
+
+    it('fails the whole load when a later page fails', async () => {
+      fetchMock.mockImplementation(async input => new URL(String(input)).searchParams.get('page') === '1'
+        ? projectResponse([project()], { 'X-Next-Page': '2' })
+        : Response.json({ message: 'Boom' }, { status: 500 }))
+      expect(await listAllProjects(source, { fetchCall: fetchMock })).toEqual(Failure('GitLab request failed (500): Boom'))
+    })
   })
 })
