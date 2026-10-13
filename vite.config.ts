@@ -5,9 +5,12 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   plugins: [react()],
   test: {
-    include: ['tests/**/*.test.{ts,tsx}'],
+    // Primer hides responsive action copies with CSS; tests must see the visible UI.
+    css: true,
+    server: { deps: { inline: ['@primer/react'] } },
+    include: ['tests/**/*.test.{ts,tsx}', 'src/**/*.test.tsx'],
     environment: 'jsdom',
-    setupFiles: ['./tests/setup.ts'],
+    setupFiles: ['./tests/setup.ts', './src/test/setup.ts'],
     restoreMocks: true,
   },
 })

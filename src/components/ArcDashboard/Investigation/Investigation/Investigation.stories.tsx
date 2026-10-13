@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { useEffect, useState } from 'react'
-import crateJson from '../../../public/sample-arcs/facultative-cam-in-talinum/ro-crate-metadata.json?raw'
-import { ArcProvider } from '../../arc/ArcProvider'
-import { createArcStore } from '../../arc/arcStore'
-import type { ArcSource } from '../../arc/types'
+import crateJson from '../../../../../public/sample-arcs/facultative-cam-in-talinum/ro-crate-metadata.json?raw'
+import { ArcProvider } from '../../../../arc/ArcProvider'
+import { createArcStore } from '../../../../arc/arcStore'
+import type { ArcSource } from '../../../../arc/types'
 import { Investigation } from './Investigation'
 
 const sampleSource: ArcSource = {

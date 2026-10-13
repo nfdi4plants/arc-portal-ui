@@ -1,6 +1,6 @@
 import type { ARC } from '@nfdi4plants/arctrl'
-import { selectAllPeople } from '../arc/selectors/people'
-import { nonEmpty } from '../arc/selectors/common'
+import { selectAllPeople } from '../../../arc/selectors/people'
+import { nonEmpty } from '../../../arc/selectors/common'
 import type { ExternalLink, InvestigationMetadata, NamedEntity } from './types'
 
 const githubUrlPattern = /https?:\/\/(?:www\.)?github\.com\/[\w.-]+\/[\w.-]+(?:\/[\w./#?=&%-]*)?/gi

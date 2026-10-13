@@ -1,5 +1,5 @@
 import { Banner, Spinner, Stack, Text } from '@primer/react'
-import { useArcSelector, useArcStatus } from '../../arc/hooks'
+import { useArcSelector, useArcStatus } from '../../../../arc/hooks'
 import { InvestigationView } from '../InvestigationView'
 import { InvestigationWindow } from '../InvestigationWindow'
 import { selectInvestigationMetadata } from '../selectInvestigationMetadata'
