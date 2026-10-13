@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useReducer, useState } from 'react'
 import { Banner } from '@primer/react'
-import type { DataHubConnection } from '../../types/dashboard.ts'
+import type { DataHubConnection, FilterKind } from '../../types/dashboard.ts'
 import { DashboardHeader } from '../DashboardHeader/DashboardHeader.tsx'
-import { SummaryCards } from '../SummaryCards/SummaryCards.tsx'
+import { StatsSidebar } from '../StatsSidebar/StatsSidebar.tsx'
 import { BarList } from '../BarList/BarList.tsx'
+import { WorkingGroupChart } from '../WorkingGroupChart/WorkingGroupChart.tsx'
 import { MonthlyChart } from '../MonthlyChart/MonthlyChart.tsx'
 import { ArcTable } from '../ArcTable/ArcTable.tsx'
 import { ArcFilterBar } from '../ArcFilterBar/ArcFilterBar.tsx'
-import { SCOPES, type ChipKind } from '../ArcFilterBar/scopes.ts'
 import { useArcIndex } from './hooks/useArcIndex.ts'
 import { dashboardReducer, initialDashboardState } from './dashboardReducer.ts'
-import { applyFilters, visibleArcs } from './logic/filters.ts'
+import { applyFilters } from './logic/filters.ts'
 import { arcsPerMonth, countBy, headlineNumbers } from './logic/summary.ts'
 import { sortArcs } from './logic/sort.ts'
 import styles from './DataHubDashboard.module.css'
@@ -18,15 +18,14 @@ import styles from './DataHubDashboard.module.css'
 export interface DataHubDashboardProps {
   /** One per configured DataHUB, in display order. A new array identity means "reload everything". */
   connections: DataHubConnection[]
-  /** Enables the access switch and the Private card. */
-  signedIn: boolean
   onArcClick: (url: string, name: string) => void
   /** Injected clock for tests. */
   now?: () => Date
 }
 
-function DataHubDashboard({ connections, signedIn, onArcClick, now = () => new Date() }: DataHubDashboardProps) {
+function DataHubDashboard({ connections, onArcClick, now = () => new Date() }: DataHubDashboardProps) {
   const { hubs, arcs, loading, updatedAt, retry, reload } = useArcIndex(connections)
+  const signedIn = connections.some(connection => connection.includesPrivate)
   const [state, dispatch] = useReducer(dashboardReducer, initialDashboardState)
   const { filters, sort } = state
   // The input responds immediately; filtering follows after a short pause.
@@ -37,28 +36,26 @@ function DataHubDashboard({ connections, signedIn, onArcClick, now = () => new D
   }, [queryInput])
   const current = now()
 
-  const accessMode = signedIn ? 'accessible' : 'public'
-  const visible = useMemo(() => visibleArcs(arcs, accessMode), [arcs, accessMode])
   const hubNames = useMemo(() => new Map(connections.map(({ hub }) => [hub.id, hub.name])), [connections])
   const groupNames = useMemo(() => new Map(arcs.map(arc => [arc.group.key, arc.group.label])), [arcs])
 
-  const filtered = useMemo(() => applyFilters(visible, filters), [visible, filters])
-  const hubScoped = useMemo(() => applyFilters(visible, filters, undefined, { ignore: 'hub' }), [visible, filters])
-  const groupScoped = useMemo(() => applyFilters(visible, filters, undefined, { ignore: 'group' }), [visible, filters])
+  const filtered = useMemo(() => applyFilters(arcs, filters, undefined, { now: current }), [arcs, filters, current])
+  const hubScoped = useMemo(() => applyFilters(arcs, filters, undefined, { now: current, ignore: 'hub' }), [arcs, filters, current])
+  const groupScoped = useMemo(() => applyFilters(arcs, filters, undefined, { now: current, ignore: 'group' }), [arcs, filters, current])
 
-  const chips: { kind: ChipKind; label: string }[] = []
+  const chips: { kind: FilterKind; label: string }[] = []
   if (filters.hubId !== undefined) chips.push({ kind: 'hub', label: `DataHUB: ${hubNames.get(filters.hubId) ?? filters.hubId}` })
   if (filters.groupKey !== undefined) chips.push({ kind: 'group', label: `Working group: ${groupNames.get(filters.groupKey) ?? filters.groupKey}` })
   if (filters.access !== undefined) chips.push({ kind: 'access', label: filters.access === 'public' ? 'Shared publicly' : 'Private' })
-  if (filters.query.trim()) {
-    chips.push({ kind: 'query', label: `${SCOPES.find(item => item.scope === filters.scope)!.label} contains “${filters.query.trim()}”` })
-  }
+  if (filters.recent) chips.push({ kind: 'recent', label: 'Changed in the last 30 days' })
+  if (filters.query.trim()) chips.push({ kind: 'query', label: `Search: “${filters.query.trim()}”` })
   const filtering = chips.length > 0
 
   const numbers = useMemo(() => headlineNumbers(filtered), [filtered])
-  const totals = useMemo(() => filtering ? headlineNumbers(visible) : undefined, [visible, filtering])
+  const totals = useMemo(() => filtering ? headlineNumbers(arcs) : undefined, [arcs, filtering])
   const hubCounts = useMemo(() => countBy(hubScoped, 'hub', hubNames), [hubScoped, hubNames])
-  const groupCounts = useMemo(() => countBy(groupScoped, 'group', groupNames, hubNames), [groupScoped, groupNames, hubNames])
+  const myGroupCounts = useMemo(() => countBy(groupScoped.filter(arc => arc.member), 'group', groupNames, hubNames), [groupScoped, groupNames, hubNames])
+  const publicGroupCounts = useMemo(() => countBy(groupScoped.filter(arc => arc.access === 'public'), 'group', groupNames, hubNames), [groupScoped, groupNames, hubNames])
   // The chart buckets depend on the calendar month, not on the clock's time of day.
   const currentMonth = `${current.getUTCFullYear()}-${String(current.getUTCMonth() + 1).padStart(2, '0')}`
   // oxlint-disable-next-line react-hooks/exhaustive-deps -- the month key, not the Date, drives the buckets.
@@ -66,7 +63,7 @@ function DataHubDashboard({ connections, signedIn, onArcClick, now = () => new D
   const sorted = useMemo(() => sortArcs(filtered, sort, hubNames), [filtered, sort, hubNames])
 
   const clearAll = () => { dispatch({ type: 'clearFilters' }); setQueryInput('') }
-  const removeChip = (kind: ChipKind) => {
+  const removeChip = (kind: FilterKind) => {
     dispatch({ type: 'removeFilter', kind })
     if (kind === 'query') setQueryInput('')
   }
@@ -74,11 +71,18 @@ function DataHubDashboard({ connections, signedIn, onArcClick, now = () => new D
   const failed = hubs.filter(hub => hub.status === 'failed')
   const allFailed = hubs.length > 0 && failed.length === hubs.length
   const updating = hubs.some(hub => hub.status === 'loading')
+  const membershipErrors = hubs.filter(hub => hub.membershipError !== undefined).map(hub => hub.hub.name)
+
+  const loggedInHubs = connections.filter(connection => connection.includesPrivate)
+  const privateState = loggedInHubs.length === 0 ? 'hidden' : loggedInHubs.length === connections.length ? 'all' : 'partial'
+  const privateNote = privateState === 'partial'
+    ? `Private ARCs are included from ${loggedInHubs.map(connection => connection.hub.name).join(', ')} only.`
+    : undefined
 
   return (
     <main className={styles.main}>
       <DashboardHeader hubCount={hubs.length} okCount={hubs.length - failed.length} updatedAt={updatedAt} now={current}
-        signedIn={signedIn} accessMode={accessMode} onAccessModeChange={() => {}} onUpdate={reload} updating={updating} />
+        onUpdate={reload} updating={updating} />
       {loading && <p role="status" className={styles.loading}>Loading ARCs from {hubs.length} DataHUBs…</p>}
       {loading ? null : allFailed
         ? <Banner variant="critical" title="Could not load ARCs"
@@ -88,24 +92,31 @@ function DataHubDashboard({ connections, signedIn, onArcClick, now = () => new D
             <Banner key={hub.id} variant="warning" title={`Could not load ARCs from ${hub.name}`} description={error}
               primaryAction={<Banner.PrimaryAction onClick={() => retry(hub.id)}>{`Retry ${hub.name}`}</Banner.PrimaryAction>} />
           ))}
-          <SummaryCards numbers={numbers} totals={totals}
-            signedIn={signedIn} accessMode={accessMode} activeAccess={filters.access}
-            onSelect={kind => kind === 'all' ? clearAll() : dispatch({ type: 'toggleAccess', value: kind })} />
-          <div className={styles.charts}>
-            <BarList title="ARCs per DataHUB" items={hubCounts} activeKey={filters.hubId}
-              onToggle={value => dispatch({ type: 'toggleHub', value })} />
-            <BarList title="ARCs per working group" items={groupCounts} activeKey={filters.groupKey}
-              onToggle={value => dispatch({ type: 'toggleGroup', value })} />
-            <MonthlyChart months={months} />
+          <div className={styles.grid}>
+            <StatsSidebar numbers={numbers} totals={totals} filtersActive={filtering} activeAccess={filters.access}
+              onSelect={kind => kind === 'all' ? clearAll() : dispatch({ type: 'toggleAccess', value: kind })}
+              privateState={privateState} privateNote={privateNote} />
+            <div className={styles.content}>
+              <div className={styles.charts}>
+                <BarList title="ARCs per DataHUB" items={hubCounts} activeKey={filters.hubId}
+                  onToggle={value => dispatch({ type: 'toggleHub', value })} />
+                <WorkingGroupChart myItems={myGroupCounts} publicItems={publicGroupCounts} loggedIn={signedIn}
+                  membershipErrors={membershipErrors} activeKey={filters.groupKey}
+                  onToggle={value => dispatch({ type: 'toggleGroup', value })} />
+                <MonthlyChart months={months} />
+              </div>
+              <div className={styles.tableCard}>
+                <ArcFilterBar query={queryInput} onQueryChange={setQueryInput} recent={filters.recent}
+                  onRecentToggle={() => dispatch({ type: 'toggleRecent' })}
+                  chips={chips} onRemoveChip={removeChip} onClearAll={clearAll} shown={filtered.length} total={arcs.length} />
+                <ArcTable arcs={sorted} hubNames={hubNames} sort={sort} now={current}
+                  onSortChange={next => dispatch({ type: 'setSort', sort: next })}
+                  resetKey={JSON.stringify(filters) + JSON.stringify(sort)}
+                  onClearFilters={filtering ? clearAll : undefined}
+                  onOpen={arc => onArcClick(arc.url, arc.title)} />
+              </div>
+            </div>
           </div>
-          <ArcFilterBar query={queryInput} scope={filters.scope} onQueryChange={setQueryInput}
-            onScopeChange={scope => dispatch({ type: 'setScope', scope })}
-            chips={chips} onRemoveChip={removeChip} onClearAll={clearAll} shown={filtered.length} total={visible.length} />
-          <ArcTable arcs={sorted} hubNames={hubNames} sort={sort} now={current}
-            onSortChange={next => dispatch({ type: 'setSort', sort: next })}
-            resetKey={JSON.stringify(filters) + JSON.stringify(sort)}
-            onClearFilters={filtering ? clearAll : undefined}
-            onOpen={arc => onArcClick(arc.url, arc.title)} />
         </>}
     </main>
   )

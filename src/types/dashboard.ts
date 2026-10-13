@@ -20,6 +20,8 @@ export interface ArcSummary {
   description: string
   group: WorkingGroup
   access: Access
+  /** True when the project appears in the logged-in user's membership list. */
+  member: boolean
   createdAt: string
   lastActivityAt: string
   topics: string[]
@@ -41,7 +43,7 @@ export interface ArcDetails {
 export type DetailsMap = Map<string, ArcDetails | 'unavailable'>
 
 export type Access = 'public' | 'private'
-export type FilterKind = 'hub' | 'group' | 'access' | 'query'
+export type FilterKind = 'hub' | 'group' | 'access' | 'query' | 'recent'
 
 export interface HeadlineNumbers {
   total: number
@@ -62,17 +64,17 @@ export interface HubState {
   /** Keeps the last successful value during a reload. */
   arcs: ArcSummary[]
   error?: string
+  /** Set when the membership list could not be loaded; "My ARCs" then shows an error. */
+  membershipError?: string
 }
-
-export type AccessMode = 'accessible' | 'public'
-export type SearchScope = 'all' | 'title' | 'description' | 'group' | 'topic' | 'person'
 
 export interface DashboardFilters {
   hubId?: string
   groupKey?: string
   access?: Access
   query: string
-  scope: SearchScope
+  /** Only ARCs changed within the last 30 days. */
+  recent: boolean
 }
 
 export interface SortState {
@@ -80,7 +82,7 @@ export interface SortState {
   direction: 'ASC' | 'DESC'
 }
 
-export type ExtraColumn = 'topics' | 'created' | 'stars' | 'description' | 'link'
+export type ExtraColumn = 'topics' | 'created' | 'stars' | 'description'
 
 /** One configured DataHUB with its data callbacks injected by `App`. */
 export interface DataHubConnection {
@@ -89,6 +91,7 @@ export interface DataHubConnection {
   includesPrivate: boolean
   fetchProjects: (signal: AbortSignal) => Promise<Result<GitLabProject[]>>
   fetchGroups: (signal: AbortSignal) => Promise<Result<GitLabGroup[]>>
+  fetchMemberProjectIds: (signal: AbortSignal) => Promise<Result<number[]>>
   fetchContributors: (projectId: number, signal: AbortSignal) => Promise<Result<GitLabContributor[]>>
   fetchLatestCommit: (projectId: number, signal: AbortSignal) => Promise<Result<GitLabCommit | null>>
 }

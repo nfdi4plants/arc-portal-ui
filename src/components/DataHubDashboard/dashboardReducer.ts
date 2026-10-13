@@ -1,15 +1,13 @@
-import type { Access, AccessMode, DashboardFilters, ExtraColumn, FilterKind, SearchScope, SortState } from '../../types/dashboard.ts'
+import type { Access, DashboardFilters, ExtraColumn, FilterKind, SortState } from '../../types/dashboard.ts'
 
 export interface DashboardState {
-  accessMode: AccessMode
   filters: DashboardFilters
   sort: SortState
   extraColumns: ExtraColumn[]
 }
 
 export const initialDashboardState: DashboardState = {
-  accessMode: 'accessible',
-  filters: { query: '', scope: 'all' },
+  filters: { query: '', recent: false },
   sort: { column: 'lastChange', direction: 'DESC' },
   extraColumns: [],
 }
@@ -21,8 +19,7 @@ export type DashboardAction =
   | { type: 'clearFilters' }
   | { type: 'removeFilter'; kind: FilterKind }
   | { type: 'setQuery'; query: string }
-  | { type: 'setScope'; scope: SearchScope }
-  | { type: 'setAccessMode'; mode: AccessMode }
+  | { type: 'toggleRecent' }
   | { type: 'setSort'; sort: SortState }
   | { type: 'toggleColumn'; column: ExtraColumn }
 
@@ -37,17 +34,17 @@ export function dashboardReducer(state: DashboardState, action: DashboardAction)
     case 'toggleHub': return { ...state, filters: { ...filters, hubId: toggle(filters.hubId, action.value) } }
     case 'toggleGroup': return { ...state, filters: { ...filters, groupKey: toggle(filters.groupKey, action.value) } }
     case 'toggleAccess': return { ...state, filters: { ...filters, access: toggle(filters.access, action.value) } }
-    case 'clearFilters': return { ...state, filters: { query: '', scope: filters.scope } }
+    case 'clearFilters': return { ...state, filters: { query: '', recent: false } }
     case 'removeFilter': return { ...state, filters: {
       ...filters,
       hubId: action.kind === 'hub' ? undefined : filters.hubId,
       groupKey: action.kind === 'group' ? undefined : filters.groupKey,
       access: action.kind === 'access' ? undefined : filters.access,
       query: action.kind === 'query' ? '' : filters.query,
+      recent: action.kind === 'recent' ? false : filters.recent,
     } }
     case 'setQuery': return { ...state, filters: { ...filters, query: action.query } }
-    case 'setScope': return { ...state, filters: { ...filters, scope: action.scope } }
-    case 'setAccessMode': return { ...state, accessMode: action.mode }
+    case 'toggleRecent': return { ...state, filters: { ...filters, recent: !filters.recent } }
     case 'setSort': return { ...state, sort: action.sort }
     case 'toggleColumn': return { ...state, extraColumns: state.extraColumns.includes(action.column)
       ? state.extraColumns.filter(column => column !== action.column)

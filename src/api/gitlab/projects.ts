@@ -51,3 +51,14 @@ export async function listAllProjects(source: string, options: GitLabRequestOpti
   if (!options.token) params.set('visibility', 'public')
   return listAllPages(source, 'projects', params, isProject, 'project', options)
 }
+
+function isMemberProject(data: unknown): data is { id: number } {
+  return typeof data === 'object' && data !== null && 'id' in data && typeof data.id === 'number'
+}
+
+/** Project ids the token can see (memberships); the response is a simple id list. */
+export async function listMemberProjectIds(source: string, options: GitLabRequestOptions = {}): Promise<Result<number[]>> {
+  const params = new URLSearchParams({ membership: 'true', simple: 'true' })
+  const result = await listAllPages(source, 'projects', params, isMemberProject, 'project', options)
+  return map(result, projects => projects.map(project => project.id))
+}

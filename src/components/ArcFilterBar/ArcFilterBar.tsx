@@ -1,17 +1,16 @@
 import type { ReactNode } from 'react'
-import { SearchIcon, XIcon } from '@primer/octicons-react'
-import { ActionList, ActionMenu, Button, IconButton, TextInput, Token } from '@primer/react'
-import type { SearchScope } from '../../types/dashboard.ts'
-import { SCOPES, type ChipKind } from './scopes.ts'
+import { HistoryIcon, SearchIcon, XIcon } from '@primer/octicons-react'
+import { Button, IconButton, TextInput, Token } from '@primer/react'
+import type { FilterKind } from '../../types/dashboard.ts'
 import styles from './ArcFilterBar.module.css'
 
 export interface ArcFilterBarProps {
   query: string
-  scope: SearchScope
   onQueryChange: (query: string) => void
-  onScopeChange: (scope: SearchScope) => void
-  chips: { kind: ChipKind; label: string }[]
-  onRemoveChip: (kind: ChipKind) => void
+  recent: boolean
+  onRecentToggle: () => void
+  chips: { kind: FilterKind; label: string }[]
+  onRemoveChip: (kind: FilterKind) => void
   onClearAll: () => void
   shown: number
   total: number
@@ -20,27 +19,16 @@ export interface ArcFilterBarProps {
 }
 
 export function ArcFilterBar({
-  query, scope, onQueryChange, onScopeChange, chips, onRemoveChip, onClearAll, shown, total, moreColumns,
+  query, onQueryChange, recent, onRecentToggle, chips, onRemoveChip, onClearAll, shown, total, moreColumns,
 }: ArcFilterBarProps) {
-  const scopeLabel = SCOPES.find(item => item.scope === scope)!.label
   return (
     <div className={styles.bar}>
       <div className={styles.search}>
         <TextInput className={styles.input} type="search" aria-label="Search ARCs" leadingVisual={SearchIcon}
           placeholder="Search ARCs by title, group, topic, person…" value={query}
           onChange={event => onQueryChange(event.target.value)} />
-        <ActionMenu>
-          <ActionMenu.Button>Search in: {scopeLabel}</ActionMenu.Button>
-          <ActionMenu.Overlay>
-            <ActionList selectionVariant="single">
-              {SCOPES.map(item => (
-                <ActionList.Item key={item.scope} selected={item.scope === scope} onSelect={() => onScopeChange(item.scope)}>
-                  {item.label}
-                </ActionList.Item>
-              ))}
-            </ActionList>
-          </ActionMenu.Overlay>
-        </ActionMenu>
+        <IconButton icon={HistoryIcon} size="small" variant="invisible" aria-label="Only recently changed ARCs"
+          aria-pressed={recent} onClick={onRecentToggle} />
         {moreColumns}
       </div>
       <div className={styles.filters}>
@@ -49,7 +37,7 @@ export function ArcFilterBar({
         {chips.map(chip => (
           <span key={chip.kind} className={styles.chip}>
             {/* Primer's own remove button is always named "Remove token", so it is replaced by a named one. */}
-            <Token text={chip.label} hideRemoveButton onRemove={() => onRemoveChip(chip.kind)} />
+            <Token text={chip.label} hideRemoveButton />
             <IconButton icon={XIcon} size="small" variant="invisible" aria-label={`Remove filter ${chip.label}`}
               onClick={() => onRemoveChip(chip.kind)} />
           </span>

@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Button, Label, Link } from '@primer/react'
+import { ActionList, ActionMenu, Button, ButtonGroup, IconButton, Label, Link } from '@primer/react'
 import { DataTable, Table, type Column } from '@primer/react/experimental'
+import { GlobeIcon, LinkExternalIcon, LockIcon, TriangleDownIcon } from '@primer/octicons-react'
 import type { ArcSummary, SortState } from '../../types/dashboard.ts'
 import { relativeTime } from '../../util/time.ts'
 import styles from './ArcTable.module.css'
@@ -42,6 +43,9 @@ export function ArcTable({ arcs, hubNames, sort, onSortChange, now, onOpen, rese
       renderCell: arc => (
         <div className={styles.title}>
           <Link as="button" className={styles.titleLink} onClick={() => onOpen(arc)}>{arc.title}</Link>
+          <Link href={arc.url} target="_blank" rel="noopener noreferrer" aria-label={`View ${arc.title} on ${hubNames.get(arc.hubId) ?? arc.hubId}`}>
+            <LinkExternalIcon size={14} />
+          </Link>
           <span className={styles.group}>{arc.group.label}</span>
         </div>
       ),
@@ -50,14 +54,29 @@ export function ArcTable({ arcs, hubNames, sort, onSortChange, now, onOpen, rese
     {
       id: 'access', header: 'Access', width: 'auto',
       renderCell: arc => arc.access === 'public'
-        ? <Label variant="success">Shared publicly</Label>
-        : <Label variant="attention">Private</Label>,
+        ? <Label variant="success"><GlobeIcon size={12} /> Public</Label>
+        : <Label variant="attention"><LockIcon size={12} /> Private</Label>,
     },
     { id: 'people', header: 'People', width: 'auto', renderCell: () => '—' },
     { id: 'lastChange', header: 'Last change', sortBy: true, width: 'auto', renderCell: arc => relativeTime(arc.lastActivityAt, now) },
     {
       id: 'open', header: () => <span className={styles.hidden}>Open</span>, width: 'auto', align: 'end',
-      renderCell: arc => <Button size="small" aria-label={`Open ${arc.title}`} onClick={() => onOpen(arc)}>Open →</Button>,
+      renderCell: arc => (
+        <ButtonGroup>
+          <Button size="small" aria-label={`Open ${arc.title}`} onClick={() => onOpen(arc)}>Open</Button>
+          <ActionMenu>
+            <ActionMenu.Anchor>
+              <IconButton icon={TriangleDownIcon} size="small" variant="invisible" aria-label={`More actions for ${arc.title}`} />
+            </ActionMenu.Anchor>
+            <ActionMenu.Overlay>
+              <ActionList>
+                <ActionList.LinkItem href={arc.url} target="_blank" rel="noopener noreferrer">View on {hubNames.get(arc.hubId) ?? arc.hubId}</ActionList.LinkItem>
+                <ActionList.Item onSelect={() => void navigator.clipboard.writeText(arc.url)}>Copy link</ActionList.Item>
+              </ActionList>
+            </ActionMenu.Overlay>
+          </ActionMenu>
+        </ButtonGroup>
+      ),
     },
   ]
 

@@ -8,8 +8,7 @@ const WIDTH = 360
 const HEIGHT = 130
 const TOP = 16
 const BASE = 112
-const monthName = new Intl.DateTimeFormat('en', { month: 'short', year: 'numeric', timeZone: 'UTC' })
-const monthInitial = new Intl.DateTimeFormat('en', { month: 'narrow', timeZone: 'UTC' })
+const monthLabel = new Intl.DateTimeFormat('en', { month: 'short', timeZone: 'UTC' })
 
 export function MonthlyChart({ months }: MonthlyChartProps) {
   const sum = months.reduce((total, month) => total + month.count, 0)
@@ -25,16 +24,13 @@ export function MonthlyChart({ months }: MonthlyChartProps) {
           const date = new Date(`${month}-01T00:00:00Z`)
           const height = (count / max) * (BASE - TOP - 12)
           const x = index * slot + (slot - barWidth) / 2
-          const last = index === months.length - 1
           return (
             <g key={month}>
-              <title>{`${monthName.format(date)}: ${count}`}</title>
-              {count > 0 && <>
-                <rect x={x} y={BASE - height} width={barWidth} height={height} rx={2}
-                  fill={last ? 'var(--bgColor-accent-emphasis)' : 'var(--bgColor-accent-muted)'} />
-                <text x={x + barWidth / 2} y={BASE - height - 4} textAnchor="middle" className={styles.count}>{count}</text>
-              </>}
-              <text x={x + barWidth / 2} y={BASE + 14} textAnchor="middle" className={styles.month}>{monthInitial.format(date)}</text>
+              <title>{`${monthLabel.format(date)}: ${count}`}</title>
+              <rect x={x} y={BASE - height} width={barWidth} height={height} rx={2}
+                fill="var(--bgColor-accent-emphasis)" />
+              <text x={x + barWidth / 2} y={BASE - height - 4} textAnchor="middle" className={styles.count}>{count}</text>
+              <text x={x + barWidth / 2} y={BASE + 14} textAnchor="middle" className={styles.month}>{monthLabel.format(date)}</text>
             </g>
           )
         })}

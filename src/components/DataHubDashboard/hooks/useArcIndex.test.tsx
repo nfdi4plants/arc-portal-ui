@@ -134,4 +134,42 @@ describe('useArcIndex', () => {
     await waitFor(() => expect(projectsA).toHaveBeenCalledTimes(1))
     expect(projectsB).toHaveBeenCalledTimes(1)
   })
+
+  it('marks ARCs as members from the membership id list', async () => {
+    const projects = [gitLabProjectFull({ id: 1 }), gitLabProjectFull({ id: 2 })]
+    const connections = [fakeConnection({ hub: hubA, fetchProjects: async () => Success(projects),
+      fetchMemberProjectIds: async () => Success([2]) })]
+    const { result } = renderHook(() => useArcIndex(connections))
+    await waitFor(() => expect(result.current.hubs[0].status).toBe('loaded'))
+    expect(result.current.arcs.map(arc => [arc.projectId, arc.member])).toEqual([[1, false], [2, true]])
+  })
+
+  it('keeps the hub loaded with a membershipError when the membership list fails', async () => {
+    const projects = [gitLabProjectFull({ id: 1 })]
+    const connections = [fakeConnection({ hub: hubA, includesPrivate: true,
+      fetchProjects: async () => Success(projects), fetchMemberProjectIds: async () => Failure('membership down') })]
+    const { result } = renderHook(() => useArcIndex(connections))
+    await waitFor(() => expect(result.current.hubs[0].status).toBe('loaded'))
+    expect(result.current.hubs[0].membershipError).toBe('membership down')
+    expect(result.current.arcs).toHaveLength(1)
+  })
+
+  it('still loads every DataHUB under StrictMode remounts', async () => {
+    const connections = [connection(hubA), connection(hubB)]
+    const { result } = renderHook(() => useArcIndex(connections), { reactStrictMode: true })
+    await waitFor(() => expect(result.current.hubs.map(hub => hub.status)).toEqual(['loaded', 'loaded']))
+    expect(result.current.arcs).toHaveLength(2)
+  })
+
+  it('is not loading while one DataHUB reloads and another has ARCs', async () => {
+    const first = [connection(hubA), connection(hubB)]
+    const { result, rerender } = renderHook(({ connections }) => useArcIndex(connections),
+      { initialProps: { connections: first } })
+    await waitFor(() => expect(result.current.arcs).toHaveLength(2))
+    const loggingIn = fakeConnection({ hub: hubB, includesPrivate: true, fetchProjects: () => new Promise(() => {}) })
+    rerender({ connections: [first[0], loggingIn] })
+    expect(result.current.arcs.map(arc => arc.hubId)).toEqual(['a'])
+    expect(result.current.hubs[1].status).toBe('loading')
+    expect(result.current.loading).toBe(false)
+  })
 })

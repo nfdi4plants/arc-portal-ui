@@ -15,7 +15,7 @@ function workingGroup(project: GitLabProject, hub: GitLabInstance, groupNames: M
 }
 
 /** `anonymous` means the request carried no token, so a project without `visibility` must be public. */
-export function toArcSummary(project: GitLabProject, hub: GitLabInstance, groupNames: Map<string, string>, anonymous: boolean): ArcSummary {
+export function toArcSummary(project: GitLabProject, hub: GitLabInstance, groupNames: Map<string, string>, anonymous: boolean, memberIds: Set<number> = new Set()): ArcSummary {
   const visibility = project.visibility ?? (anonymous ? 'public' : 'private')
   const host = new URL(hub.url).host
   return {
@@ -26,6 +26,7 @@ export function toArcSummary(project: GitLabProject, hub: GitLabInstance, groupN
     description: project.description ?? '',
     group: workingGroup(project, hub, groupNames),
     access: visibility === 'public' ? 'public' : 'private',
+    member: memberIds.has(project.id),
     createdAt: project.created_at ?? project.last_activity_at ?? '',
     lastActivityAt: project.last_activity_at ?? project.created_at ?? '',
     topics: project.topics ?? [],

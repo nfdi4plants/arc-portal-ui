@@ -32,6 +32,13 @@ describe('toArcSummary', () => {
     expect(arc.group).toEqual({ key: 'plantdatahub/~personal', label: 'Personal Sandbox', hubId: 'plantdatahub', personal: true })
   })
 
+  it('marks the ARC as a member only when its id is in the membership list', () => {
+    const project = gitLabProjectFull({ id: 7 })
+    expect(toArcSummary(project, hub, groups, true).member).toBe(false)
+    expect(toArcSummary(project, hub, groups, true, new Set([7])).member).toBe(true)
+    expect(toArcSummary(project, hub, groups, true, new Set([8])).member).toBe(false)
+  })
+
   it.each([['public', 'public'], ['internal', 'private'], ['private', 'private']] as const)(
     'maps visibility %s to %s', (visibility, access) => {
       expect(toArcSummary(gitLabProjectFull({ visibility }), hub, groups, true).access).toBe(access)
@@ -55,6 +62,13 @@ describe('toArcSummary', () => {
     expect(arc.description).toBe('')
     expect(arc.topics).toEqual([])
     expect(arc.lastActivityAt).toBe('2026-01-02T00:00:00Z')
+  })
+
+  it('marks the ARC as a member only when its id is in the membership list', () => {
+    const project = gitLabProjectFull({ id: 7 })
+    expect(toArcSummary(project, hub, groups, true).member).toBe(false)
+    expect(toArcSummary(project, hub, groups, true, new Set([7])).member).toBe(true)
+    expect(toArcSummary(project, hub, groups, true, new Set([8])).member).toBe(false)
   })
 })
 

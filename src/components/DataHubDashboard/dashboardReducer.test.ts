@@ -19,11 +19,18 @@ describe('dashboardReducer', () => {
     expect(reduce(once, action).filters[field]).toBeUndefined()
   })
 
-  it('clearFilters resets filters and the query but keeps the search scope', () => {
+  it('toggleRecent sets and clears recent', () => {
+    expect(initialDashboardState.filters.recent).toBe(false)
+    const on = reduce(initialDashboardState, { type: 'toggleRecent' })
+    expect(on.filters.recent).toBe(true)
+    expect(reduce(on, { type: 'toggleRecent' }).filters.recent).toBe(false)
+  })
+
+  it('clearFilters resets filters, the query and recent', () => {
     const state = reduce(initialDashboardState,
       { type: 'toggleHub', value: 'a' }, { type: 'toggleGroup', value: 'a/x' }, { type: 'toggleAccess', value: 'private' },
-      { type: 'setScope', scope: 'topic' }, { type: 'setQuery', query: 'rice' }, { type: 'clearFilters' })
-    expect(state.filters).toEqual({ query: '', scope: 'topic' })
+      { type: 'setQuery', query: 'rice' }, { type: 'toggleRecent' }, { type: 'clearFilters' })
+    expect(state.filters).toEqual({ query: '', recent: false })
   })
 
   it.each([
@@ -39,6 +46,11 @@ describe('dashboardReducer', () => {
   it('removeFilter(query) clears the query', () => {
     const state = reduce(initialDashboardState, { type: 'setQuery', query: 'rice' }, { type: 'removeFilter', kind: 'query' })
     expect(state.filters.query).toBe('')
+  })
+
+  it('removeFilter(recent) clears recent', () => {
+    const state = reduce(initialDashboardState, { type: 'toggleRecent' }, { type: 'removeFilter', kind: 'recent' })
+    expect(state.filters.recent).toBe(false)
   })
 
   it('setSort replaces the sort', () => {

@@ -1,4 +1,4 @@
-export { listProjects, getProject, getTopStarredProjects, searchProjects, listAllProjects } from './projects.ts'
+export { listProjects, getProject, getTopStarredProjects, searchProjects, listAllProjects, listMemberProjectIds } from './projects.ts'
 export { getCurrentUser } from './users.ts'
 export { listGroups, listAllGroups, getGroupProjects } from './groups.ts'
 export type {

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { getProject, getTopStarredProjects, listAllProjects, listProjects, searchProjects } from './index.ts'
+import { getProject, getTopStarredProjects, listAllProjects, listMemberProjectIds, listProjects, searchProjects } from './index.ts'
 import { Success, Failure } from '../../types/result.ts'
 import { project, projectResponse } from '../../test/helpers.tsx'
 
@@ -141,6 +141,32 @@ describe('GitLab projects API', () => {
         ? projectResponse([project()], { 'X-Next-Page': '2' })
         : Response.json({ message: 'Boom' }, { status: 500 }))
       expect(await listAllProjects(source, { fetchCall: fetchMock })).toEqual(Failure('GitLab request failed (500): Boom'))
+    })
+  })
+
+  describe('listMemberProjectIds', () => {
+    it('requests the membership id list with the token', async () => {
+      fetchMock.mockResolvedValue(Response.json([{ id: 7 }, { id: 8 }], { headers: { 'X-Next-Page': '' } }))
+      const result = await listMemberProjectIds(source, { fetchCall: fetchMock, token: 'runtime-token' })
+      expect(result).toEqual(Success([7, 8]))
+      const url = requestedUrl()
+      expect(url.pathname).toBe('/api/v4/projects')
+      expect(Object.fromEntries(url.searchParams)).toEqual({
+        membership: 'true', simple: 'true', per_page: '100', page: '1',
+      })
+      expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get('PRIVATE-TOKEN')).toBe('runtime-token')
+    })
+
+    it('follows the next page and concatenates the ids', async () => {
+      fetchMock.mockImplementation(async input => new URL(String(input)).searchParams.get('page') === '1'
+        ? Response.json([{ id: 1 }], { headers: { 'X-Next-Page': '2' } })
+        : Response.json([{ id: 2 }], { headers: { 'X-Next-Page': '' } }))
+      expect(await listMemberProjectIds(source, { fetchCall: fetchMock })).toEqual(Success([1, 2]))
+    })
+
+    it('fails when an item lacks a numeric id', async () => {
+      fetchMock.mockResolvedValue(Response.json([{ id: 7 }, { name: 'no id' }], { headers: { 'X-Next-Page': '' } }))
+      expect(await listMemberProjectIds(source, { fetchCall: fetchMock })).toEqual(Failure('GitLab returned an invalid project list.'))
     })
   })
 })

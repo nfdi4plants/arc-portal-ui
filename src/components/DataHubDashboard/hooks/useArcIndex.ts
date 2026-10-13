@@ -27,8 +27,9 @@ async function loadHub(connection: DataHubConnection, signal: AbortSignal, apply
   const id = connection.hub.id
   apply(id, hub => hub.status === 'loading' ? hub : { ...hub, status: 'loading', error: undefined })
   try {
-    const [projects, groups] = await Promise.all([
+    const [projects, groups, memberships] = await Promise.all([
       connection.fetchProjects(signal), connection.fetchGroups(signal),
+      connection.fetchMemberProjectIds(signal),
     ])
     if (signal.aborted) return
     if (projects.success === false) {
@@ -37,8 +38,17 @@ async function loadHub(connection: DataHubConnection, signal: AbortSignal, apply
     }
     // Group names are cosmetic: without them labels fall back to paths.
     const names = groups.success === true ? groupNamesFrom(groups.value) : new Map<string, string>()
-    const arcs = projects.value.map(project => toArcSummary(project, connection.hub, names, !connection.includesPrivate))
-    apply(id, hub => ({ ...hub, status: 'loaded', arcs, error: undefined }))
+    const memberIds = memberships.success === true ? new Set(memberships.value) : null
+    const arcs = projects.value.map(project =>
+      toArcSummary(project, connection.hub, names, !connection.includesPrivate, memberIds ?? new Set()))
+    apply(id, hub => ({
+      ...hub,
+      status: 'loaded',
+      arcs,
+      error: undefined,
+      // A membership failure never hides the ARCs; the working-group chart names the DataHUB.
+      membershipError: memberships.success === false ? memberships.error : undefined,
+    }))
   } catch (error) {
     // Keep injected callbacks from causing an unhandled rejection.
     if (!signal.aborted) apply(id, hub => ({ ...hub, status: 'failed',
@@ -104,6 +114,8 @@ export function useArcIndex(connections: DataHubConnection[]) {
   useEffect(() => () => {
     for (const controller of controllers.current.values()) controller.abort()
     controllers.current.clear()
+    // StrictMode remounts with the same refs; forget the connections so the remount reloads them.
+    previous.current.clear()
   }, [])
 
   const retry = (hubId: string) => {
@@ -121,6 +133,7 @@ export function useArcIndex(connections: DataHubConnection[]) {
   }
 
   const { hubs, arcs, updatedAt } = state
-  const loading = hubs.some(hub => hub.status === 'loading' && hub.arcs.length === 0)
+  // Only the first load, when nothing can be shown yet; a hub reloading after a login never hides the others.
+  const loading = hubs.some(hub => hub.status === 'loading') && arcs.length === 0
   return { hubs, arcs, loading, updatedAt, retry, reload }
 }

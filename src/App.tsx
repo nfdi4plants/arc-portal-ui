@@ -4,7 +4,7 @@ import { BaseStyles } from '@primer/react'
 import { useMemo, useRef, useState } from 'react'
 import { ThemeProvider } from '@primer/react/next'
 import DataHubDashboard from './components/DataHubDashboard/DataHubDashboard.tsx'
-import { listAllGroups, listAllProjects } from './api/gitlab/index.ts'
+import { listAllGroups, listAllProjects, listMemberProjectIds } from './api/gitlab/index.ts'
 import { availableDataHubs } from './config/gitlab.ts'
 import type { DataHubConnection } from './types/dashboard.ts'
 import { Success } from './types/result.ts'
@@ -47,6 +47,7 @@ function Portal() {
         includesPrivate: !!token,
         fetchProjects: signal => listAllProjects(hub.url, { token, signal }),
         fetchGroups: signal => listAllGroups(hub.url, { allAvailable: true, token, signal }),
+        fetchMemberProjectIds: signal => token ? listMemberProjectIds(hub.url, { token, signal }) : Promise.resolve(Success([])),
         // Contributor details arrive with the people features.
         fetchContributors: async () => Success([]),
         fetchLatestCommit: async () => Success(null),
@@ -63,7 +64,7 @@ function Portal() {
       pageState.type === "arc-dashboard" ? (
         <ArcDashboard url={pageState.data.url} name={pageState.data.name} onBack={() => setPageState({ type: "datahub-dashboard" })} />
       ) :
-      <DataHubDashboard connections={connections} signedIn={connections.some(c => c.includesPrivate)}
+      <DataHubDashboard connections={connections}
         onArcClick={(url, name) => setPageState({ type: "arc-dashboard", data: { url, name } })} />
     }
   </>
