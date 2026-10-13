@@ -20,6 +20,9 @@ export const MOTOR = {
   dashIframesMs: 120,
   wallJumpPush: 260,
   wallJumpLockMs: 120,
+  // Arcade reports wall contact only while the body pushes into the wall, so a wall jump stays
+  // possible this long after the contact ends.
+  wallGraceMs: 80,
   glideFallSpeed: 90,
 } as const
 
@@ -60,6 +63,9 @@ export interface MotorState {
   wallLockMs: number
   // The side of the wall the player jumped off. Input towards it is ignored while wallLockMs runs.
   wallLockDir: 1 | -1
+  // Time left to wall jump off the wall last touched in the air, and the side it was on.
+  wallGraceMs: number
+  wallGraceDir: 1 | -1
   dashDir: 1 | -1
   jumpsUsed: number
   airDashUsed: boolean
@@ -82,6 +88,8 @@ export function createMotorState(facing: 1 | -1 = 1): MotorState {
     dashIframesMs: 0,
     wallLockMs: 0,
     wallLockDir: 1,
+    wallGraceMs: 0,
+    wallGraceDir: 1,
     dashDir: 1,
     jumpsUsed: 0,
     airDashUsed: false,
@@ -114,7 +122,7 @@ export type JumpKind = 'ground' | 'wall' | 'air' | null
 export function availableJump(state: MotorState, env: MotorEnv): JumpKind {
   const grounded = onGround(state, env)
   if (grounded || state.coyoteMs > 0) return 'ground'
-  if (env.mechanics.wallJump && wallSide(env) !== 0) return 'wall'
+  if (env.mechanics.wallJump && (wallSide(env) !== 0 || state.wallGraceMs > 0)) return 'wall'
   if (env.mechanics.doubleJump && state.jumpsUsed < 2) return 'air'
   return null
 }
@@ -145,6 +153,13 @@ export function stepMotor(state: MotorState, input: MotorInput, env: MotorEnv, d
   s.dashCooldownMs = Math.max(0, s.dashCooldownMs - dtMs)
   s.dashIframesMs = Math.max(0, s.dashIframesMs - dtMs)
   s.wallLockMs = Math.max(0, s.wallLockMs - dtMs)
+  const wall = wallSide(env)
+  if (wall !== 0 && !grounded) {
+    s.wallGraceMs = MOTOR.wallGraceMs
+    s.wallGraceDir = wall
+  } else {
+    s.wallGraceMs = grounded ? 0 : Math.max(0, s.wallGraceMs - dtMs)
+  }
   if (grounded) {
     s.coyoteMs = MOTOR.coyoteMs
     s.jumpsUsed = 0
@@ -188,11 +203,12 @@ export function stepMotor(state: MotorState, input: MotorInput, env: MotorEnv, d
       if (kind === 'ground') s.jumpsUsed = 1
       else if (kind === 'air') s.jumpsUsed = 2
       else {
-        const wall = wallSide(env) as 1 | -1
-        s.vx = -wall * MOTOR.wallJumpPush
-        s.facing = (-wall) as 1 | -1
+        const side = wall !== 0 ? wall : s.wallGraceDir
+        s.vx = -side * MOTOR.wallJumpPush
+        s.facing = -side as 1 | -1
         s.wallLockMs = MOTOR.wallJumpLockMs
-        s.wallLockDir = wall
+        s.wallLockDir = side
+        s.wallGraceMs = 0
         s.jumpsUsed = Math.max(1, s.jumpsUsed)
       }
     }

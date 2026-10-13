@@ -129,6 +129,19 @@ describe('motor', () => {
     expect(without.jumped).toBe(false)
   })
 
+  it('allows a wall jump 60 ms after the wall contact ends and refuses it at 120 ms', () => {
+    const mechanics = { ...NO_MECHANICS, wallJump: true }
+    const falling = run(grounded(), 200, input(), env())
+    const touched = stepMotor(falling, input(), env({ touchingWallRight: true, mechanics }), STEP_MS)
+
+    const early = stepMotor(run(touched, 60, input(), env({ mechanics })), input(['jump'], ['jump']), env({ mechanics }), STEP_MS)
+    expect(early.jumped).toBe(true)
+    expect(early.vx).toBe(-MOTOR.wallJumpPush)
+
+    const late = stepMotor(run(touched, 120, input(), env({ mechanics })), input(['jump'], ['jump']), env({ mechanics }), STEP_MS)
+    expect(late.jumped).toBe(false)
+  })
+
   it('caps the fall speed while gliding with the hat', () => {
     const falling = run(grounded(), 200, input(), env())
     const glide = env({ mechanics: { ...NO_MECHANICS, hatGlide: true } })
