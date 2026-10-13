@@ -3,7 +3,8 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App.tsx'
 import { TOKEN_STORAGE_KEY } from './auth/context.ts'
-import { deferred, project, projectResponse } from './test/helpers.tsx'
+import { defaultDataHub } from './config/gitlab.ts'
+import { deferred, openAccountMenu, project, projectResponse } from './test/helpers.tsx'
 
 const account = { id: 7, name: 'Jane Doe', username: 'jane' }
 const publicMembership = { id: 10, name: 'Shared lab', full_path: 'shared-lab', visibility: 'public' }
@@ -50,10 +51,13 @@ describe('optional login in the portal', () => {
     expect(tokenLink.searchParams.get('name')).toBe('arc-portal')
     expect(tokenLink.searchParams.get('scopes')).toBe('read_user,read_api')
     await user.type(dialog.getByLabelText('Personal access token'), ' runtime-token {Enter}')
-    expect(await screen.findByText('Jane Doe')).toBeVisible()
-    expect(screen.getByText('@jane')).toBeVisible()
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(localStorage.getItem(TOKEN_STORAGE_KEY)).toBe('runtime-token')
+    expect(await screen.findByRole('button', { name: 'Account menu' })).toBeVisible()
+    expect(screen.queryByRole('dialog', { name: 'Login to GitLab' })).not.toBeInTheDocument()
+    const accountMenu = await openAccountMenu(user)
+    expect(accountMenu.getByText('Jane Doe')).toBeVisible()
+    expect(accountMenu.getByText('@jane')).toBeVisible()
+    await user.keyboard('{Escape}')
+    expect(JSON.parse(localStorage.getItem(TOKEN_STORAGE_KEY)!)).toEqual({ [defaultDataHub.id]: 'runtime-token' })
     expect(localStorage.length).toBe(1)
 
     const selector = screen.getByRole('combobox', { name: 'Organisation' })
@@ -69,7 +73,8 @@ describe('optional login in the portal', () => {
     expect(new Headers(searchCall[1]?.headers).get('PRIVATE-TOKEN')).toBe('runtime-token')
     expect(fetchCall.mock.calls.every(call => !String(call[0]).includes('runtime-token'))).toBe(true)
 
-    await user.click(screen.getByRole('button', { name: 'Logout' }))
+    const menu = await openAccountMenu(user)
+    await user.click(menu.getByRole('button', { name: 'Logout' }))
     expect(localStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull()
     expect(screen.queryByRole('link', { name: 'Private matching ARC' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Private organisation ARC' })).not.toBeInTheDocument()
@@ -101,7 +106,7 @@ describe('optional login in the portal', () => {
     await waitFor(() => expect(dialog.getByRole('alert')).toHaveTextContent('Unable to reach GitLab'))
     expect(localStorage.length).toBe(0)
     await user.click(dialog.getByRole('button', { name: 'Login' }))
-    expect(await screen.findByRole('button', { name: 'Logout' })).toBeVisible()
+    expect(await screen.findByRole('button', { name: 'Account menu' })).toBeVisible()
   })
 
   it('cancels pending validation, prevents duplicate submission and ignores the response after closing the dialog', async () => {
@@ -119,26 +124,29 @@ describe('optional login in the portal', () => {
     await user.click(dialog.getByRole('button', { name: 'Cancel' }))
     expect(userCalls()[0][1]?.signal?.aborted).toBe(true)
     await act(async () => pending.resolve(Response.json(account)))
-    expect(screen.queryByRole('button', { name: 'Logout' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Account menu' })).not.toBeInTheDocument()
     expect(localStorage.length).toBe(0)
     const reopened = await openLogin(user)
     expect(reopened.getByLabelText('Personal access token')).toHaveValue('')
   })
 
-  it('validates saved credentials while public discovery stays available', async () => {
+  it('migrates a saved official-instance token while public discovery stays available', async () => {
     localStorage.setItem(TOKEN_STORAGE_KEY, 'saved-token')
     const pending = deferred<Response>()
     const transport = fetchCall.getMockImplementation()!
     fetchCall.mockImplementation((input, init) => new URL(String(input)).pathname === '/api/v4/user'
       ? pending.promise : transport(input, init))
+    const user = userEvent.setup()
     render(<App />)
     expect(await screen.findByRole('link', { name: 'Featured public ARC' })).toBeVisible()
     expect(screen.getByText('Checking login…')).toBeVisible()
     const discoveryCalls = fetchCall.mock.calls.filter(call => new URL(String(call[0])).pathname !== '/api/v4/user')
     expect(discoveryCalls.every(call => !hasToken(call[1]))).toBe(true)
     await act(async () => pending.resolve(Response.json(account)))
-    expect(await screen.findByText('Jane Doe')).toBeVisible()
-    expect(localStorage.getItem(TOKEN_STORAGE_KEY)).toBe('saved-token')
+    expect(await screen.findByRole('button', { name: 'Account menu' })).toBeVisible()
+    const accountMenu = await openAccountMenu(user)
+    expect(accountMenu.getByText('Jane Doe')).toBeVisible()
+    expect(JSON.parse(localStorage.getItem(TOKEN_STORAGE_KEY)!)).toEqual({ [defaultDataHub.id]: 'saved-token' })
   })
 
   it('preserves a failed saved login for retry and lets the user forget it', async () => {

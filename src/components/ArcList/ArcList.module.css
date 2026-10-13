@@ -1,12 +1,16 @@
 .list { list-style: none; padding: 0; margin: 16px 0 0; display: flex; flex-direction: column; gap: 12px; }
-.item {
+.item, .skeletonItem {
   padding: 16px 20px;
   border: 1px solid var(--borderColor-muted, #d8dee4);
   border-radius: 10px;
   background: var(--bgColor-default, #fff);
+}
+.item {
   cursor: pointer;
   transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
 }
+.skeletonItem { display: flex; flex-direction: column; gap: 12px; }
+.loadingLabel { margin: 24px 0 0; color: var(--fgColor-muted, #59636e); }
 @media (hover: hover) {
   .item:hover {
     background: var(--bgColor-muted, #f6f8fa);
