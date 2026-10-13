@@ -393,6 +393,8 @@ describe('ProvenanceExplorer header', () => {
     expect(screen.getByRole('button', { name: 'Show 2 more levels' })).toBeInTheDocument()
     expect(crumbs().getByText('Std. Mix 5µM')).toHaveAttribute('aria-current', 'page')
     expect(crumbs().getByText('Std. Mix 5µM')).toHaveAttribute('title', 'Std. Mix 5µM')
+    // The crumb before the current one can be cut first, so it carries its full text too.
+    expect(crumbs().getByRole('button', { name: 'Inputs A' })).toHaveAttribute('title', 'Inputs A')
   })
 
   it('lists the hidden crumbs in the menu and navigates to the chosen one', async () => {

@@ -151,7 +151,7 @@ describe('compactPillViews', () => {
 
     expect(rest).toEqual([])
     expect(chip).toMatchObject({ kind: 'toggle', toggle: 'more', valuePart: '3', category: 'factor' })
-    expect(chip.tooltip).toBe('Show the 3 properties')
+    expect(chip.tooltip).toBe('Show the 3 details')
     // The dot takes 10px more than a chip without one.
     expect(chip.width).toBe(compactPillViews(edge([count, count]), measure)[0].width + 10 + 7 * ('3'.length - '2'.length))
   })

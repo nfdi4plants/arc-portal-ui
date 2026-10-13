@@ -140,7 +140,7 @@ interface NodeBox {
 }
 
 // Pills wrap into rows inside the node. A pill wider than a row widens the node, because pills are never cut.
-function measureNode(node: CanvasNode, measure: MeasureText, busiestSide: number): NodeBox {
+function measureNode(node: CanvasNode, measure: MeasureText, busiestSide: number, compact: boolean): NodeBox {
   const titleText = shortText(node.title, TITLE_LIMIT)
   const subtitleText = node.subtitle ? shortText(node.subtitle, SUBTITLE_LIMIT) : ''
   const titleWidth = measure(titleText, 600, 13, node.mono)
@@ -165,9 +165,11 @@ function measureNode(node: CanvasNode, measure: MeasureText, busiestSide: number
     : subtitleText
       ? 58
       : 42
-  const height = busiestSide > 1 ? Math.max(contentHeight, EDGE_END_SPACING * (busiestSide + 1)) : contentHeight
+  // The edge ends are spread along the side they use: the height in the left to right layout, the width in the compact one.
+  const endsRoom = busiestSide > 1 ? EDGE_END_SPACING * (busiestSide + 1) : 0
+  const height = compact ? contentHeight : Math.max(contentHeight, endsRoom)
   return {
-    width: Math.max(NODE_MIN_WIDTH, textWidth, rows.length ? Math.ceil(widest + 30) : 0),
+    width: Math.max(NODE_MIN_WIDTH, textWidth, rows.length ? Math.ceil(widest + 30) : 0, compact ? endsRoom : 0),
     height,
     titleText,
     subtitleText,
@@ -252,7 +254,7 @@ export function fitsInline(minInlineWidth: number, availableWidth: number): bool
 export interface LayoutBox {
   // Visible width, 0 while unknown (before the first measurement, and in jsdom).
   width?: number
-  // The box is measured and taller than it is wide.
+  // The box is measured and taller than it is wide, judged by its border box so that a scrollbar does not change the shape.
   portrait?: boolean
 }
 
@@ -264,7 +266,8 @@ const NOTHING_EXPANDED: ReadonlySet<string> = new Set()
 // width the rows are as wide as the widest pill.
 //
 // A portrait box gets the compact layout instead: top to bottom and left aligned, with one chip per
-// edge. Only the shape of the box decides, so a layout cannot make the choice flip back and forth.
+// edge. Only the border box of the box decides, so no layout (and no scrollbar it brings) can make the
+// choice flip back and forth.
 export async function layoutGraph(
   nodes: CanvasNode[],
   edges: CanvasEdge[],
@@ -273,10 +276,11 @@ export async function layoutGraph(
   box: LayoutBox = {},
 ): Promise<GraphLayout> {
   const availableWidth = box.width ?? 0
+  const compactBox = box.portrait === true
   const outgoing = countBy(edges.map((edge) => edge.from))
   const incoming = countBy(edges.map((edge) => edge.to))
   const boxes = nodes.map((node) =>
-    measureNode(node, measure, Math.max(outgoing.get(node.id) ?? 0, incoming.get(node.id) ?? 0)),
+    measureNode(node, measure, Math.max(outgoing.get(node.id) ?? 0, incoming.get(node.id) ?? 0), compactBox),
   )
 
   const widthOf = new Map(nodes.map((node, i) => [node.id, boxes[i].width]))
@@ -377,7 +381,7 @@ export async function layoutGraph(
     }
   }
 
-  if (box.portrait) return place(true, NOTHING_EXPANDED)
+  if (compactBox) return place(true, NOTHING_EXPANDED)
   const open = new Set(
     edges
       .filter((edge, i) => expanded.has(edge.id) && fitsInline(minInlineWidths[i], availableWidth))

@@ -10,13 +10,16 @@ import { selectInvestigationMetadata } from '../Investigation/selectInvestigatio
 import '../Investigation/investigation.css'
 import './dashboard.css'
 
+// The provenance index holds Maps, so it is compared by identity. The comparator lives here and
+// not inline, because a new comparator on every render would build the index again each time.
+const sameIndex = (a: unknown, b: unknown) => a === b
+
 export type DashboardProps = Omit<ArcDetailsProps, 'metadata'> & { arcJson: string }
 
 export function Dashboard(props: DashboardProps) {
   const status = useArcStatus()
   const metadata = useArcSelector(selectInvestigationMetadata)
-  // The index holds Maps, so it is compared by identity. It changes only when the ARC changes.
-  const provenance = useArcSelector(buildProvenanceIndex, (a, b) => a === b)
+  const provenance = useArcSelector(buildProvenanceIndex, sameIndex)
 
   return (
     <DashboardWindow title="ARC-Dashboard" fillHeight>

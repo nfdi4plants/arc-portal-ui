@@ -320,14 +320,24 @@ describe('GraphCanvas', () => {
 // The edge from Alpha to Beta needs a box of 543px to expand inline: its widest pill (143px), the 132px of the
 // widest node on each side, 32px of label padding and 104px of ELK padding and spacing.
 describe('GraphCanvas in a measured box', () => {
-  let size = { width: 0, height: 0 }
+  // The client size is what a scrollbar leaves of the box. The border size is the whole box.
+  let size = { width: 0, height: 0, borderWidth: 0, borderHeight: 0 }
   let notifyResize: Array<() => void> = []
 
-  function measureBox(width: number, height: number) {
-    size = { width, height }
+  const sizeOf = (width: number, height: number, border?: { width: number; height: number }) => ({
+    width,
+    height,
+    borderWidth: border?.width ?? width,
+    borderHeight: border?.height ?? height,
+  })
+
+  function measureBox(width: number, height: number, border?: { width: number; height: number }) {
+    size = sizeOf(width, height, border)
     notifyResize = []
     vi.spyOn(Element.prototype, 'clientWidth', 'get').mockImplementation(() => size.width)
     vi.spyOn(Element.prototype, 'clientHeight', 'get').mockImplementation(() => size.height)
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(() => size.borderWidth)
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(() => size.borderHeight)
     vi.stubGlobal(
       'ResizeObserver',
       class {
@@ -341,8 +351,8 @@ describe('GraphCanvas in a measured box', () => {
     )
   }
 
-  async function resize(width: number, height: number) {
-    size = { width, height }
+  async function resize(width: number, height: number, border?: { width: number; height: number }) {
+    size = sizeOf(width, height, border)
     await act(async () => notifyResize.forEach((notify) => notify()))
   }
 
@@ -392,6 +402,25 @@ describe('GraphCanvas in a measured box', () => {
     expect(within(list).getByRole('list')).toHaveFocus()
 
     await user.keyboard('{Escape}')
+    await waitFor(() => expect(dialog()).toBeNull())
+    expect(more).toHaveFocus()
+    expect(more).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it.each([
+    ['Tab', '{Tab}'],
+    ['Shift+Tab', '{Shift>}{Tab}{/Shift}'],
+  ])('closes the list on %s and puts the focus back on the toggle', async (_name, keys) => {
+    measureBox(500, 300)
+    const user = userEvent.setup()
+    render(canvas())
+    const more = await showMore()
+    more.focus()
+    await user.keyboard('{Enter}')
+    await screen.findByRole('dialog', { name: 'More properties of Alpha to Beta' })
+
+    await user.keyboard(keys)
+
     await waitFor(() => expect(dialog()).toBeNull())
     expect(more).toHaveFocus()
     expect(more).toHaveAttribute('aria-expanded', 'false')
@@ -544,7 +573,7 @@ describe('GraphCanvas in a measured box', () => {
       const user = userEvent.setup()
       render(canvas())
 
-      const chip = await screen.findByRole('button', { name: 'Show the 3 properties of Alpha to Beta' })
+      const chip = await screen.findByRole('button', { name: 'Show the 3 details of Alpha to Beta' })
       expect(chip).toHaveTextContent('3')
       expect(screen.getByRole('img', { name: '3' })).toBeInTheDocument()
       expect(screen.queryByRole('img', { name: 'Parameter · temperature: 20 C' })).toBeNull()
@@ -553,7 +582,7 @@ describe('GraphCanvas in a measured box', () => {
 
       await user.click(chip)
 
-      const list = await screen.findByRole('dialog', { name: 'Properties of Alpha to Beta' })
+      const list = await screen.findByRole('dialog', { name: 'Details of Alpha to Beta' })
       expect(listTexts(list)).toEqual(['temperature: 20 C', 'duration: 2 h', 'volume: 5 ml'])
       expect(chip).toHaveAttribute('aria-expanded', 'true')
     })
@@ -562,7 +591,7 @@ describe('GraphCanvas in a measured box', () => {
       measureBox(1200, 1500)
       render(canvas())
 
-      expect(await screen.findByRole('button', { name: 'Show the 3 properties of Alpha to Beta' })).toBeInTheDocument()
+      expect(await screen.findByRole('button', { name: 'Show the 3 details of Alpha to Beta' })).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: /^Show 2 more properties/ })).toBeNull()
     })
 
@@ -571,14 +600,14 @@ describe('GraphCanvas in a measured box', () => {
       render(canvas())
 
       expect(await showMore()).toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: /^Show the \d+ properties/ })).toBeNull()
+      expect(screen.queryByRole('button', { name: /^Show the \d+ details/ })).toBeNull()
       expect(vi.mocked(layoutGraph).mock.lastCall?.[4]).toEqual({ width: 0, portrait: false })
     })
 
     it('does not lay out again when a portrait box changes its width', async () => {
       measureBox(358, 760)
       render(canvas())
-      await screen.findByRole('button', { name: 'Show the 3 properties of Alpha to Beta' })
+      await screen.findByRole('button', { name: 'Show the 3 details of Alpha to Beta' })
       const before = layoutCalls()
 
       await resize(500, 760)
@@ -590,7 +619,7 @@ describe('GraphCanvas in a measured box', () => {
     it('starts the graph at the left edge of the box, where a normal graph is centered', async () => {
       measureBox(358, 760)
       const { unmount } = render(canvas())
-      await screen.findByRole('button', { name: 'Show the 3 properties of Alpha to Beta' })
+      await screen.findByRole('button', { name: 'Show the 3 details of Alpha to Beta' })
       expect(region().querySelector('svg')?.parentElement?.className).toContain('canvasCompact')
       unmount()
 
@@ -598,6 +627,35 @@ describe('GraphCanvas in a measured box', () => {
       render(canvas())
       await showMore()
       expect(region().querySelector('svg')?.parentElement?.className).not.toContain('canvasCompact')
+    })
+
+    it('keeps its mode when a scrollbar takes space off the client size of a box that is nearly square', async () => {
+      // 740x745 is portrait. A horizontal scrollbar leaves 730 of the height, which is less than the width.
+      measureBox(740, 745)
+      render(canvas())
+      await screen.findByRole('button', { name: 'Show the 3 details of Alpha to Beta' })
+      const before = layoutCalls()
+
+      await resize(740, 730, { width: 740, height: 745 })
+      await act(async () => {})
+
+      expect(screen.getByRole('button', { name: 'Show the 3 details of Alpha to Beta' })).toBeInTheDocument()
+      expect(layoutCalls()).toBe(before)
+    })
+
+    it('stays in the normal layout when a scrollbar makes the client size of a landscape box portrait', async () => {
+      // 740x735 is landscape. A vertical scrollbar leaves 725 of the width, which is less than the height.
+      measureBox(740, 735)
+      render(canvas())
+      await showMore()
+      const before = layoutCalls()
+
+      await resize(725, 735, { width: 740, height: 735 })
+      await act(async () => {})
+
+      expect(await showMore()).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /^Show the \d+ details/ })).toBeNull()
+      expect(layoutCalls()).toBe(before)
     })
 
     it('scrolls to a centered node only vertically', async () => {

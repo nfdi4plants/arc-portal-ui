@@ -117,9 +117,11 @@ function Breadcrumbs({
       <ol className={styles.crumbs}>
         {visible.map(({ label, view }, position) => {
           const isLast = position === visible.length - 1
+          // In the narrow header the crumb before the current one gives way first, then the current one.
+          const givesWay = narrow && position > 0 && position === visible.length - 2
           const shown = cutLabel(label)
-          // The last crumb of the narrow header can also be cut by the CSS, so it always carries its full text.
-          const title = shown === label && !(narrow && isLast) ? undefined : label
+          // The CSS can cut these two crumbs of the narrow header, so they always carry their full text.
+          const title = shown === label && !(narrow && (isLast || givesWay)) ? undefined : label
           return (
             <Fragment key={view}>
               {position === 1 && hidden.length > 0 && (
@@ -128,7 +130,15 @@ function Breadcrumbs({
                   <HiddenCrumbsMenu hidden={hidden} onNavigate={onNavigate} />
                 </li>
               )}
-              <li className={narrow && isLast ? `${styles.crumb} ${styles.crumbShrinking}` : styles.crumb}>
+              <li
+                className={
+                  narrow && isLast
+                    ? `${styles.crumb} ${styles.crumbShrinking}`
+                    : givesWay
+                      ? `${styles.crumb} ${styles.crumbGivingWay}`
+                      : styles.crumb
+                }
+              >
                 {position > 0 && <Separator />}
                 {isLast ? (
                   <span className={styles.crumbCurrent} aria-current="page" title={title}>
