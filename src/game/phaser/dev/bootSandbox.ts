@@ -18,8 +18,9 @@ export function baseGameConfig(parent: HTMLElement, scenes: Phaser.Types.Scenes.
     input: { mouse: { preventDefaultWheel: false }, keyboard: false },
     // Below 30 fps the game slows down instead of running many catch-up physics steps per frame,
     // which would make a slow PC slower still.
-    // limit keeps 144 Hz screens from rendering more frames than a 60 Hz one.
-    fps: { min: 30, limit: 60 },
+    // No fps.limit: in Phaser 4.2.1 the limited step passes the accumulated delta and then keeps the
+    // remainder, so the leftover time is counted twice and the simulation runs too fast.
+    fps: { min: 30 },
     disableContextMenu: true,
     scene: scenes,
   }
