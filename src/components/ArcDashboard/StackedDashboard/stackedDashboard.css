@@ -46,12 +46,6 @@
   min-height: 0;
 }
 
-.stacked-dashboard-graphview .dashboard-component-content {
-  padding: 0;
-  overflow: hidden;
-  scrollbar-gutter: auto;
-}
-
 .stacked-dashboard-graphview .popup-dashlet-panel:not([data-expanded]) [aria-label='Provenance explorer'] > header {
   padding-right: 64px;
 }

@@ -1,27 +1,15 @@
-import { Banner, Spinner, Stack, Text } from '@primer/react'
-import { useId, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from 'react'
-import { useArcSelector, useArcStatus } from '../../../arc/hooks'
-import { buildProvenanceIndex } from '../../../arc/provenance/buildIndex'
-import type { ProvenanceIndex } from '../../../arc/provenance/types'
-import { DashboardWindow } from '../../DashboardWindow'
-import { PopupDashlet } from '../../PopupDashlet'
+import { useId, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
+import { ArcDashboardFrame } from '../ArcDashboardFrame'
 import { ArcDetails } from '../ArcDetails'
-import type { DashboardProps } from '../Dashboard'
+import type { DashboardContentProps, DashboardProps } from '../dashboardTypes'
 import { InvestigationDashlets } from '../InvestigationDashlets/InvestigationDashlets'
-import { selectInvestigationMetadata } from '../Investigation/selectInvestigationMetadata'
-import type { InvestigationMetadata } from '../Investigation/types'
-import { ProvenanceExplorer } from '../Provenance/ProvenanceExplorer'
+import { PopupGraphview } from '../Provenance/PopupGraphview'
 import './splitDashboard.css'
 
-const sameIndex = (a: unknown, b: unknown) => a === b
 const clampShare = (share: number) => Math.max(20, Math.min(80, share))
 export type SplitDashboardProps = DashboardProps
 
-export function SplitDashboardContent({ metadata, provenance, actions, ...props }: SplitDashboardProps & {
-  metadata: InvestigationMetadata
-  provenance?: ProvenanceIndex
-  actions?: ReactNode
-}) {
+export function SplitDashboardContent({ metadata, provenance, actions, ...props }: DashboardContentProps) {
   const [webviewShare, setWebviewShare] = useState(60)
   const [collapsed, setCollapsed] = useState<'webview' | 'graphview' | null>(null)
   const workspace = useRef<HTMLDivElement>(null)
@@ -86,17 +74,14 @@ export function SplitDashboardContent({ metadata, provenance, actions, ...props 
           }}
         />
         <div id={graphviewId} className="split-dashboard-pane">
-          <PopupDashlet
-            title="Graphview"
-            description="Explore connections between datasets, experimental processes, and their inputs and outputs."
+          <PopupGraphview
+            index={provenance}
             label="Graphview"
             className="split-dashboard-graphview"
             expandOnClick={false}
             collapsed={collapsed === 'graphview'}
             onToggleCollapsed={() => togglePane('graphview')}
-          >
-            {provenance ? <ProvenanceExplorer index={provenance} embedded /> : <Text as="p">No provenance data available.</Text>}
-          </PopupDashlet>
+          />
         </div>
       </div>
     </main>
@@ -104,23 +89,5 @@ export function SplitDashboardContent({ metadata, provenance, actions, ...props 
 }
 
 export function SplitDashboard(props: SplitDashboardProps) {
-  const status = useArcStatus()
-  const metadata = useArcSelector(selectInvestigationMetadata)
-  const provenance = useArcSelector(buildProvenanceIndex, sameIndex)
-
-  return (
-    <DashboardWindow label="SplitDashboard">
-      {status.kind === 'error' ? (
-        <div className="investigation-feedback">
-          <Banner variant="critical" title="Could not load ARC" description={status.error instanceof Error ? status.error.message : String(status.error)} />
-        </div>
-      ) : !metadata ? (
-        <Stack className="investigation-feedback" direction="horizontal" align="center" justify="center" gap="condensed" role="status">
-          <Spinner size="large" /><Text as="span">Loading ARC…</Text>
-        </Stack>
-      ) : (
-        <SplitDashboardContent {...props} metadata={metadata} provenance={provenance} />
-      )}
-    </DashboardWindow>
-  )
+  return <ArcDashboardFrame {...props} label="SplitDashboard" content={SplitDashboardContent} />
 }

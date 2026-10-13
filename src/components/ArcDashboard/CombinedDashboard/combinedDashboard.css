@@ -128,9 +128,3 @@
   min-height: 0;
 }
 
-.combined-dashboard-graphview .dashboard-component-content {
-  padding: 0;
-  overflow: hidden;
-  scrollbar-gutter: auto;
-}
-

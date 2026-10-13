@@ -1,11 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { TalinumStory } from '../../../storybook/TalinumStory'
+import { withTalinumStory } from '../../../storybook/withTalinumStory'
 import { privateTalinumDataHubData, publicTalinumDataHubData, talinumArcJson, talinumRepository } from '../../../storybook/fixtures/talinumArc'
-import { NewDashboard, type NewDashboardProps } from './NewDashboard'
+import { NewDashboard } from './NewDashboard'
 
-function SampleNewDashboard(props: NewDashboardProps) {
-  return <TalinumStory>{() => <NewDashboard {...props} />}</TalinumStory>
-}
+const SampleNewDashboard = withTalinumStory(NewDashboard)
 
 const meta = {
   title: 'NewDashboard',

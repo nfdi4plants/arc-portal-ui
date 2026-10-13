@@ -80,13 +80,6 @@
   height: var(--new-dashboard-dashlet-height);
 }
 
-.new-dashboard-graphview .dashboard-component-content {
-  flex: 1;
-  padding: 0;
-  overflow: hidden;
-  scrollbar-gutter: auto;
-}
-
 @container new-dashboard (min-width: 1000px) {
   .new-dashboard-orbit {
     grid-template-columns: repeat(4, var(--new-dashboard-dashlet-width));

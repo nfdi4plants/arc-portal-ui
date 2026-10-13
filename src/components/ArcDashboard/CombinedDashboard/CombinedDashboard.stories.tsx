@@ -1,11 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { TalinumStory } from '../../../storybook/TalinumStory'
+import { withTalinumStory } from '../../../storybook/withTalinumStory'
 import { privateTalinumDataHubData, publicTalinumDataHubData, talinumArcJson, talinumRepository } from '../../../storybook/fixtures/talinumArc'
-import { CombinedDashboard, type CombinedDashboardProps } from './CombinedDashboard'
+import { CombinedDashboard } from './CombinedDashboard'
 
-function SampleCombinedDashboard(props: CombinedDashboardProps) {
-  return <TalinumStory>{() => <CombinedDashboard {...props} />}</TalinumStory>
-}
+const SampleCombinedDashboard = withTalinumStory(CombinedDashboard)
 
 const meta = {
   title: 'CombinedDashboard',

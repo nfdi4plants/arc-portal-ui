@@ -1,11 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { TalinumStory } from '../../../storybook/TalinumStory'
+import { withTalinumStory } from '../../../storybook/withTalinumStory'
 import { privateTalinumDataHubData, publicTalinumDataHubData, talinumArcJson, talinumRepository } from '../../../storybook/fixtures/talinumArc'
-import { SplitDashboard, type SplitDashboardProps } from './SplitDashboard'
+import { SplitDashboard } from './SplitDashboard'
 
-function SampleSplitDashboard(props: SplitDashboardProps) {
-  return <TalinumStory>{() => <SplitDashboard {...props} />}</TalinumStory>
-}
+const SampleSplitDashboard = withTalinumStory(SplitDashboard)
 
 const meta = {
   title: 'SplitDashboard',

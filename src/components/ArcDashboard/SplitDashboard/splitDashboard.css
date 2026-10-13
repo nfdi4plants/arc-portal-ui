@@ -55,7 +55,6 @@
 .split-dashboard-workspace[data-collapsed='graphview'] { grid-template-rows: minmax(0, 1fr) 12px 50px; }
 .split-dashboard-pane { min-width: 0; min-height: 0; }
 .split-dashboard-pane > .popup-dashlet { height: 100%; }
-.split-dashboard-graphview .dashboard-component-content { padding: 0; overflow: hidden; scrollbar-gutter: auto; }
 
 .split-dashboard-divider {
   display: flex;
