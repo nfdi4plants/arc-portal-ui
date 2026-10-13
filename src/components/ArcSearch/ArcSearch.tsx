@@ -6,7 +6,7 @@ import { useProjectPage } from '../../util/useProjectPage.ts'
 import { ArcList } from '../ArcList/ArcList.tsx'
 import styles from './ArcSearch.module.css'
 
-export function ArcSearch({ fetchCall, signedIn = false }: { fetchCall: SearchArcs; signedIn?: boolean }) {
+export function ArcSearch({ fetchCall, signedIn = false, onArcClick }: { fetchCall: SearchArcs; signedIn?: boolean; onArcClick: (url: string, name: string) => void }) {
   const headingId = useId()
   const [input, setInput] = useState('')
   const [request, setRequest] = useState<{ fetchCall: SearchArcs; query: string; page: number } | null>(null)
@@ -59,7 +59,7 @@ export function ArcSearch({ fetchCall, signedIn = false }: { fetchCall: SearchAr
             ? `${state.result.items.length} results for “${activeRequest.query}” · Page ${state.result.page}`
             : `No ARCs found for “${activeRequest.query}” on page ${state.result.page}.`}
         </Text>
-        {state.result.items.length > 0 && <ArcList projects={state.result.items} label="ARC search results" />}
+        {state.result.items.length > 0 && <ArcList projects={state.result.items} label="ARC search results" onArcClick={onArcClick} />}
         <Stack as="nav" direction="horizontal" align="center" justify="space-between" gap="condensed" aria-label="Search result pages" className={styles.pagination}>
           <Button disabled={state.result.previousPage === null} onClick={() => goToPage(state.result.previousPage!)}>Previous</Button>
           <Text size="medium">Page {state.result.page}</Text>

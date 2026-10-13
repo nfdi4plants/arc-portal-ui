@@ -1,7 +1,7 @@
 import '@primer/primitives/dist/css/functional/themes/light.css'
 import '@primer/css/dist/primer.css'
 import { BaseStyles } from '@primer/react'
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { ThemeProvider } from '@primer/react/next'
 import DataHubDashboard from './components/DataHubDashboard/DataHubDashboard.tsx'
 import { getGroupProjects, getTopStarredProjects, listAllGroups, searchProjects } from './api/gitlab/index.ts'
@@ -11,11 +11,26 @@ import type { FetchGroupArcs, FetchGroups } from './types/organisation.ts'
 import { AuthenticationProvider } from './auth/AuthenticationProvider.tsx'
 import { useAuthentication } from './auth/context.ts'
 import { Navbar } from './components/Navbar/Navbar.tsx'
+import ArcDashboard from './components/ArcDashboard/ArcDashboard.tsx'
+
 
 const fetchPublicGroups: FetchGroups = signal => listAllGroups(referenceGitLab.source, { visibility: 'public', signal })
 
+type PageState =
+  | {
+    type: "datahub-dashboard";
+  }
+  | {
+    type: "arc-dashboard";
+    data: {
+      url: string;
+      name: string;
+    };
+  };
+
 function Portal() {
   const { session } = useAuthentication()
+  const [pageState, setPageState] = useState<PageState>({ type: "datahub-dashboard" })
   const token = session?.token
   const fetchTopStarred = useCallback<FetchArcs>(options =>
     getTopStarredProjects(referenceGitLab.source, { ...options, token }), [token])
@@ -28,8 +43,15 @@ function Portal() {
 
   return <>
     <Navbar />
-    <DataHubDashboard fetchTopStarred={fetchTopStarred} fetchSearch={fetchSearch} signedIn={!!session}
-      organisations={{ fetchPublicGroups, fetchMembershipGroups: session ? fetchMembershipGroups : null, fetchGroupProjects }} />
+    {
+      pageState.type === "arc-dashboard" ? (
+        <ArcDashboard url={pageState.data.url} name={pageState.data.name} onBack={() => setPageState({ type: "datahub-dashboard" })} />
+      ) :
+      <DataHubDashboard 
+        onArcClick={(url, name) => setPageState({ type: "arc-dashboard", data: { url, name } })}
+        fetchTopStarred={fetchTopStarred} fetchSearch={fetchSearch} signedIn={!!session}
+        organisations={{ fetchPublicGroups, fetchMembershipGroups: session ? fetchMembershipGroups : null, fetchGroupProjects }} />
+    }
   </>
 }
 

@@ -12,9 +12,10 @@ export interface DataHubDashboardProps {
   fetchSearch: SearchArcs
   signedIn?: boolean
   organisations?: OrganisationBrowserProps
+  onArcClick: (url: string, name: string) => void
 }
 
-function DataHubDashboard({ fetchTopStarred, fetchSearch, signedIn = false, organisations }: DataHubDashboardProps) {
+function DataHubDashboard({ fetchTopStarred, fetchSearch, signedIn = false, organisations, onArcClick }: DataHubDashboardProps) {
   return (
     <main className={styles.main}>
       <header className={styles.header}>
@@ -24,8 +25,8 @@ function DataHubDashboard({ fetchTopStarred, fetchSearch, signedIn = false, orga
         <Link href={referenceGitLab.exploreUrl} className={styles.source}>Explore the reference GitLab instance ↗</Link>
       </header>
       <div className={styles.grid}>
-        <TopStarredArcs fetchCall={fetchTopStarred} />
-        <ArcSearch fetchCall={fetchSearch} signedIn={signedIn} />
+        <TopStarredArcs fetchCall={fetchTopStarred} onArcClick={onArcClick} />
+        <ArcSearch fetchCall={fetchSearch} signedIn={signedIn} onArcClick={onArcClick} />
       </div>
       {organisations && <OrganisationBrowser {...organisations} />}
     </main>
