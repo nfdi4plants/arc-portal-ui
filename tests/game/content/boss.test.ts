@@ -116,6 +116,15 @@ describe('finalBossFromPlan', () => {
     }
   })
 
+  it('gives every phase one drawn heavy and two light attacks, so it always has a light one, over 200 seeds', () => {
+    for (let seed = 0; seed < 200; seed++) {
+      for (const phase of finalBossFromPlan(plan, createRng(seed)).phases) {
+        expect(phase.attacks.slice(0, 3).filter((attack) => attack.heavy)).toHaveLength(1)
+        expect(phase.attacks.filter((attack) => !attack.heavy)).toHaveLength(2)
+      }
+    }
+  })
+
   it('never telegraphs faster than 80 ms', () => {
     const rushed: RunPlan = { ...plan, segments: [{ ...plan.segments[0], telegraphMs: 40 }], nodes: plan.nodes.slice(0, 2) }
     const [phase] = finalBossFromPlan(rushed, createRng('floor')).phases

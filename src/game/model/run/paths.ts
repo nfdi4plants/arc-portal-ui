@@ -33,10 +33,13 @@ export function longestPaths(index: ProvenanceIndex): Map<string, number> {
   return longest
 }
 
-// Inputs are the nodes no row produces.
+// Inputs are the nodes no row produces. A node is still an input when every row that produces it
+// also takes it as input (a row from a node to itself).
 export function startCandidatesFrom(index: ProvenanceIndex, longest: Map<string, number>): StartCandidate[] {
+  const isInput = (id: string) =>
+    (index.producedBy.get(id) ?? []).every((rowId) => index.rowById.get(rowId)?.inputs.includes(id))
   return index.nodes
-    .filter((node) => (index.producedBy.get(node.id)?.length ?? 0) === 0)
+    .filter((node) => isInput(node.id))
     .map((node) => ({ nodeId: node.id, pathLength: longest.get(node.id) ?? 0 }))
     .filter((candidate) => candidate.pathLength >= 1)
     .sort((a, b) => b.pathLength - a.pathLength || compareText(a.nodeId, b.nodeId))

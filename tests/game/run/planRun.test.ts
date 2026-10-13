@@ -1,7 +1,7 @@
 import { ARC } from '@nfdi4plants/arctrl'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { buildProvenanceIndex } from '../../../src/arc/provenance/buildIndex'
-import type { ProvenanceIndex } from '../../../src/arc/provenance/types'
+import type { IoKind, ProvenanceIndex, ProvenanceNode, ProvenanceRow } from '../../../src/arc/provenance/types'
 import type { RunPlan } from '../../../src/game/contracts/run'
 import { listStartCandidates, planRun, segmentQuality, telegraphMs } from '../../../src/game/model/run'
 import { crateJson } from '../../helpers/sampleCrate'
@@ -91,6 +91,38 @@ describe('planRun on the sample ARC', () => {
     }
     expect(listStartCandidates(empty)).toEqual([])
     expect(planRun(empty, 'Empty', 'seed')).toBeNull()
+  })
+
+  it('starts at a node that a row only maps to itself', () => {
+    const rowOf = (id: string, from: string, to: string): ProvenanceRow => ({
+      id,
+      name: id,
+      processKey: 'assays/A::p',
+      datasetId: 'assays/A',
+      inputs: [from],
+      outputs: [to],
+      annotations: [],
+    })
+    const nodeOf = (id: string, kind: IoKind): ProvenanceNode => ({ id, kind, annotations: [], datasetIds: [], processKeys: [] })
+    const rows = [rowOf('r0', 'Plant1', 'Plant1'), rowOf('r1', 'Plant1', 'Extract1'), rowOf('r2', 'Extract1', 'Data1')]
+    const nodes = [nodeOf('Plant1', 'source'), nodeOf('Extract1', 'sample'), nodeOf('Data1', 'data')]
+    const loop: ProvenanceIndex = {
+      datasets: [],
+      processes: [],
+      rows,
+      nodes,
+      datasetById: new Map(),
+      processByKey: new Map(),
+      rowById: new Map(rows.map((row) => [row.id, row])),
+      nodeById: new Map(nodes.map((node) => [node.id, node])),
+      groupById: new Map(),
+      producedBy: new Map([['Plant1', ['r0']], ['Extract1', ['r1']], ['Data1', ['r2']]]),
+      consumedBy: new Map([['Plant1', ['r0', 'r1']], ['Extract1', ['r2']]]),
+    }
+    expect(listStartCandidates(loop)).toEqual([{ nodeId: 'Plant1', pathLength: 2 }])
+    const plan = planRun(loop, 'Loop', 'seed')
+    expect(plan?.nodes.map((node) => node.id)).toEqual(['Plant1', 'Extract1', 'Data1'])
+    expect(plan?.segments).toHaveLength(2)
   })
 })
 

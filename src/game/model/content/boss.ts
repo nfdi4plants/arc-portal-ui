@@ -36,19 +36,22 @@ function takeRandom(rng: Rng, pool: number[]): number {
 }
 
 // Draws `count` attacks without repeats, `minHeavy` of them heavy, in table order. The id carries
-// the table position, so the same attack has the same id whatever else was drawn.
+// the table position, so the same attack has the same id whatever else was drawn. With
+// `lightRest` the attacks after the first `minHeavy` are all light, so the draw has exactly
+// `minHeavy` heavy ones.
 function drawAttacks(
   rng: Rng,
   archetype: BossArchetype,
   count: number,
   minHeavy: number,
   heavyTelegraphMs: number,
+  lightRest = false,
 ): BossAttackSpec[] {
   const table = BOSS_ATTACKS[archetype]
   const heavyPool = table.flatMap((attack, i) => (attack.heavy ? [i] : []))
   const chosen: number[] = []
   for (let i = 0; i < minHeavy; i++) chosen.push(takeRandom(rng, heavyPool))
-  const rest = table.flatMap((_, i) => (chosen.includes(i) ? [] : [i]))
+  const rest = table.flatMap((attack, i) => (chosen.includes(i) || (lightRest && attack.heavy) ? [] : [i]))
   while (chosen.length < count) chosen.push(takeRandom(rng, rest))
   return chosen
     .sort((a, b) => a - b)
@@ -103,7 +106,7 @@ export const finalBossFromPlan: FinalBossFromPlan = (plan, rng) => {
       quality: segment.quality,
       telegraphMs,
       attacks: [
-        ...drawAttacks(rng, archetype, 3, 1, telegraphMs),
+        ...drawAttacks(rng, archetype, 3, 1, telegraphMs, true),
         toSpec(SHARED_HEAVY_ATTACK, `crate.${SHARED_HEAVY_ATTACK.kind}.0`, telegraphMs),
       ],
     }

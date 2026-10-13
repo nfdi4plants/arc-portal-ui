@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PowerUpKind } from '../../../src/game/contracts/progression'
-import { applyCard, canApply, CARDS, cardById, createBuild } from '../../../src/game/model/progression'
+import { applyCard, canApply, CARDS, createBuild } from '../../../src/game/model/progression'
 
 const countOf = (kind: PowerUpKind) => CARDS.filter((card) => card.kind === kind).length
 
@@ -18,11 +18,6 @@ describe('catalog', () => {
     for (const card of CARDS) {
       expect(() => applyCard(createBuild(), card.id)).not.toThrow()
     }
-  })
-
-  it('finds cards by id and returns undefined for the starting staff', () => {
-    expect(cardById('weapon.wand')?.name).toBe('Wand')
-    expect(cardById('weapon.staff')).toBeUndefined()
   })
 
   it('throws for an unknown card id, and canApply returns false for it', () => {

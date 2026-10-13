@@ -28,6 +28,19 @@ function run(state: MotorState, ms: number, i: MotorInput, e: MotorEnv): MotorSt
   return s
 }
 
+// Steps the whole number of steps nearest to `ms`, so a boundary test lands within half a step of the
+// time it names.
+function elapse(state: MotorState, ms: number, i: MotorInput, e: MotorEnv): MotorState {
+  let s = state
+  for (let n = Math.round(ms / STEP_MS); n > 0; n--) s = stepMotor(s, i, e, STEP_MS)
+  return s
+}
+
+// The step that applies `i` `ms` after `state`, counting that step itself, with no input before it.
+function stepAt(state: MotorState, ms: number, i: MotorInput, e: MotorEnv): MotorState {
+  return stepMotor(elapse(state, ms - STEP_MS, input(), e), i, e, STEP_MS)
+}
+
 function grounded(): MotorState {
   return stepMotor(createMotorState(), input(), env({ grounded: true }), STEP_MS)
 }
@@ -52,12 +65,13 @@ function jumpApex(holdMs: number): number {
 }
 
 describe('motor', () => {
-  it('allows a coyote jump 60 ms after leaving a ledge and refuses it at 120 ms', () => {
-    const early = stepMotor(run(grounded(), 60, input(), env()), input(['jump'], ['jump']), env(), STEP_MS)
+  it('allows a coyote jump just inside the coyote time after leaving a ledge and refuses it just after', () => {
+    const jump = input(['jump'], ['jump'])
+    const early = stepAt(grounded(), MOTOR.coyoteMs - 10, jump, env())
     expect(early.jumped).toBe(true)
     expect(early.vy).toBeLessThan(0)
 
-    const late = stepMotor(run(grounded(), 120, input(), env()), input(['jump'], ['jump']), env(), STEP_MS)
+    const late = stepAt(grounded(), MOTOR.coyoteMs + 10, jump, env())
     expect(late.jumped).toBe(false)
     expect(late.vy).toBeGreaterThan(0)
   })
@@ -88,7 +102,7 @@ describe('motor', () => {
     expect(turned.facing).toBe(-1)
   })
 
-  it('gives 120 ms of i-frames on dash and respects the cooldown', () => {
+  it('gives i-frames for the dash i-frame time and respects the cooldown', () => {
     const e = env({ grounded: true })
     const dashed = stepMotor(grounded(), input(['dash'], ['dash']), e, STEP_MS)
     expect(dashed.dashed).toBe(true)
@@ -96,12 +110,40 @@ describe('motor', () => {
     expect(dashed.vy).toBe(0)
     expect(dashed.dashIframesMs).toBeGreaterThan(0)
 
-    const after = run(dashed, 130, input(), e)
+    expect(elapse(dashed, MOTOR.dashIframesMs - 10, input(), e).dashIframesMs).toBeGreaterThan(0)
+    const after = elapse(dashed, MOTOR.dashIframesMs + 10, input(), e)
     expect(after.dashIframesMs).toBe(0)
     expect(stepMotor(after, input(['dash'], ['dash']), e, STEP_MS).dashed).toBe(false)
 
     const cooled = run(after, 400, input(), e)
     expect(stepMotor(cooled, input(['dash'], ['dash']), e, STEP_MS).dashed).toBe(true)
+  })
+
+  it('fires a dash pressed during the cooldown once it ends, within the dash buffer', () => {
+    const e = env({ grounded: true })
+    const dash = input(['dash'], ['dash'])
+    const dashed = stepMotor(grounded(), dash, e, STEP_MS)
+    // Presses `beforeEndMs` before the cooldown ends, then waits on for the buffer time.
+    const dashesAgain = (beforeEndMs: number): boolean => {
+      let s = stepAt(dashed, e.stats.dashCooldownMs - beforeEndMs, dash, e)
+      expect(s.dashed).toBe(false)
+      for (let n = Math.round((beforeEndMs + MOTOR.dashBufferMs) / STEP_MS); n > 0 && !s.dashed; n--) s = stepMotor(s, input(), e, STEP_MS)
+      return s.dashed
+    }
+    expect(dashesAgain(MOTOR.dashBufferMs - 10)).toBe(true)
+    expect(dashesAgain(MOTOR.dashBufferMs + 10)).toBe(false)
+  })
+
+  it('fires a dash pressed while actions are locked once they unlock, within the dash buffer', () => {
+    const locked = env({ grounded: true, actionsLocked: true })
+    const pressed = stepMotor(grounded(), input(['dash'], ['dash']), locked, STEP_MS)
+    expect(pressed.dashed).toBe(false)
+    const unlockedAfter = (ms: number) => {
+      const stillLocked = elapse(pressed, ms - STEP_MS, input(), locked)
+      return stepMotor(stillLocked, input(), env({ grounded: true }), STEP_MS).dashed
+    }
+    expect(unlockedAfter(MOTOR.dashBufferMs - 10)).toBe(true)
+    expect(unlockedAfter(MOTOR.dashBufferMs + 10)).toBe(false)
   })
 
   it('jumps in the air only with the doubleJump mechanic, once', () => {
@@ -129,16 +171,17 @@ describe('motor', () => {
     expect(without.jumped).toBe(false)
   })
 
-  it('allows a wall jump 60 ms after the wall contact ends and refuses it at 120 ms', () => {
+  it('allows a wall jump just inside the wall grace after the contact ends and refuses it just after', () => {
     const mechanics = { ...NO_MECHANICS, wallJump: true }
     const falling = run(grounded(), 200, input(), env())
     const touched = stepMotor(falling, input(), env({ touchingWallRight: true, mechanics }), STEP_MS)
+    const jump = input(['jump'], ['jump'])
 
-    const early = stepMotor(run(touched, 60, input(), env({ mechanics })), input(['jump'], ['jump']), env({ mechanics }), STEP_MS)
+    const early = stepAt(touched, MOTOR.wallGraceMs - 10, jump, env({ mechanics }))
     expect(early.jumped).toBe(true)
     expect(early.vx).toBe(-MOTOR.wallJumpPush)
 
-    const late = stepMotor(run(touched, 120, input(), env({ mechanics })), input(['jump'], ['jump']), env({ mechanics }), STEP_MS)
+    const late = stepAt(touched, MOTOR.wallGraceMs + 10, jump, env({ mechanics }))
     expect(late.jumped).toBe(false)
   })
 

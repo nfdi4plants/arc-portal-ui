@@ -15,6 +15,7 @@ export const MOTOR = {
   terminalFall: 720,
   coyoteMs: 90,
   jumpBufferMs: 120,
+  dashBufferMs: 100,
   dashMs: 150,
   dashSpeedFactor: 3.2,
   dashIframesMs: 120,
@@ -46,7 +47,7 @@ export interface MotorEnv {
   mechanics: { doubleJump: boolean; airDash: boolean; wallJump: boolean; hatGlide: boolean }
   // Multiplies the horizontal target speed, for example while attacking on the ground. Default 1.
   speedScale?: number
-  // Blocks starting jumps and dashes and turning around. Jump presses still fill the buffer.
+  // Blocks starting jumps and dashes and turning around. Jump and dash presses still fill their buffers.
   actionsLocked?: boolean
 }
 
@@ -57,6 +58,7 @@ export interface MotorState {
   // Remaining times in ms.
   coyoteMs: number
   jumpBufferMs: number
+  dashBufferMs: number
   dashMs: number
   dashCooldownMs: number
   dashIframesMs: number
@@ -83,6 +85,7 @@ export function createMotorState(facing: 1 | -1 = 1): MotorState {
     facing,
     coyoteMs: 0,
     jumpBufferMs: 0,
+    dashBufferMs: 0,
     dashMs: 0,
     dashCooldownMs: 0,
     dashIframesMs: 0,
@@ -150,6 +153,7 @@ export function stepMotor(state: MotorState, input: MotorInput, env: MotorEnv, d
   const grounded = onGround(s, env)
 
   s.jumpBufferMs = Math.max(0, s.jumpBufferMs - dtMs)
+  s.dashBufferMs = Math.max(0, s.dashBufferMs - dtMs)
   s.dashCooldownMs = Math.max(0, s.dashCooldownMs - dtMs)
   s.dashIframesMs = Math.max(0, s.dashIframesMs - dtMs)
   s.wallLockMs = Math.max(0, s.wallLockMs - dtMs)
@@ -173,7 +177,9 @@ export function stepMotor(state: MotorState, input: MotorInput, env: MotorEnv, d
 
   let dir = (input.held.has('right') ? 1 : 0) - (input.held.has('left') ? 1 : 0)
 
-  if (input.pressed.has('dash') && !locked && canDash(s, env)) {
+  if (input.pressed.has('dash')) s.dashBufferMs = MOTOR.dashBufferMs
+  if (s.dashBufferMs > 0 && !locked && canDash(s, env)) {
+    s.dashBufferMs = 0
     if (!grounded && s.coyoteMs <= 0) s.airDashUsed = true
     s.dashDir = dir !== 0 ? (dir as 1 | -1) : s.facing
     s.facing = s.dashDir

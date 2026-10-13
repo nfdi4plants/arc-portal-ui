@@ -116,7 +116,7 @@ export const CARDS: readonly PowerUpCard[] = [
   {
     id: 'weapon.petriShield',
     name: 'Petri Shield',
-    description: 'Heavy attack that blocks, then bashes. Picking it again gives Overclocked Petri Shield.',
+    description: 'Heavy attack that reflects projectiles, then bashes. It does not block melee. Picking it again gives Overclocked Petri Shield.',
     rarity: 'uncommon',
     kind: 'weapon',
     slot: 'heavy',
@@ -145,7 +145,7 @@ export const CARDS: readonly PowerUpCard[] = [
   {
     id: 'mechanic.tripleCombo',
     name: 'Triple Combo',
-    description: 'Your light string gets a fourth move: a spin that hits in front and behind.',
+    description: 'Adds one more move to the end of your light string: a spin that hits in front and behind.',
     rarity: 'rare',
     kind: 'mechanic',
   },
@@ -166,14 +166,14 @@ export const CARDS: readonly PowerUpCard[] = [
   {
     id: 'mechanic.hatGlide',
     name: 'Hat Glide',
-    description: 'Glide slowly while falling.',
+    description: 'Hold jump while falling to glide slowly.',
     rarity: 'rare',
     kind: 'mechanic',
   },
   {
     id: 'mechanic.lifesteal',
     name: 'Lifesteal',
-    description: 'Heal 8% of the damage you deal.',
+    description: 'Heal 8% of the damage your own attacks deal. Bonus hits from other effects do not heal.',
     rarity: 'rare',
     kind: 'mechanic',
   },
@@ -222,7 +222,7 @@ export const CARDS: readonly PowerUpCard[] = [
   {
     id: 'legendary.theOntology',
     name: 'The Ontology',
-    description: 'Your hits tag enemies. Hitting a tagged enemy deals 50% extra and passes 30% on to the nearest other tagged enemy.',
+    description: 'Your hits tag enemies. Hitting a tagged enemy deals 50% extra, and 30% of that boosted hit (45% of the original) passes to the nearest other tagged enemy.',
     rarity: 'legendary',
     kind: 'legendary',
   },
@@ -243,22 +243,18 @@ export const CARDS: readonly PowerUpCard[] = [
   {
     id: 'legendary.fairPrinciples',
     name: 'FAIR Principles',
-    description: 'Four letters orbit you. F adds 20% damage, A shoots the nearest enemy every 2 seconds, I grants a shield every 8 seconds and R regenerates 1 HP per second.',
+    description: 'Four letters orbit you. F adds 20% damage, A shoots the nearest enemy every 2 seconds, I grants a shield every 8 seconds when you have none and R regenerates 1 HP per second.',
     rarity: 'legendary',
     kind: 'legendary',
   },
   {
     id: 'legendary.peerReview',
     name: 'Peer Review',
-    description: 'Every third hit summons a reviewer that repeats your last three attacks.',
+    description: 'Every third hit summons a reviewer that replays your last three hits or shots.',
     rarity: 'legendary',
     kind: 'legendary',
   },
 ]
-
-export function cardById(id: string): PowerUpCard | undefined {
-  return CARDS.find((card) => card.id === id)
-}
 
 // Cards with these ids take the first free slot in abilitySlots when picked.
 export const ABILITY_IDS: readonly (MechanicId | LegendaryId)[] = ['parry', 'familiar', 'gitRevert']
