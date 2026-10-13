@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import type { CreateGame } from '../contracts/events'
-import { baseGameConfig } from './dev/bootSandbox'
+import { baseGameConfig } from './config'
 import { createGameHandle, createLoopPause } from './gameHandle'
 import { BootScene } from './scenes/BootScene'
 import { BossScene } from './scenes/BossScene'
@@ -11,6 +11,18 @@ import { HudScene } from './scenes/HudScene'
 import { LevelUpScene } from './scenes/LevelUpScene'
 import { StretchScene } from './scenes/StretchScene'
 import { VictoryScene } from './scenes/VictoryScene'
+
+// Phaser 4.2.1 never calls WEBGL_lose_context, and every Start run from the menu creates a new game.
+// Without this the destroyed games keep their GL contexts until the browser reclaims them.
+function releaseWebGlContext(game: Phaser.Game): void {
+  const renderer = game.renderer
+  if (!(renderer instanceof Phaser.Renderer.WebGL.WebGLRenderer)) return
+  try {
+    renderer.gl.getExtension('WEBGL_lose_context')?.loseContext()
+  } catch {
+    // The context is already gone, so there is nothing left to release.
+  }
+}
 
 export const createGame: CreateGame = (parent, { bindings }) => {
   const ctx = new RunContext(bindings, (event) => control.emit(event))
@@ -59,6 +71,7 @@ export const createGame: CreateGame = (parent, { bindings }) => {
     focus,
     destroy: () => {
       loopPause.setPaused(false)
+      releaseWebGlContext(game)
       game.destroy(true)
     },
   })

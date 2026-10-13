@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import type { ScribbleArt } from '../../contracts/art'
 import { DEPTH, PALETTE } from '../../contracts/constants'
+import { cssColor } from '../color'
 import type { Point } from './geometry'
 
 const NUMBER_MS = 600
@@ -8,47 +9,69 @@ const NUMBER_RISE = 22
 
 interface FloatingNumber {
   text: Phaser.GameObjects.Text
+  crit: boolean
   startY: number
   ageMs: number
 }
 
-function cssColor(color: number): string {
-  return `#${color.toString(16).padStart(6, '0')}`
-}
-
-const CREAM = cssColor(PALETTE.cream)
-const YELLOW = cssColor(PALETTE.yellow)
 const OUTLINE = cssColor(PALETTE.outline)
+const NORMAL_LOOK = { fontSize: '9px', color: cssColor(PALETTE.cream), strokeThickness: 2 }
+const CRIT_LOOK = { fontSize: '15px', color: cssColor(PALETTE.yellow), strokeThickness: 3 }
+
+// The camera zooms the text up, so it is rasterised at least at that scale.
+function resolutionFor(zoom: number): number {
+  return Math.max(2, Math.ceil(zoom))
+}
 
 // Damage numbers and hit effects. Numbers age with the real step time (hit-stop does not freeze
 // them), so they keep rising while the actors hold still. Texts and effect sprites are pooled:
 // creating a Phaser Text allocates a canvas and a texture, which is too slow to do on every hit.
+// Normal and crit numbers have separate pools, so a reused Text keeps its style and a hit only
+// sets its string, position and alpha. Every style or resolution change would render the Text again.
 export function createFeedback(scene: Phaser.Scene, art: ScribbleArt) {
   const numbers: FloatingNumber[] = []
-  const freeTexts: Phaser.GameObjects.Text[] = []
+  const freeNormal: Phaser.GameObjects.Text[] = []
+  const freeCrit: Phaser.GameObjects.Text[] = []
+  // The camera zoom that the texts were rasterised for.
+  let zoom = scene.cameras.main.zoom
   const effects = new Set<Phaser.GameObjects.Sprite>()
   const freeEffects: Phaser.GameObjects.Sprite[] = []
   const effectScale = 1 / art.pixelsPerUnit
 
-  function takeText(): Phaser.GameObjects.Text {
-    const reused = freeTexts.pop()
+  function syncResolution() {
+    const current = scene.cameras.main.zoom
+    if (current === zoom) return
+    zoom = current
+    const resolution = resolutionFor(zoom)
+    const retune = (text: Phaser.GameObjects.Text) => {
+      if (text.style.resolution !== resolution) text.setResolution(resolution)
+    }
+    for (const item of numbers) retune(item.text)
+    for (const text of freeNormal) retune(text)
+    for (const text of freeCrit) retune(text)
+  }
+
+  function takeText(crit: boolean): Phaser.GameObjects.Text {
+    const reused = (crit ? freeCrit : freeNormal).pop()
     if (reused) return reused.setActive(true).setVisible(true)
     return scene.add
-      .text(0, 0, '', { fontFamily: 'sans-serif', fontStyle: 'bold', stroke: OUTLINE })
+      .text(0, 0, '', {
+        fontFamily: 'sans-serif',
+        fontStyle: 'bold',
+        stroke: OUTLINE,
+        resolution: resolutionFor(zoom),
+        ...(crit ? CRIT_LOOK : NORMAL_LOOK),
+      })
       .setOrigin(0.5, 1)
       .setDepth(DEPTH.fx)
   }
 
   function spawnNumber(point: Point, damage: number, crit: boolean) {
-    const text = takeText()
-    // The camera zooms the text up, so it is rasterised at least at that scale.
-    text.setResolution(Math.max(2, Math.ceil(scene.cameras.main.zoom)))
-    text.setFontSize(crit ? 15 : 9)
-    text.setColor(crit ? YELLOW : CREAM)
-    text.setStroke(OUTLINE, crit ? 3 : 2)
+    syncResolution()
+    const text = takeText(crit)
     text.setText(String(Math.round(damage)))
     text.setPosition(point.x, point.y - 6).setAlpha(1)
-    numbers.push({ text, startY: text.y, ageMs: 0 })
+    numbers.push({ text, crit, startY: text.y, ageMs: 0 })
   }
 
   function releaseEffect(sprite: Phaser.GameObjects.Sprite) {
@@ -83,7 +106,8 @@ export function createFeedback(scene: Phaser.Scene, art: ScribbleArt) {
         const t = item.ageMs / NUMBER_MS
         if (t >= 1) {
           item.text.setActive(false).setVisible(false)
-          freeTexts.push(item.text)
+          const free = item.crit ? freeCrit : freeNormal
+          free.push(item.text)
           continue
         }
         item.text.setY(item.startY - NUMBER_RISE * (1 - (1 - t) * (1 - t)))
@@ -95,8 +119,10 @@ export function createFeedback(scene: Phaser.Scene, art: ScribbleArt) {
     destroy() {
       for (const item of numbers) item.text.destroy()
       numbers.length = 0
-      for (const text of freeTexts) text.destroy()
-      freeTexts.length = 0
+      for (const text of freeNormal) text.destroy()
+      freeNormal.length = 0
+      for (const text of freeCrit) text.destroy()
+      freeCrit.length = 0
       for (const sprite of effects) sprite.destroy()
       effects.clear()
       for (const sprite of freeEffects) sprite.destroy()

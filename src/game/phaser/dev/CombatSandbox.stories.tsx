@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 import { CombatSandboxScene } from './CombatSandboxScene'
 import { SandboxStory } from './SandboxStory'
 
-// A stable array, so the sandbox boots once instead of on every render.
+// A stable array keeps the sandbox from rebooting on every render.
 const scenes = [CombatSandboxScene]
 
 const meta = {
