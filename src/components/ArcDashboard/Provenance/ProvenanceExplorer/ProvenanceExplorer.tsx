@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { datasetGraph, lineage, processDetail, processGraph, processGroups } from '../../../../arc/provenance/queries'
 import type { ProvenanceIndex } from '../../../../arc/provenance/types'
-import { GraphCanvas } from '../GraphCanvas/GraphCanvas'
+import { GraphCanvas } from '../GraphCanvas'
 import { Legend, type ProvenanceView } from './Legend'
 import styles from './ProvenanceExplorer.module.css'
 import {
@@ -37,6 +37,13 @@ const QUERY_NAMES: Record<ProvenanceView, string> = {
   lineage: 'lineage(index, nodeId)',
 }
 
+// Only these views can come up empty. A group always has a member and a lineage always contains its own node.
+const NOTHING_TO_SHOW: Partial<Record<ProvenanceView, string>> = {
+  datasets: 'This ARC has no datasets.',
+  processes: 'This dataset has no annotated processes.',
+  groups: 'This process has no inputs or outputs.',
+}
+
 const START: Navigation = { view: 'datasets' }
 
 const CRUMB_MAX_LENGTH = 28
@@ -62,6 +69,11 @@ function Breadcrumbs({ crumbs, onNavigate }: { crumbs: Crumb[]; onNavigate: (vie
           const title = shown === label ? undefined : label
           return (
             <li key={view} className={styles.crumb}>
+              {index > 0 && (
+                <span className={styles.separator} aria-hidden="true">
+                  &gt;
+                </span>
+              )}
               {index === crumbs.length - 1 ? (
                 <span className={styles.crumbCurrent} aria-current="page" title={title}>
                   {shown}
@@ -80,6 +92,7 @@ function Breadcrumbs({ crumbs, onNavigate }: { crumbs: Crumb[]; onNavigate: (vie
 }
 
 // The index comes ready-built from the parent. The explorer runs the queries itself, one per level.
+// The parent box must have a height. The card fills it and the graph scrolls inside the card.
 export function ProvenanceExplorer({ index }: { index: ProvenanceIndex }) {
   const [nav, setNav] = useState<Navigation>(START)
   // A new index is another ARC, so the selection of the old one must not outlive it. React lets a
@@ -184,12 +197,12 @@ export function ProvenanceExplorer({ index }: { index: ProvenanceIndex }) {
     crumbs.push({ label: selectedNode, view: 'lineage' })
   }
 
-  const noProcesses = view === 'processes' && processes != null && processes.nodes.every((node) => node.external)
-  const emptyMessage = noProcesses
-    ? 'This dataset has no annotated processes.'
-    : canvas === null
+  const emptyMessage =
+    canvas === null
       ? 'This selection is not part of the loaded ARC.'
-      : null
+      : canvas.nodes.length === 0
+        ? (NOTHING_TO_SHOW[view] ?? null)
+        : null
   const note =
     view === 'lineage' && limitedLineage && limitedLineage.graph.nodes.length < limitedLineage.total
       ? `Showing ${limitedLineage.graph.nodes.length} of ${limitedLineage.total} nodes.`
@@ -221,7 +234,7 @@ export function ProvenanceExplorer({ index }: { index: ProvenanceIndex }) {
         ) : (
           <p className={styles.empty}>{emptyMessage}</p>
         )}
-        {view === 'detail' && <p className={styles.hint}>Select a node to see its lineage.</p>}
+        {view === 'detail' && emptyMessage === null && <p className={styles.hint}>Select a node to see its lineage.</p>}
       </div>
       <div className={styles.footer}>
         <Legend view={view} />

@@ -2,7 +2,13 @@ import { ARC } from '@nfdi4plants/arctrl'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeAll, describe, expect, it } from 'vitest'
-import type { ProvenanceIndex } from '../../src/arc/provenance/types'
+import type {
+  ProvenanceDataset,
+  ProvenanceIndex,
+  ProvenanceNode,
+  ProvenanceProcess,
+  ProvenanceRow,
+} from '../../src/arc/provenance/types'
 import { buildProvenanceIndex } from '../../src/arc/provenance/buildIndex'
 import { ProvenanceExplorer } from '../../src/components/ArcDashboard/Provenance/ProvenanceExplorer'
 import { crateJson } from '../helpers/sampleCrate'
@@ -13,16 +19,19 @@ beforeAll(() => {
   sampleIndex = buildProvenanceIndex(ARC.fromROCrateJsonString(crateJson))
 })
 
-function renderExplorer() {
+function renderExplorer(index: ProvenanceIndex = sampleIndex) {
   const user = userEvent.setup()
-  render(<ProvenanceExplorer index={sampleIndex} />)
+  render(<ProvenanceExplorer index={index} />)
   return user
 }
 
 // The real canvas lays out asynchronously, so a view is ready once its graph group exists.
 const canvas = async () => within(await screen.findByRole('group'))
 const crumbs = () => within(screen.getByRole('navigation', { name: 'Breadcrumb' }))
-const crumbTexts = () => crumbs().getAllByRole('listitem').map((item) => item.textContent)
+const crumbTexts = () =>
+  crumbs()
+    .getAllByRole('listitem')
+    .map((item) => item.querySelector('button, [aria-current]')?.textContent)
 const legend = () => within(screen.getByRole('list', { name: 'Legend' }))
 
 // Nodes are buttons named "<title>, ... select to ...". Edge toggles are buttons too and are not nodes.
@@ -34,6 +43,82 @@ async function nodeLabels() {
 async function clickNode(user: ReturnType<typeof userEvent.setup>, title: string) {
   const view = await canvas()
   await user.click(view.getByRole('button', { name: (name) => name.startsWith(`${title},`) }))
+}
+
+// A chain of samples n0 -> n1 -> ... with `length` samples. The first row is the process "first"
+// with one input group and one output group. The other rows are the process "rest" without groups,
+// so the group views stay small and only the lineage of n0 grows large.
+function chainIndex(length: number): ProvenanceIndex {
+  const dataset: ProvenanceDataset = { id: 'assays/chain/', kind: 'assay', identifier: 'chain' }
+  const nodeIds = Array.from({ length }, (_, i) => `n${i}`)
+  const nodes: ProvenanceNode[] = nodeIds.map((id) => ({
+    id,
+    kind: 'sample',
+    annotations: [],
+    datasetIds: [dataset.id],
+    processKeys: [],
+  }))
+  const firstKey = `${dataset.id}::first`
+  const restKey = `${dataset.id}::rest`
+  const rows: ProvenanceRow[] = nodeIds.slice(1).map((outputId, i) => ({
+    id: `row${i}`,
+    name: `row${i}`,
+    processKey: i === 0 ? firstKey : restKey,
+    datasetId: dataset.id,
+    inputs: [nodeIds[i]],
+    outputs: [outputId],
+    annotations: [],
+  }))
+
+  const signatureId = `${firstKey}#sig`
+  const inputGroup = {
+    id: `${firstKey}#in0`,
+    side: 'inputs' as const,
+    label: 'Inputs A',
+    nodeIds: ['n0'],
+    signatureIds: [signatureId],
+  }
+  const outputGroup = {
+    id: `${firstKey}#out0`,
+    side: 'outputs' as const,
+    label: 'Outputs A',
+    nodeIds: ['n1'],
+    signatureIds: [signatureId],
+  }
+  const first: ProvenanceProcess = {
+    key: firstKey,
+    name: 'first',
+    datasetId: dataset.id,
+    rowIds: ['row0'],
+    signatures: [{ id: signatureId, rowIds: ['row0'], annotations: [], distinguishing: [] }],
+    inputGroups: [inputGroup],
+    outputGroups: [outputGroup],
+    groupEdges: [{ id: `${firstKey}#e0`, from: inputGroup.id, to: outputGroup.id, signatureId, rowIds: ['row0'] }],
+  }
+  const rest: ProvenanceProcess = {
+    key: restKey,
+    name: 'rest',
+    datasetId: dataset.id,
+    rowIds: rows.slice(1).map((row) => row.id),
+    signatures: [],
+    inputGroups: [],
+    outputGroups: [],
+    groupEdges: [],
+  }
+
+  return {
+    datasets: [dataset],
+    processes: [first, rest],
+    rows,
+    nodes,
+    datasetById: new Map([[dataset.id, dataset]]),
+    processByKey: new Map([first, rest].map((process) => [process.key, process])),
+    rowById: new Map(rows.map((row) => [row.id, row])),
+    nodeById: new Map(nodes.map((node) => [node.id, node])),
+    groupById: new Map([inputGroup, outputGroup].map((group) => [group.id, group])),
+    producedBy: new Map(rows.map((row) => [row.outputs[0], [row.id]])),
+    consumedBy: new Map(rows.map((row) => [row.inputs[0], [row.id]])),
+  }
 }
 
 async function openGroupsOfGasChromatography() {
@@ -155,6 +240,19 @@ describe('ProvenanceExplorer', () => {
     expect(screen.queryByRole('group')).not.toBeInTheDocument()
   })
 
+  it('tells that a process whose rows have no inputs and outputs has none', async () => {
+    const arc = ARC.fromROCrateJsonString(crateJson)
+    const table = arc.Assays.find((assay) => assay.Identifier === 'GCqTOF_targets')!.Tables.find((t) => t.Name === 'mass_spec')!
+    table.RemoveColumns([table.Headers.findIndex((h) => h.isInput), table.Headers.findIndex((h) => h.isOutput)])
+    const user = renderExplorer(buildProvenanceIndex(arc))
+
+    await clickNode(user, 'GCqTOF_targets')
+    await clickNode(user, 'mass_spec')
+
+    expect(screen.getByText('This process has no inputs or outputs.')).toBeInTheDocument()
+    expect(screen.queryByRole('group')).not.toBeInTheDocument()
+  })
+
   it('returns to the datasets when the parent passes the index of another ARC', async () => {
     const user = userEvent.setup()
     const { rerender } = render(<ProvenanceExplorer index={sampleIndex} />)
@@ -166,5 +264,25 @@ describe('ProvenanceExplorer', () => {
     expect(crumbTexts()).toEqual(['Datasets'])
     expect(screen.getByText('datasetGraph(index)')).toBeInTheDocument()
     expect(await nodeLabels()).toHaveLength(11)
+  })
+
+  it('tells that an ARC without datasets has none and keeps the footer', () => {
+    renderExplorer(buildProvenanceIndex(new ARC('empty-arc')))
+
+    expect(screen.getByText('This ARC has no datasets.')).toBeInTheDocument()
+    expect(legend().getByText('Study')).toBeInTheDocument()
+    expect(screen.queryByRole('group')).not.toBeInTheDocument()
+  })
+
+  it('shows the 80 nodes nearest to the selected one of a larger lineage and says so', async () => {
+    const user = renderExplorer(chainIndex(100))
+    await clickNode(user, 'chain')
+    await clickNode(user, 'first')
+    await clickNode(user, 'Inputs A')
+
+    await clickNode(user, 'n0')
+
+    expect(await screen.findByText('Showing 80 of 100 nodes.')).toBeInTheDocument()
+    expect(await nodeLabels()).toHaveLength(80)
   })
 })

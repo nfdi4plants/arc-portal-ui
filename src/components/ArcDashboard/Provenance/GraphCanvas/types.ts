@@ -14,6 +14,8 @@ export interface CanvasPill {
   value: string | null
   unit?: string | null
   category?: AnnotationCategory
+  // Hover text and accessible name for 'process' and 'count' pills.
+  tooltip?: string
 }
 
 export interface CanvasNode {

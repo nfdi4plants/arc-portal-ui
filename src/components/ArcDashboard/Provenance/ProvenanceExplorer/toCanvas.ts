@@ -44,13 +44,17 @@ function propertyPills(annotations: Annotation[], prefix: string): CanvasPill[] 
 
 // Datasets and processes connect through shared nodes, and the edge shows how many.
 function countEdges(edges: DatasetGraph['edges']): CanvasEdge[] {
-  return edges.map((edge) => ({
-    id: edge.id,
-    from: edge.from,
-    to: edge.to,
-    color: 'neutral',
-    pills: [{ key: 'count', kind: 'count', value: String(edge.sharedNodeIds.length) }],
-  }))
+  return edges.map((edge) => {
+    const count = edge.sharedNodeIds.length
+    const tooltip = count === 1 ? '1 shared input or output' : `${count} shared inputs and outputs`
+    return {
+      id: edge.id,
+      from: edge.from,
+      to: edge.to,
+      color: 'neutral',
+      pills: [{ key: 'count', kind: 'count', value: String(count), tooltip }],
+    }
+  })
 }
 
 export function datasetsToCanvas(graph: DatasetGraph): CanvasGraph {
@@ -183,7 +187,7 @@ function detailEdges(
   isHighlighted?: (edge: DetailEdge) => boolean,
 ): CanvasEdge[] {
   return edges.map((edge) => {
-    const processPill: CanvasPill[] = showProcess ? [{ key: 'process', kind: 'process', value: edge.processName }] : []
+    const processPill: CanvasPill[] = showProcess ? [{ key: 'process', kind: 'process', value: edge.processName, tooltip: `Process ${edge.processName}` }] : []
     return {
       id: edge.id,
       from: edge.from,

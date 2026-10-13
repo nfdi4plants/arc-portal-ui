@@ -69,7 +69,13 @@ describe('datasetsToCanvas', () => {
     expect(canvas.nodes[0].ariaLabel).toContain('study')
     expect(canvas.nodes[0].subtitle).toBeUndefined()
     expect(canvas.edges).toEqual([
-      { id: 'e1', from: 'studies/s/', to: 'assays/a/', color: 'neutral', pills: [{ key: 'count', kind: 'count', value: '3' }] },
+      {
+        id: 'e1',
+        from: 'studies/s/',
+        to: 'assays/a/',
+        color: 'neutral',
+        pills: [{ key: 'count', kind: 'count', value: '3', tooltip: '3 shared inputs and outputs' }],
+      },
     ])
   })
 })
@@ -89,7 +95,10 @@ describe('processesToCanvas', () => {
     expect(canvas.nodes.map((node) => node.subtitle)).toEqual(['1 row', '6 rows', 'r'])
     expect(canvas.nodes.map((node) => node.dashed)).toEqual([undefined, undefined, true])
     expect(canvas.nodes[2]).toMatchObject({ title: 'far', color: 'run' })
-    expect(canvas.edges[0]).toMatchObject({ color: 'neutral', pills: [{ kind: 'count', value: '1' }] })
+    expect(canvas.edges[0]).toMatchObject({
+      color: 'neutral',
+      pills: [{ kind: 'count', value: '1', tooltip: '1 shared input or output' }],
+    })
   })
 })
 
@@ -182,7 +191,7 @@ describe('lineageToCanvas', () => {
     const one = lineageToCanvas(lineage([detailEdge('e1', 'a', 'b', 'p1', { differing }), detailEdge('e2', 'b', 'c', 'p1')]))
 
     expect(several.edges[0].pills.map((pill) => pill.kind)).toEqual(['process', 'property'])
-    expect(several.edges[0].pills[0]).toMatchObject({ value: 'p1' })
+    expect(several.edges[0].pills[0]).toMatchObject({ value: 'p1', tooltip: 'Process p1' })
     expect(several.edges[1].pills.map((pill) => pill.kind)).toEqual(['process'])
     expect(one.edges.flatMap((edge) => edge.pills.map((pill) => pill.kind))).toEqual(['property'])
   })
