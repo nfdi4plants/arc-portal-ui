@@ -3,6 +3,7 @@ import { Banner } from '@primer/react'
 import type { DataHubFetchers, FilterKind } from '../../types/dashboard.ts'
 import type { GitLabInstance } from '../../types/gitlab.ts'
 import { availableDataHubs } from '../../config/gitlab.ts'
+import { getProjectCount } from '../../api/gitlab/index.ts'
 import { DashboardHeader } from '../DashboardHeader/DashboardHeader.tsx'
 import { StatsSidebar } from '../StatsSidebar/StatsSidebar.tsx'
 import { BarList } from '../BarList/BarList.tsx'
@@ -24,13 +25,14 @@ export interface DataHubDashboardProps extends DataHubFetchers {
   dataHubs?: GitLabInstance[]
   /** Session tokens keyed by DataHUB id. */
   tokens?: Record<string, string>
+  fetchProjectCount?: typeof getProjectCount
   onArcClick: (url: string, name: string, projectId: number, dataHub: GitLabInstance) => void
   /** Injected clock for tests. */
   now?: () => Date
 }
 
 function DataHubDashboard({ dataHubs = availableDataHubs, tokens, fetchProjects, fetchGroups, fetchMemberProjectIds,
-  fetchContributors, fetchLatestCommit, onArcClick, now = () => new Date() }: DataHubDashboardProps) {
+  fetchContributors, fetchLatestCommit, fetchProjectCount = getProjectCount, onArcClick, now = () => new Date() }: DataHubDashboardProps) {
   // Authentication status updates should not reload ARCs unless a token actually changes.
   const tokenSignature = JSON.stringify(dataHubs.map(hub => tokens?.[hub.id] ?? null))
   const connections = useMemo(() => {
@@ -40,6 +42,15 @@ function DataHubDashboard({ dataHubs = availableDataHubs, tokens, fetchProjects,
   const { hubs, arcs, loading, updatedAt, retry, reload } = useArcIndex(connections, {
     fetchProjects, fetchGroups, fetchMemberProjectIds,
   })
+  useEffect(() => {
+    const controller = new AbortController()
+    for (const { hub, token } of connections) {
+      void fetchProjectCount(hub.url, { token, signal: controller.signal }).then(result => {
+        if (!controller.signal.aborted) console.log('GitLab project count', hub.url, result)
+      })
+    }
+    return () => controller.abort()
+  }, [connections, fetchProjectCount])
   const [state, dispatch] = useReducer(dashboardReducer, initialDashboardState)
   const { filters, sort } = state
   // The input responds immediately; filtering follows after a short pause.
@@ -151,6 +162,7 @@ function DataHubDashboard({ dataHubs = availableDataHubs, tokens, fetchProjects,
         </>}
     </main>
   )
+  return <div>Loaded</div>
 }
 
 export default DataHubDashboard

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import DataHubDashboard, { type DataHubDashboardProps } from './DataHubDashboard.tsx'
 import { fakeDataHubFetchers, gitLabProjectFull, plantdatahub, renderWithTheme, deferred } from '../../test/helpers.tsx'
 import { AUTH_FAILED_MESSAGE } from '../../api/gitlab/client.ts'
+import type { getProjectCount } from '../../api/gitlab/index.ts'
 import { Failure, Success, type Result } from '../../types/result.ts'
 import type { GitLabContributor } from '../../types/gitlab.ts'
 import type { DataHubFetchers } from '../../types/dashboard.ts'
@@ -28,13 +29,45 @@ const otherProjects = [
   proj(5, 'Epsilon', 'https://other.example', '2026-07-01T10:00:00Z'),
 ]
 const dashboard = (overrides: Partial<DataHubDashboardProps> = {}): DataHubDashboardProps => ({
-  ...fakeDataHubFetchers(), dataHubs: [plantdatahub], onArcClick: vi.fn(), now, ...overrides,
+  ...fakeDataHubFetchers(), fetchProjectCount: async () => Success(0), dataHubs: [plantdatahub], onArcClick: vi.fn(), now, ...overrides,
 })
 const twoHubs = (overrides: Partial<DataHubDashboardProps> = {}) => dashboard({
   dataHubs: [plantdatahub, otherHub],
   fetchProjects: async source => Success(source === plantdatahub.url ? plantProjects : otherProjects),
   fetchGroups: async () => Success([{ id: 2, name: 'CEPLAS', full_path: 'ceplas' }]),
   ...overrides,
+})
+
+describe('DataHubDashboard project counts', () => {
+  it('starts counts for each hub on mount and logs each completed Result while ARCs load independently', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const gate = deferred<Result<number>>()
+    const fetchProjectCount = vi.fn<typeof getProjectCount>((source) => source === plantdatahub.url
+      ? gate.promise : Promise.resolve(Failure('Count unavailable')))
+    const props = twoHubs({ fetchProjectCount, tokens: { [plantdatahub.id]: 'runtime-token' } })
+    renderWithTheme(<DataHubDashboard {...props} />)
+    expect(fetchProjectCount).toHaveBeenCalledWith(plantdatahub.url, { token: 'runtime-token', signal: expect.any(AbortSignal) })
+    expect(fetchProjectCount).toHaveBeenCalledWith(otherHub.url, { token: undefined, signal: expect.any(AbortSignal) })
+    expect(await screen.findByRole('button', { name: 'Open Alpha' })).toBeVisible()
+    expect(log).toHaveBeenCalledWith('GitLab project count', otherHub.url, Failure('Count unavailable'))
+    expect(log).not.toHaveBeenCalledWith('GitLab project count', plantdatahub.url, expect.anything())
+    gate.resolve(Success(12_345))
+    await waitFor(() => expect(log).toHaveBeenCalledWith('GitLab project count', plantdatahub.url, Success(12_345)))
+    expect(fetchProjectCount).toHaveBeenCalledTimes(2)
+  })
+
+  it('cancels counts when leaving the dashboard and skips their late logs', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const gate = deferred<Result<number>>()
+    const fetchProjectCount = vi.fn<typeof getProjectCount>(() => gate.promise)
+    const { unmount } = renderWithTheme(<DataHubDashboard {...dashboard({ fetchProjectCount })} />)
+    const signal = fetchProjectCount.mock.calls[0][1]!.signal!
+    unmount()
+    expect(signal.aborted).toBe(true)
+    gate.resolve(Success(3))
+    await gate.promise
+    expect(log).not.toHaveBeenCalled()
+  })
 })
 
 describe('DataHubDashboard US1 overview', () => {
