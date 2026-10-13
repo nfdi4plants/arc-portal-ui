@@ -5,7 +5,7 @@ import { useProjectPage } from '../../util/useProjectPage.ts'
 import { ArcList } from '../ArcList/ArcList.tsx'
 import styles from './TopStarredArcs.module.css'
 
-export function TopStarredArcs({ fetchCall }: { fetchCall: FetchArcs }) {
+export function TopStarredArcs({ fetchCall, onArcClick }: { fetchCall: FetchArcs, onArcClick: (url: string, name: string) => void }) {
   const headingId = useId()
   const load = useCallback((signal: AbortSignal) => fetchCall({ page: 1, perPage: 10, signal }), [fetchCall])
   const state = useProjectPage(load)
@@ -28,7 +28,7 @@ export function TopStarredArcs({ fetchCall }: { fetchCall: FetchArcs }) {
       )}
       {state.status === 'success' && (
         state.result.items.length
-          ? <ArcList projects={state.result.items} label="Most-starred ARCs" />
+          ? <ArcList projects={state.result.items} label="Most-starred ARCs" onArcClick={onArcClick} />
           : <Text as="p" size="medium" role="status" className={styles.status}>No public ARCs found.</Text>
       )}
     </section>
