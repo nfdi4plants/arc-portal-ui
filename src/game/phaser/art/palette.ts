@@ -1,10 +1,10 @@
 import { PALETTE } from '../../contracts/constants'
+import { cssColor } from '../color'
 
 // Colour derivation for the scribble art. Pure, so it runs in unit tests without a canvas.
 
-export function cssColor(color: number): string {
-  return `#${color.toString(16).padStart(6, '0')}`
-}
+// The art modules import cssColor from here.
+export { cssColor }
 
 export const OUTLINE = cssColor(PALETTE.outline)
 

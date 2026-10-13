@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
+import { visibleBounds } from '../../../game/model/image'
 
-// Alpha values up to this count as transparent.
-const ALPHA_THRESHOLD = 8
 // The bounds are found on a copy no larger than this, so the scan stays cheap on large images.
 const SCAN_SIZE = 256
 
@@ -23,25 +22,13 @@ export function useTrimmedImage(url: string): string | null {
       if (!context) return setTrimmed(url)
       context.drawImage(image, 0, 0, scan.width, scan.height)
       const { data, width, height } = context.getImageData(0, 0, scan.width, scan.height)
-      let minX = width
-      let minY = height
-      let maxX = -1
-      let maxY = -1
-      for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-          if (data[(y * width + x) * 4 + 3] <= ALPHA_THRESHOLD) continue
-          if (x < minX) minX = x
-          if (x > maxX) maxX = x
-          if (y < minY) minY = y
-          if (y > maxY) maxY = y
-        }
-      }
-      if (maxX < 0) return setTrimmed(url)
+      const bounds = visibleBounds(data, width, height)
+      if (!bounds) return setTrimmed(url)
       // One scan pixel of margin, mapped back to the full image, so no outline gets cut off.
-      const left = Math.max(0, Math.floor((minX - 1) / scale))
-      const top = Math.max(0, Math.floor((minY - 1) / scale))
-      const right = Math.min(image.naturalWidth, Math.ceil((maxX + 2) / scale))
-      const bottom = Math.min(image.naturalHeight, Math.ceil((maxY + 2) / scale))
+      const left = Math.max(0, Math.floor((bounds.x - 1) / scale))
+      const top = Math.max(0, Math.floor((bounds.y - 1) / scale))
+      const right = Math.min(image.naturalWidth, Math.ceil((bounds.x + bounds.width + 1) / scale))
+      const bottom = Math.min(image.naturalHeight, Math.ceil((bounds.y + bounds.height + 1) / scale))
       const cut = document.createElement('canvas')
       cut.width = right - left
       cut.height = bottom - top

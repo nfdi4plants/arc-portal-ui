@@ -11,6 +11,7 @@ import type { InputLayer } from '../input/InputLayer'
 import { applySpriteRef } from '../art'
 import { createAttackMachine } from './attacks'
 import type { AttackPhase } from './attacks'
+import { bodyOf, isOneWay } from './oneWay'
 import { staffMoveset } from './staffMoveset'
 
 export const PLAYER_HURTBOX = { width: 18, height: 42 }
@@ -42,26 +43,7 @@ export interface PlayerDebugState {
 
 export type Player = PlayerHandle & { destroy(): void; debugState(): PlayerDebugState }
 
-// A scene marks a static body as a one-way platform by turning off collision on every side
-// except the top. The player lands on it from above, jumps up through it, and drops through
-// it with down + jump.
-export function markOneWay(body: Phaser.Physics.Arcade.StaticBody | Phaser.Physics.Arcade.Body): void {
-  body.checkCollision.down = false
-  body.checkCollision.left = false
-  body.checkCollision.right = false
-}
-
-function isOneWay(body: Phaser.Physics.Arcade.Body | Phaser.Physics.Arcade.StaticBody): boolean {
-  return body.checkCollision.down === false && body.checkCollision.up !== false
-}
-
-function bodyOf(object: unknown): Phaser.Physics.Arcade.Body | Phaser.Physics.Arcade.StaticBody | null {
-  if (typeof object !== 'object' || object === null) return null
-  const o = object as { isBody?: boolean; body?: unknown }
-  if (o.isBody) return object as Phaser.Physics.Arcade.Body
-  if (o.body && (o.body as { isBody?: boolean }).isBody) return o.body as Phaser.Physics.Arcade.Body
-  return null
-}
+export { markOneWay } from './oneWay'
 
 function clamp1(v: number): number {
   return Math.max(-1, Math.min(1, v))

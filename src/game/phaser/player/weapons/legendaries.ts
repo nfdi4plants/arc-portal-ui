@@ -1,6 +1,7 @@
 import type Phaser from 'phaser'
 import type { Combatant, HitboxSpec, ProjectileSpec } from '../../../contracts/combat'
 import { DEPTH, MAGE_FRAME, MAGE_TEXTURE, PALETTE, PLAYER_HEIGHT } from '../../../contracts/constants'
+import { cssColor } from '../../color'
 import type { AbilityFeature } from './mechanics'
 import type { Core, Feature } from './core'
 import { centerOf, createRingBuffer, nearestLiving, pickChainTarget } from './helpers'
@@ -122,10 +123,6 @@ const AUTO_BOLT_RANGE = 420
 const SHIELD_MS = 8000
 const REGEN_MS = 1000
 const ORBIT_RADIUS = 30
-
-function cssColor(color: number): string {
-  return `#${color.toString(16).padStart(6, '0')}`
-}
 
 // F is folded into the damage modifier by the loadout. A fires a bolt at the nearest enemy every
 // 2 s. I grants one shield every 8 s when the player has none. R heals 1 hp per second.

@@ -1,14 +1,11 @@
 import type Phaser from 'phaser'
 import { DEPTH, PALETTE } from '../../contracts/constants'
+import { cssColor } from '../color'
 
 // Speech bubble texts for chatter mobs. Creating a Text allocates a canvas, so awake chatter mobs
 // borrow one from a small per-scene pool and give it back when they sleep or die.
 
 const pools = new WeakMap<Phaser.Scene, Phaser.GameObjects.Text[]>()
-
-function cssColor(color: number): string {
-  return `#${color.toString(16).padStart(6, '0')}`
-}
 
 function poolOf(scene: Phaser.Scene): Phaser.GameObjects.Text[] {
   let free = pools.get(scene)
