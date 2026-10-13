@@ -12,7 +12,7 @@ export type PassiveKind =
   | 'tuned' // parameter: one seeded stat is boosted (speed, damage, range or attack rate)
   | 'shieldDrop' // component: drops a shield fragment that absorbs one hit
   | 'patrol' // protocol: fixed scripted route, predictable but hits harder
-  | 'summoner' // performer: spawns one or two weak minions once
+  | 'summoner' // performer: spawns two weak minions once
   | 'blink' // date: short-range teleports with a brief flash before each
   | 'chatter' // comment: speech bubbles with its value text, low HP
 

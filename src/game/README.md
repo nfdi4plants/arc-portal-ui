@@ -28,7 +28,11 @@ time. `model/run/` turns the index into a `RunPlan`:
 
 The node after each segment is a boss (`model/content/boss.ts`). The final boss has one phase per
 segment in path order, and each phase uses its segment's telegraph timing. The same annotation always
-makes the same monster, because the monster seed comes from the annotation and not from the run.
+has the same look and kind, because the monster is derived from a hash of the annotation. Its
+stats scale with the segment depth, `1 + 0.12 * segmentIndex`.
+
+On the death screen a node boss whose step has 8 or more annotations (quality 1) gets no annotate
+hint, because its attacks already have the longest warnings.
 
 ## Folder layout
 
@@ -51,6 +55,8 @@ src/game/
     scenes/        Boot, Stretch, Boss, FinalBoss, Hud, LevelUp, Death and Victory, the run flow
                    (RunDirector, RunContext) and the level generator
     dev/           Storybook sandboxes
+    config.ts      the Phaser game config that the game and the sandboxes share
+    color.ts       cssColor, a number to "#rrggbb" for Phaser text styles
     createGame.ts  builds the Phaser game and returns the GameHandle the dashlet talks to
   assets/          ARCMage.png
 ```
@@ -111,7 +117,8 @@ The target is a steady 60 fps on an integrated GPU.
   not create game objects per hit or per shot.
 - The Phaser config has no `fps.limit`. In Phaser 4.2.1 the limited step passes the accumulated
   delta and then keeps the remainder, so time is counted twice and the game runs too fast.
-  `fps.min` is 30, so a slow frame slows the game down instead of running many catch-up steps.
+  `fps.min` is 30, so below 30 fps the game slows down. Many catch-up steps per frame would make a
+  slow PC slower still.
 - Arcade physics runs at a fixed 120 Hz with `useTree: false`. The dynamic body tree would be rebuilt
   every step and only helps when many dynamic bodies collide with each other, which the game never
   does.
@@ -121,7 +128,7 @@ The target is a steady 60 fps on an integrated GPU.
 
 ## Tests
 
-Pure modules are unit-tested with Vitest under `tests/game/`. The dashlet test is
+Vitest unit-tests the pure modules under `tests/game/`. The dashlet test is
 `tests/components/ArcGameDashlet.test.tsx`, with `createGame` mocked.
 
 ```
