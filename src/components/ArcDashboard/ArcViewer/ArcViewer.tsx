@@ -1,7 +1,8 @@
 import '@primer/primitives/dist/css/functional/themes/light.css'
 import '@primer/css/dist/primer.css'
 import {WebViewer} from '@nfdi4plants/arc-web-view'
-import {Component, useCallback, useEffect, useRef, useState, type ReactNode} from 'react'
+import {Component, useCallback, useContext, useEffect, useRef, useState, type ReactNode} from 'react'
+import { PopupDashletExpandedContext } from '../../PopupDashlet/PopupDashletContext'
 import './arcViewer.css'
 
 const defaultArcUrl = `${import.meta.env.BASE_URL}sample-arcs/facultative-cam-in-talinum/ro-crate-metadata.json`
@@ -31,22 +32,33 @@ class ViewerErrorBoundary extends Component<{children: ReactNode}, {failed: bool
 function ExpandedWebViewer({ provideJson }: { provideJson: () => Promise<string> }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const initialized = useRef(false);
+  const popupExpanded = useContext(PopupDashletExpandedContext);
 
   useEffect(() => {
     const container = containerRef.current;
     // WebViewer uses a dialog below Primer's wide breakpoint (1400px).
     // It has no initial-sidebar prop, so activate its own toggle once ready.
-    if (!container || initialized.current) return;
+    if (!container) return;
+    const findToggle = () => [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => {
+      const label = button.getAttribute('aria-label') ??
+        (button.getAttribute('aria-labelledby') ?? '').split(/\s+/)
+          .map((id) => document.getElementById(id)?.textContent ?? '').join(' ');
+      return label.trim() === 'Expand sidebar';
+    });
+    if (popupExpanded === false) {
+      const toggle = findToggle();
+      const pane = container.querySelector('[data-component="SplitPageLayout.Pane"]')?.closest('[data-is-hidden]');
+      const sidebarDialog = container.closest('.popup-dashlet-panel')?.querySelector('.popup-dashlet-overlays [role="dialog"]');
+      if (pane?.getAttribute('data-is-hidden') === 'false' || sidebarDialog) toggle?.click();
+      initialized.current = false;
+      return;
+    }
+    if (initialized.current) return;
     const desktop = window.matchMedia('(min-width: 1400px)');
 
     const openSidebar = () => {
       if (initialized.current || !desktop.matches) return;
-      const toggle = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => {
-        const label = button.getAttribute('aria-label') ??
-          (button.getAttribute('aria-labelledby') ?? '').split(/\s+/)
-            .map((id) => document.getElementById(id)?.textContent ?? '').join(' ');
-        return label.trim() === 'Expand sidebar';
-      });
+      const toggle = findToggle();
       if (!toggle) return;
       initialized.current = true;
       observer.disconnect();
@@ -60,7 +72,7 @@ function ExpandedWebViewer({ provideJson }: { provideJson: () => Promise<string>
       observer.disconnect();
       desktop.removeEventListener('change', openSidebar);
     };
-  }, []);
+  }, [popupExpanded]);
 
   return <div ref={containerRef} className="viewer-content"><WebViewer jsonString={provideJson} /></div>;
 }

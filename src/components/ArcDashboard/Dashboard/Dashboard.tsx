@@ -47,7 +47,7 @@ export function Dashboard(props: DashboardProps) {
   const provenance = useArcSelector(buildProvenanceIndex, sameIndex)
 
   return (
-    <DashboardWindow label="ARC-Dashboard" fillHeight>
+    <DashboardWindow label="ARC-Dashboard">
       {status.kind === 'error' ? (
         <div className="investigation-feedback">
           <Banner
