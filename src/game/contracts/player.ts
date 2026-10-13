@@ -1,6 +1,7 @@
 import type Phaser from 'phaser'
 import type { ScribbleArt } from './art'
 import type { Combatant, CombatWorld, HitEvent } from './combat'
+import type { Action } from './input'
 import type { PlayerBuild, PlayerWeaponId, WeaponSlot } from './progression'
 
 // Everything an attack or ability needs when it fires.
@@ -14,6 +15,8 @@ export interface AttackContext {
   tier: 1 | 2
   // Multiplies hitbox sizes of melee moves (PlayerStats.meleeRange).
   rangeScale: number
+  // Actions held in the current step, for moves that change with a direction (down + attack).
+  held: ReadonlySet<Action>
 }
 
 // One attack. The player's attack state machine runs the timing. All times are divided by
@@ -73,4 +76,8 @@ export interface PlayerHandle extends Combatant {
   setLethalHitInterceptor(interceptor: ((hit: HitEvent) => boolean) | null): void
   // Freezes input and physics, for level-up cards and pause.
   setFrozen(frozen: boolean): void
+  // A shield absorbs the next hit completely. Shield fragments (component monsters) grant one,
+  // up to three at a time.
+  grantShield(): void
+  shieldCount(): number
 }

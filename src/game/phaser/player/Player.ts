@@ -19,6 +19,7 @@ const DROP_THROUGH_MS = 150
 const ATTACK_GROUND_SPEED = 0.3
 const ABILITY_ACTIONS: readonly Action[] = ['ability1', 'ability2', 'ability3', 'ability4']
 const GHOST_COUNT = 6
+const MAX_SHIELDS = 3
 const GHOST_LIFE_MS = 180
 const GHOST_INTERVAL_MS = 28
 
@@ -166,6 +167,7 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
     aim: { x: aim.x, y: aim.y },
     tier,
     rangeScale: build.stats.meleeRange,
+    held,
   })
 
   const attacks = createAttackMachine({
@@ -188,6 +190,8 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
   let squashY = 1
   let lean = 0
   let flashMs = 0
+  let shields = 0
+  let held: ReadonlySet<Action> = new Set()
   let flashing = false
   let ghostMs = 0
 
@@ -214,6 +218,7 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
     motor.vy = body.velocity.y
 
     const frame = deps.input.frame()
+    held = frame.held
     aim = frame.aim
     flinchMs = Math.max(0, flinchMs - dt)
     damageIframesMs = Math.max(0, damageIframesMs - dt)
@@ -375,6 +380,12 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
     isDead: () => hp <= 0,
     receiveHit(hit) {
       if (hp <= 0 || handle.isInvulnerable()) return
+      if (shields > 0) {
+        shields--
+        damageIframesMs = DAMAGE_IFRAMES_MS
+        flashMs = 70
+        return
+      }
       if (hit.damage >= hp && interceptor?.(hit)) return
       hp = Math.max(0, hp - hit.damage)
       attacks.cancel()
@@ -393,6 +404,10 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
       readBuild()
     },
     hp: () => hp,
+    grantShield() {
+      shields = Math.min(MAX_SHIELDS, shields + 1)
+    },
+    shieldCount: () => shields,
     heal(amount) {
       if (hp <= 0) return
       hp = Math.min(build.stats.maxHp, hp + amount)
