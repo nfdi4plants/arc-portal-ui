@@ -78,6 +78,25 @@ describe('createArcStore', () => {
     expect(store.getArc()).toBeNull()
   })
 
+  it('can restart after a canceled load, as required by Strict Mode effect replay', async () => {
+    const { fetchROCrate, calls } = controllableFetch()
+    const store = createArcStore(sampleCrateSource({ fetchROCrate }))
+    const canceled = store.load()
+    store.cancelLoad()
+    await canceled
+
+    expect(calls[0].signal?.aborted).toBe(true)
+    expect(store.getStatus().kind).toBe('idle')
+    expect(store.getArc()).toBeNull()
+
+    const resumed = store.load()
+    expect(store.getStatus().kind).toBe('loading')
+    calls[1].resolve(crateJson)
+    await resumed
+    expect(store.getStatus().kind).toBe('ready')
+    expect(store.getArc()?.Identifier).toBe('Facultative-CAM-in-Talinum')
+  })
+
   it('lets a superseded load settle only once the forced load has finished', async () => {
     const { fetchROCrate, calls } = controllableFetch()
     const store = createArcStore(sampleCrateSource({ fetchROCrate }))

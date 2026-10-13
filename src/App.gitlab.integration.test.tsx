@@ -5,6 +5,9 @@ import App from './App.tsx'
 import { TOKEN_STORAGE_KEY } from './auth/context.ts'
 import { dataHubCollection, defaultDataHub } from './config/gitlab.ts'
 import { deferred, openAccountMenu, project, projectResponse } from './test/helpers.tsx'
+import { crateJson } from '../tests/helpers/sampleCrate.ts'
+
+vi.mock('./components/ArcDashboard/ArcViewer/ArcViewer.tsx', () => ({ default: () => <div>ARC viewer</div> }))
 
 const fetchCall = vi.fn<typeof fetch>()
 
@@ -13,10 +16,12 @@ function requestToken(init?: RequestInit) { return new Headers(init?.headers).ge
 function group(host: string) { return { id: 10, name: 'Plants', full_path: `${host}/plants`, visibility: 'public' } }
 
 beforeEach(() => {
+  vi.spyOn(console, 'log').mockImplementation(() => {})
   localStorage.clear()
   fetchCall.mockReset()
   fetchCall.mockImplementation(async input => {
     const url = requestUrl(input)
+    if (url.pathname.includes('/packages/generic/')) return new Response(crateJson)
     if (url.pathname === '/api/v4/user') return Response.json({ id: 7, name: url.host, username: 'researcher' })
     if (url.pathname === '/api/v4/groups') return Response.json([group(url.host)], { headers: { 'X-Next-Page': '' } })
     const kind = url.pathname.startsWith('/api/v4/groups/') ? 'Organisation' : url.searchParams.has('search') ? 'Matching' : 'Featured'
@@ -87,10 +92,59 @@ describe('multiple GitLab instances', () => {
 
     fetchCall.mockImplementation(transport)
     await user.click(screen.getByRole('link', { name: `${host} Organisation ARC` }))
-    expect(screen.getByRole('button', { name: 'Back' })).toBeVisible()
+    expect(await screen.findByText(`Arc Dashboard: ${host} Organisation ARC -`)).toBeVisible()
+    const download = fetchCall.mock.calls.find(call => requestUrl(call[0]).pathname.includes('/packages/generic/'))!
+    expect(String(download[0])).toBe(`${instance.url}api/v4/projects/1/packages/generic/isa_arc_json/0.0.1/arc-ro-crate-metadata.json`)
+    expect(requestToken(download[1])).toBeNull()
+    expect(screen.getByRole('link', { name: 'Link' })).toHaveAttribute('href', project().web_url)
+    expect(await screen.findByText('ARC viewer')).toBeVisible()
     await user.click(screen.getByRole('button', { name: 'Back' }))
     expect(screen.getByRole('combobox', { name: 'GitLab instance' })).toHaveValue(defaultDataHub.id)
     expect(await screen.findByRole('link', { name: 'git.nfdi4plants.org Featured ARC' })).toBeVisible()
+  })
+
+  it.each([
+    { instance: defaultDataHub, selection: 'Featured' },
+    { instance: dataHubCollection.supported[0], selection: 'Matching' },
+  ])('downloads a selected $selection ARC using the token for $instance.name', async ({ instance, selection }) => {
+    const tokens = { [defaultDataHub.id]: 'official-token', [dataHubCollection.supported[0].id]: 'microbe-token' }
+    localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(tokens))
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByRole('button', { name: 'Account menu' })
+    await user.selectOptions(screen.getByRole('combobox', { name: 'GitLab instance' }), instance.id)
+    if (selection === 'Matching') await user.type(screen.getByRole('textbox', { name: 'Search term' }), 'plants{Enter}')
+    await user.click(await screen.findByRole('link', { name: `${new URL(instance.url).host} ${selection} ARC` }))
+
+    expect(await screen.findByText(`Arc Dashboard: ${new URL(instance.url).host} ${selection} ARC -`)).toBeVisible()
+    const download = fetchCall.mock.calls.find(call => requestUrl(call[0]).pathname.includes('/packages/generic/'))!
+    expect(String(download[0])).toBe(`${instance.url.replace(/\/+$/, '')}/api/v4/projects/1/packages/generic/isa_arc_json/0.0.1/arc-ro-crate-metadata.json`)
+    expect(requestToken(download[1])).toBe(tokens[instance.id])
+    expect(requestUrl(download[0]).search).toBe('')
+  })
+
+  it('cancels an unfinished authenticated ARC download when the user logs out', async () => {
+    localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify({ [defaultDataHub.id]: 'saved-token' }))
+    const pending = deferred<Response>()
+    const transport = fetchCall.getMockImplementation()!
+    fetchCall.mockImplementation((input, init) => {
+      if (!requestUrl(input).pathname.includes('/packages/generic/')) return transport(input, init)
+      return requestToken(init) ? pending.promise : Promise.resolve(new Response('Forbidden', { status: 403 }))
+    })
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByRole('button', { name: 'Account menu' })
+    await user.click(await screen.findByRole('link', { name: 'git.nfdi4plants.org Featured ARC' }))
+    expect(screen.getByText('Loading…')).toBeVisible()
+
+    const download = fetchCall.mock.calls.find(call => requestUrl(call[0]).pathname.includes('/packages/generic/'))!
+    const menu = await openAccountMenu(user)
+    await user.click(menu.getByRole('button', { name: 'Logout' }))
+    expect(download[1]?.signal?.aborted).toBe(true)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not load ARC.')
+    await act(async () => pending.resolve(new Response(crateJson)))
+    expect(screen.queryByText(/Arc Dashboard:/)).not.toBeInTheDocument()
+    expect(screen.queryByText('ARC viewer')).not.toBeInTheDocument()
   })
 
   it('retires pending requests when users switch instances and ignores late results', async () => {
