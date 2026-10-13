@@ -108,12 +108,22 @@
   gap: 7px;
 }
 
-/* In the narrow header the last crumb gives way when the line is still too long. */
+/*
+ * In the narrow header the crumb before the current one gives way first. Flex items shrink in
+ * proportion to their shrink factor, so the tiny factor of the current crumb keeps it whole until
+ * the crumb before it is nearly gone.
+ */
 .crumbShrinking {
+  min-width: 0;
+  flex-shrink: 0.02;
+}
+
+.crumbGivingWay {
   min-width: 0;
 }
 
-.crumbShrinking .crumbCurrent {
+.crumbShrinking .crumbCurrent,
+.crumbGivingWay .crumbButton {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

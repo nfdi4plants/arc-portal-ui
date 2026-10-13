@@ -1,7 +1,9 @@
 import { useROCrate } from '../../arc/hooks.ts'
 import type { ARC } from '@nfdi4plants/arctrl'
-import { Suspense, lazy } from 'react'
+import { Suspense, lazy, useMemo } from 'react'
 import { Button } from '@primer/react'
+import { buildProvenanceIndex } from '../../arc/provenance/buildIndex.ts'
+import { ProvenanceExplorer } from './Provenance/ProvenanceExplorer'
 
 const ArcViewer = lazy(() => import('./ArcViewer/ArcViewer.tsx'))
 
@@ -16,6 +18,8 @@ type ArcDashboardProps = {
 
 function LoadedArc({ arc, name, url, onBack }: { arc: ARC; name: string; url: string; onBack: () => void }) {
     console.log(arc)
+    // Built once per ARC. A new index sends the explorer back to its datasets view.
+    const provenance = useMemo(() => buildProvenanceIndex(arc), [arc])
 
     return <>
         Arc Dashboard: {name} -
@@ -24,6 +28,10 @@ function LoadedArc({ arc, name, url, onBack }: { arc: ARC; name: string; url: st
         <Suspense fallback={<p role="status">Loading ARC viewer…</p>}>
             <ArcViewer />
         </Suspense>
+        {/* The explorer fills its box, so the box gets a height. */}
+        <div style={{ height: '66dvh' }}>
+            <ProvenanceExplorer index={provenance} />
+        </div>
     </>
 }
 

@@ -252,6 +252,12 @@ function PillMenu({ label, pills, boxHeight, rootRef, opener, onClose }: MenuPro
       role="dialog"
       aria-label={label}
       tabIndex={-1}
+      onKeyDown={(event) => {
+        // Tab would leave the canvas or land on its last node, so the list closes and the toggle takes the focus.
+        if (event.key !== 'Tab') return
+        event.preventDefault()
+        onClose()
+      }}
       onBlur={(event) => {
         const next = event.relatedTarget as Node | null
         if (!dialogRef.current?.contains(next) && !(next && opener.contains(next))) onClose()
@@ -313,16 +319,21 @@ export function GraphCanvas({
     [],
   )
 
-  // Size of the box the canvas is shown in, null until it is measured.
-  const [box, setBox] = useState<{ width: number; height: number } | null>(null)
+  // Size of the box the canvas is shown in, null until it is measured. The shape comes from the border
+  // box, which a scrollbar does not change. A scrollbar takes 15px off the client size, which near a
+  // square box would flip the layout mode back and forth. The client size serves for the widths and heights.
+  const [box, setBox] = useState<{ width: number; height: number; portrait: boolean } | null>(null)
   useLayoutEffect(() => {
     const root = rootRef.current
     if (!root) return
     const measureBox = () =>
       setBox((current) => {
-        const next = { width: root.clientWidth, height: root.clientHeight }
+        const next = { width: root.clientWidth, height: root.clientHeight, portrait: root.offsetHeight > root.offsetWidth }
         const same =
-          current && Math.abs(next.width - current.width) < RESIZE_NOISE && Math.abs(next.height - current.height) < RESIZE_NOISE
+          current &&
+          current.portrait === next.portrait &&
+          Math.abs(next.width - current.width) < RESIZE_NOISE &&
+          Math.abs(next.height - current.height) < RESIZE_NOISE
         return same ? current : next
       })
     measureBox()
@@ -333,7 +344,7 @@ export function GraphCanvas({
   }, [])
   const measured = box !== null
   const boxWidth = box?.width ?? 0
-  const portrait = boxWidth > 0 && (box?.height ?? 0) > boxWidth
+  const portrait = boxWidth > 0 && (box?.portrait ?? false)
   // The width shapes the layout only through the rows of an expanded edge. A portrait box takes the
   // compact layout, which has no expanded edges and does not depend on the width.
   const layoutWidth = !portrait && expanded.size > 0 ? boxWidth : 0
@@ -487,7 +498,7 @@ export function GraphCanvas({
             <PillMenu
               boxHeight={box?.height ?? 0}
               rootRef={rootRef}
-              label={`${layout.compact ? 'Properties' : 'More properties'} of ${ownerOf(menuEdge)}`}
+              label={`${layout.compact ? 'Details' : 'More properties'} of ${ownerOf(menuEdge)}`}
               pills={layout.compact ? [...menuEdge.edge.pills, ...(menuEdge.edge.morePills ?? [])] : (menuEdge.edge.morePills ?? [])}
               opener={openMenu.opener}
               onClose={closeMenu}

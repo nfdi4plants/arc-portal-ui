@@ -362,6 +362,15 @@ describe('layoutGraph in a portrait box', () => {
     expect(nodeOf(layout, 'c0_0').x).toBe(12)
   })
 
+  it('spreads the edge ends over the width of a node in the compact layout, and over the height in the normal one', async () => {
+    const compact = await layoutGraph(fanNodes, fanEdges, new Set(), measure, { portrait: true })
+    const normal = await layoutGraph(fanNodes, fanEdges, new Set(), measure)
+
+    // The parent has four edge ends on one side, 28px each with 28px at the border.
+    expect([nodeOf(compact, 'P').width, nodeOf(compact, 'P').height]).toEqual([140, 42])
+    expect([nodeOf(normal, 'P').width, nodeOf(normal, 'P').height]).toEqual([132, 140])
+  })
+
   it('shows one chip on every edge with several pills and keeps a single pill', async () => {
     const layout = await layoutGraph(layerNodes, layerEdges, new Set(['e3']), measure, { width: 400, portrait: true })
 
@@ -370,7 +379,7 @@ describe('layoutGraph in a portrait box', () => {
       expect(laid.pills).toHaveLength(1)
       expect(laid.pills[0].view.toggle).toBe('more')
       expect(laid.pills[0].view.valuePart).toBe(`${total}`)
-      expect(laid.pills[0].view.tooltip).toBe(`Show the ${total} properties`)
+      expect(laid.pills[0].view.tooltip).toBe(`Show the ${total} details`)
       expect(laid.pills[0].view.category).toBe('parameter')
     }
     const single = edgeOf(layout, 'e5').pills

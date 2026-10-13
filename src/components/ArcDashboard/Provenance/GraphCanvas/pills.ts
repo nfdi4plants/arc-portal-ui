@@ -145,7 +145,7 @@ export function compactPillViews(edge: CanvasEdge, measure: MeasureText): PillVi
   const all = [...edge.pills, ...(edge.morePills ?? [])]
   if (all.length <= 1) return all.map((pill) => toPillView(pill, measure))
   const category = all.find((pill) => pill.kind === 'property')?.category
-  return [toggleView(`${edge.id}:toggle`, 'more', `${all.length}`, `Show the ${all.length} properties`, measure, category)]
+  return [toggleView(`${edge.id}:toggle`, 'more', `${all.length}`, `Show the ${all.length} details`, measure, category)]
 }
 
 // Plain text of a pill for lists and screen readers: a property in full, any other pill by its tooltip.
