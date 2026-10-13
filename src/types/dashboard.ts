@@ -1,5 +1,5 @@
 import type { ArcKey } from '../arc/types.ts'
-import type { GitLabInstance } from './gitlab.ts'
+import type { GitLabInstance, GitLabRequestOptions, ListGroupsOptions } from './gitlab.ts'
 import type { GitLabCommit, GitLabContributor, GitLabGroup, GitLabProject } from './gitlab.ts'
 import type { Result } from './result.ts'
 
@@ -88,15 +88,17 @@ export interface SortState {
 
 export type ExtraColumn = 'topics' | 'created' | 'stars' | 'description'
 
-/** One configured DataHUB with its data callbacks injected by `App`. */
+/** One configured DataHUB and its optional authenticated session. */
 export interface DataHubConnection {
   hub: GitLabInstance
-  /** True only when the request carries the session token. */
-  includesPrivate: boolean
-  /** `tokenRejected` means the saved token was refused (401) and the result is the anonymous public list. */
-  fetchProjects: (signal: AbortSignal) => Promise<Result<{ projects: GitLabProject[]; tokenRejected: boolean }>>
-  fetchGroups: (signal: AbortSignal) => Promise<Result<GitLabGroup[]>>
-  fetchMemberProjectIds: (signal: AbortSignal) => Promise<Result<number[]>>
-  fetchContributors: (projectId: number, signal: AbortSignal) => Promise<Result<GitLabContributor[]>>
-  fetchLatestCommit: (projectId: number, signal: AbortSignal) => Promise<Result<GitLabCommit | null>>
+  token?: string
+}
+
+/** Shared fetch callbacks receive the GitLab instance URL and optional token/signal. */
+export interface DataHubFetchers {
+  fetchProjects: (source: string, options?: GitLabRequestOptions) => Promise<Result<GitLabProject[]>>
+  fetchGroups: (source: string, options?: Omit<ListGroupsOptions, 'page' | 'perPage'>) => Promise<Result<GitLabGroup[]>>
+  fetchMemberProjectIds: (source: string, options?: GitLabRequestOptions) => Promise<Result<number[]>>
+  fetchContributors: (source: string, projectId: number, options?: GitLabRequestOptions) => Promise<Result<GitLabContributor[]>>
+  fetchLatestCommit: (source: string, projectId: number, options?: GitLabRequestOptions) => Promise<Result<GitLabCommit | null>>
 }

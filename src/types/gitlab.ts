@@ -20,7 +20,8 @@ export interface GitLabProject {
   topics?: string[]
   last_activity_at?: string
   visibility?: GitLabVisibility
-  namespace?: { id: number; name: string; path: string; kind: 'group' | 'user'; full_path: string }
+  owner?: { name: string; web_url?: string } | null
+  namespace?: { id?: number; name: string; path?: string; kind?: 'group' | 'user'; full_path?: string; web_url?: string }
   created_at?: string
   default_branch?: string | null
 }

@@ -1,11 +1,12 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import DataHubDashboard from './DataHubDashboard.tsx'
-import { fakeConnection, gitLabProjectFull, plantdatahub, projectsResult, renderWithTheme, deferred } from '../../test/helpers.tsx'
+import DataHubDashboard, { type DataHubDashboardProps } from './DataHubDashboard.tsx'
+import { fakeDataHubFetchers, gitLabProjectFull, plantdatahub, renderWithTheme, deferred } from '../../test/helpers.tsx'
+import { AUTH_FAILED_MESSAGE } from '../../api/gitlab/client.ts'
 import { Failure, Success, type Result } from '../../types/result.ts'
 import type { GitLabContributor } from '../../types/gitlab.ts'
-import type { DataHubConnection } from '../../types/dashboard.ts'
+import type { DataHubFetchers } from '../../types/dashboard.ts'
 
 const now = () => new Date('2026-10-13T12:00:00Z')
 const otherHub = { id: 'other', name: 'Other Hub', url: 'https://other.example' }
@@ -26,17 +27,19 @@ const otherProjects = [
   proj(4, 'Delta', 'https://other.example', '2026-10-12T10:00:00Z'),
   proj(5, 'Epsilon', 'https://other.example', '2026-07-01T10:00:00Z'),
 ]
-const connection = (overrides: Partial<DataHubConnection> = {}) => fakeConnection({ hub: plantdatahub, ...overrides })
-const twoConnections = (overrides: Partial<DataHubConnection>[] = []) => [
-  connection({ fetchProjects: async () => projectsResult(plantProjects),
-    fetchGroups: async () => Success([{ id: 2, name: 'CEPLAS', full_path: 'ceplas' }]), ...overrides[0] }),
-  fakeConnection({ hub: otherHub, fetchProjects: async () => projectsResult(otherProjects),
-    fetchGroups: async () => Success([{ id: 2, name: 'CEPLAS', full_path: 'ceplas' }]), ...overrides[1] }),
-]
+const dashboard = (overrides: Partial<DataHubDashboardProps> = {}): DataHubDashboardProps => ({
+  ...fakeDataHubFetchers(), dataHubs: [plantdatahub], onArcClick: vi.fn(), now, ...overrides,
+})
+const twoHubs = (overrides: Partial<DataHubDashboardProps> = {}) => dashboard({
+  dataHubs: [plantdatahub, otherHub],
+  fetchProjects: async source => Success(source === plantdatahub.url ? plantProjects : otherProjects),
+  fetchGroups: async () => Success([{ id: 2, name: 'CEPLAS', full_path: 'ceplas' }]),
+  ...overrides,
+})
 
 describe('DataHubDashboard US1 overview', () => {
   it('shows the stats sidebar with totals, DataHUBs, the private hint and the DOI placeholder', async () => {
-    renderWithTheme(<DataHubDashboard connections={twoConnections()} onArcClick={vi.fn()} now={now} />)
+    renderWithTheme(<DataHubDashboard {...twoHubs()} onArcClick={vi.fn()} now={now} />)
     const summary = within(await screen.findByRole('complementary', { name: 'Summary' }))
     const accessible = summary.getByRole('button', { name: 'ARCs accessible' })
     expect(accessible).toHaveAttribute('aria-pressed', 'true')
@@ -52,7 +55,7 @@ describe('DataHubDashboard US1 overview', () => {
   })
 
   it('names the DataHUB bars and lists rows by latest change first', async () => {
-    renderWithTheme(<DataHubDashboard connections={twoConnections()} onArcClick={vi.fn()} now={now} />)
+    renderWithTheme(<DataHubDashboard {...twoHubs()} onArcClick={vi.fn()} now={now} />)
     expect(await screen.findByRole('button', { name: 'PLANTdataHUB (official): 3 ARCs' })).toBeVisible()
     expect(screen.getByRole('button', { name: 'Other Hub: 2 ARCs' })).toBeVisible()
     const openButtons = await screen.findAllByRole('button', { name: /^Open / })
@@ -61,7 +64,7 @@ describe('DataHubDashboard US1 overview', () => {
   })
 
   it('labels every month column and shows a zero count', async () => {
-    renderWithTheme(<DataHubDashboard connections={twoConnections()} onArcClick={vi.fn()} now={now} />)
+    renderWithTheme(<DataHubDashboard {...twoHubs()} onArcClick={vi.fn()} now={now} />)
     await screen.findByRole('button', { name: 'Open Alpha' })
     expect(screen.getAllByText(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)$/)).toHaveLength(12)
     expect(screen.getAllByText('0')).not.toHaveLength(0)
@@ -71,7 +74,7 @@ describe('DataHubDashboard US1 overview', () => {
 describe('DataHubDashboard US2 filtering', () => {
   it('adds a chip, updates the count and presses the right stat when filtering by DataHUB', async () => {
     const user = userEvent.setup()
-    renderWithTheme(<DataHubDashboard connections={twoConnections()} onArcClick={vi.fn()} now={now} />)
+    renderWithTheme(<DataHubDashboard {...twoHubs()} onArcClick={vi.fn()} now={now} />)
     const hubBar = await screen.findByRole('button', { name: 'PLANTdataHUB (official): 3 ARCs' })
     const summary = within(screen.getByRole('complementary', { name: 'Summary' }))
     expect(summary.getByRole('button', { name: 'ARCs accessible' })).toHaveAttribute('aria-pressed', 'true')
@@ -90,7 +93,7 @@ describe('DataHubDashboard US2 filtering', () => {
 
   it('filters the rows by search term', async () => {
     const user = userEvent.setup()
-    renderWithTheme(<DataHubDashboard connections={twoConnections()} onArcClick={vi.fn()} now={now} />)
+    renderWithTheme(<DataHubDashboard {...twoHubs()} onArcClick={vi.fn()} now={now} />)
     await screen.findByRole('button', { name: 'Open Alpha' })
     // Paste is one event; typing re-renders the whole dashboard per key, which is slow under load.
     await user.click(screen.getByRole('searchbox', { name: 'Search ARCs' }))
@@ -102,7 +105,7 @@ describe('DataHubDashboard US2 filtering', () => {
 
   it('filters the rows to recently changed ARCs', async () => {
     const user = userEvent.setup()
-    renderWithTheme(<DataHubDashboard connections={twoConnections()} onArcClick={vi.fn()} now={now} />)
+    renderWithTheme(<DataHubDashboard {...twoHubs()} onArcClick={vi.fn()} now={now} />)
     await screen.findByRole('button', { name: 'Open Gamma' })
     await user.click(screen.getByRole('button', { name: 'Only recently changed ARCs' }))
     expect(screen.getByText('Changed in the last 30 days')).toBeVisible()
@@ -112,7 +115,7 @@ describe('DataHubDashboard US2 filtering', () => {
 
   it('shows the empty state when nothing matches', async () => {
     const user = userEvent.setup()
-    renderWithTheme(<DataHubDashboard connections={twoConnections()} onArcClick={vi.fn()} now={now} />)
+    renderWithTheme(<DataHubDashboard {...twoHubs()} onArcClick={vi.fn()} now={now} />)
     await screen.findByRole('button', { name: 'Open Alpha' })
     await user.click(screen.getByRole('searchbox', { name: 'Search ARCs' }))
     await user.paste('nothing matches')
@@ -124,7 +127,7 @@ describe('DataHubDashboard US2 filtering', () => {
 
 describe('DataHubDashboard working-group tabs', () => {
   it('selects Public ARCs and explains the private tab when logged out', async () => {
-    renderWithTheme(<DataHubDashboard connections={twoConnections()} onArcClick={vi.fn()} now={now} />)
+    renderWithTheme(<DataHubDashboard {...twoHubs()} onArcClick={vi.fn()} now={now} />)
     expect(await screen.findByRole('tab', { name: 'Public ARCs' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByText('Log in to see your ARCs.')).toBeInTheDocument()
   })
@@ -133,13 +136,11 @@ describe('DataHubDashboard working-group tabs', () => {
     const personal = proj(9, 'Personal study', 'https://git.nfdi4plants.org', '2026-10-01T10:00:00Z', {
       namespace: { id: 9, name: 'Jane', path: 'jane', kind: 'user', full_path: 'jane' },
     })
-    const connections = [
-      connection({ includesPrivate: true, fetchProjects: async () => projectsResult([...plantProjects, personal]),
-        fetchGroups: async () => Success([{ id: 2, name: 'CEPLAS', full_path: 'ceplas' }]),
-        fetchMemberProjectIds: async () => Success([1, 2, 9]) }),
-      fakeConnection({ hub: otherHub, fetchProjects: async () => projectsResult(otherProjects) }),
-    ]
-    renderWithTheme(<DataHubDashboard connections={connections} onArcClick={vi.fn()} now={now} />)
+    const props = twoHubs({ tokens: { [plantdatahub.id]: 'plant-token' },
+      fetchProjects: async source => Success(source === plantdatahub.url ? [...plantProjects, personal] : otherProjects),
+      fetchMemberProjectIds: async () => Success([1, 2, 9]),
+    })
+    renderWithTheme(<DataHubDashboard {...props} />)
     expect(await screen.findByRole('tab', { name: 'My ARCs' })).toHaveAttribute('aria-selected', 'true')
     const myPanel = within(screen.getByRole('tabpanel', { name: 'My ARCs' }))
     expect(myPanel.getByRole('button', { name: /CEPLAS: 2 ARCs/ })).toBeVisible()
@@ -152,12 +153,14 @@ describe('DataHubDashboard table actions', () => {
   it('links out, opens the single-ARC page and offers more actions', async () => {
     const onArcClick = vi.fn()
     const user = userEvent.setup()
-    renderWithTheme(<DataHubDashboard connections={twoConnections()} onArcClick={onArcClick} now={now} />)
+    renderWithTheme(<DataHubDashboard {...twoHubs()} onArcClick={onArcClick} now={now} />)
     const external = await screen.findByRole('link', { name: 'View Alpha on PLANTdataHUB (official)' })
     expect(external).toHaveAttribute('href', 'https://git.nfdi4plants.org/arcs/1')
     expect(external).toHaveAttribute('target', '_blank')
     await user.click(screen.getByRole('button', { name: 'Open Alpha' }))
-    expect(onArcClick).toHaveBeenCalledWith('https://git.nfdi4plants.org/arcs/1', 'Alpha')
+    expect(onArcClick).toHaveBeenCalledWith('https://git.nfdi4plants.org/arcs/1', 'Alpha', 1, plantdatahub)
+    await user.click(screen.getByRole('button', { name: 'Open Delta' }))
+    expect(onArcClick).toHaveBeenCalledWith('https://other.example/arcs/4', 'Delta', 4, otherHub)
     await user.click(screen.getByRole('button', { name: 'More actions for Alpha' }))
     expect(await screen.findByRole('menuitem', { name: 'View on PLANTdataHUB (official)' })).toBeVisible()
   })
@@ -166,11 +169,10 @@ describe('DataHubDashboard table actions', () => {
 describe('DataHubDashboard US3 logged-in views', () => {
   it('counts one private ARC, labels its row and explains the partial note', async () => {
     const privateArc = proj(6, 'Private study', 'https://git.nfdi4plants.org', '2026-10-09T10:00:00Z', { visibility: 'private' })
-    const connections = [
-      connection({ includesPrivate: true, fetchProjects: async () => projectsResult([...plantProjects, privateArc]) }),
-      fakeConnection({ hub: otherHub, fetchProjects: async () => projectsResult(otherProjects) }),
-    ]
-    renderWithTheme(<DataHubDashboard connections={connections} onArcClick={vi.fn()} now={now} />)
+    const props = twoHubs({ tokens: { [plantdatahub.id]: 'plant-token' },
+      fetchProjects: async source => Success(source === plantdatahub.url ? [...plantProjects, privateArc] : otherProjects),
+    })
+    renderWithTheme(<DataHubDashboard {...props} />)
     const summary = within(await screen.findByRole('complementary', { name: 'Summary' }))
     expect(summary.getByRole('button', { name: 'private' })).toHaveTextContent('1')
     expect(screen.getByText('Private ARCs are included from PLANTdataHUB (official) only.')).toBeVisible()
@@ -179,17 +181,15 @@ describe('DataHubDashboard US3 logged-in views', () => {
   })
 
   it('keeps the other DataHUB visible and unrefetched while a changed one reloads', async () => {
-    const fetchA = vi.fn<DataHubConnection['fetchProjects']>(async () => projectsResult(plantProjects))
-    const fetchB = vi.fn<DataHubConnection['fetchProjects']>(async () => projectsResult(otherProjects))
-    const firstB = fakeConnection({ hub: otherHub, fetchProjects: fetchB })
-    const element = (connections: DataHubConnection[]) => (
-      <DataHubDashboard connections={connections} onArcClick={vi.fn()} now={now} />)
-    const first = [connection({ includesPrivate: true, fetchProjects: fetchA }), firstB]
-    const { rerender } = renderWithTheme(element(first))
+    const fetchA = vi.fn<DataHubFetchers['fetchProjects']>(async () => Success(plantProjects))
+    const fetchB = vi.fn<DataHubFetchers['fetchProjects']>(async () => Success(otherProjects))
+    const props = twoHubs({ tokens: { [plantdatahub.id]: 'plant-token' },
+      fetchProjects: (source, options) => (source === plantdatahub.url ? fetchA : fetchB)(source, options),
+    })
+    const { rerender } = renderWithTheme(<DataHubDashboard {...props} />)
     await screen.findByRole('button', { name: 'Open Alpha' })
     expect(screen.getByRole('button', { name: 'Open Delta' })).toBeVisible()
-    const secondB = fakeConnection({ hub: otherHub, includesPrivate: true, fetchProjects: fetchB })
-    rerender(element([first[0], secondB]))
+    rerender(<DataHubDashboard {...props} tokens={{ ...props.tokens, [otherHub.id]: 'other-token' }} />)
     expect(screen.getByRole('button', { name: 'Open Alpha' })).toBeVisible()
     expect(screen.queryByRole('button', { name: 'Open Delta' })).not.toBeInTheDocument()
     await waitFor(() => expect(screen.getByRole('button', { name: 'Open Delta' })).toBeVisible())
@@ -200,17 +200,17 @@ describe('DataHubDashboard US3 logged-in views', () => {
 
 describe('DataHubDashboard expired login', () => {
   it('treats a rejected token as logged out', async () => {
-    const conn = connection({
-      includesPrivate: true,
-      fetchProjects: async () => Success({ projects: plantProjects, tokenRejected: true }),
+    const props = dashboard({
+      tokens: { [plantdatahub.id]: 'expired-token' },
+      fetchProjects: async (_source, options) => options?.token ? Failure(AUTH_FAILED_MESSAGE) : Success(plantProjects),
       fetchMemberProjectIds: async () => Failure('Unauthorized'),
     })
-    renderWithTheme(<DataHubDashboard connections={[conn]} onArcClick={vi.fn()} now={now} />)
+    renderWithTheme(<DataHubDashboard {...props} onArcClick={vi.fn()} now={now} />)
     const summary = within(await screen.findByRole('complementary', { name: 'Summary' }))
     expect(await screen.findByText(/Your login for .* has expired/)).toBeVisible()
     expect(summary.getByRole('group', { name: 'private' })).toHaveTextContent('–')
     expect(summary.getByRole('group', { name: 'private' })).toHaveTextContent('log in to see')
-    expect(screen.queryByText(/only\./)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Private ARCs are included from/)).not.toBeInTheDocument()
     expect(screen.queryByText(/Could not load your memberships/)).not.toBeInTheDocument()
   })
 })
@@ -220,8 +220,8 @@ describe('DataHubDashboard US4 people', () => {
 
   it('keeps rows visible while details load and counts distinct people afterwards', async () => {
     const gates: ReturnType<typeof deferred<Result<GitLabContributor[]>>>[] = []
-    const conn = connection({
-      fetchProjects: async () => projectsResult(plantProjects),
+    const props = dashboard({
+      fetchProjects: async () => Success(plantProjects),
       fetchContributors: () => {
         const gate = deferred<Result<GitLabContributor[]>>()
         gates.push(gate)
@@ -229,7 +229,7 @@ describe('DataHubDashboard US4 people', () => {
       },
       fetchLatestCommit: async () => Success(null),
     })
-    renderWithTheme(<DataHubDashboard connections={[conn]} onArcClick={vi.fn()} now={now} />)
+    renderWithTheme(<DataHubDashboard {...props} onArcClick={vi.fn()} now={now} />)
     const summary = within(await screen.findByRole('complementary', { name: 'Summary' }))
     expect(await screen.findByRole('button', { name: 'Open Alpha' })).toBeVisible()
     expect(summary.getByRole('group', { name: 'people' })).toHaveTextContent('counting…')
@@ -239,12 +239,12 @@ describe('DataHubDashboard US4 people', () => {
   })
 
   it('does not count ARCitect', async () => {
-    const conn = connection({
-      fetchProjects: async () => projectsResult(plantProjects),
+    const props = dashboard({
+      fetchProjects: async () => Success(plantProjects),
       fetchContributors: async () => Success([{ name: 'ARCitect', email: 'arcitect@nfdi4plants.org', commits: 999 }, jane]),
       fetchLatestCommit: async () => Success(null),
     })
-    renderWithTheme(<DataHubDashboard connections={[conn]} onArcClick={vi.fn()} now={now} />)
+    renderWithTheme(<DataHubDashboard {...props} onArcClick={vi.fn()} now={now} />)
     const summary = within(await screen.findByRole('complementary', { name: 'Summary' }))
     await waitFor(() => expect(summary.getByRole('group', { name: 'people' })).toHaveTextContent('1'))
     expect(screen.queryByText('ARCitect')).not.toBeInTheDocument()
@@ -252,14 +252,14 @@ describe('DataHubDashboard US4 people', () => {
 
   it('finds an ARC by contributor name', async () => {
     const user = userEvent.setup()
-    const conn = connection({
-      fetchProjects: async () => projectsResult(plantProjects),
-      fetchContributors: async projectId => projectId === 1
+    const props = dashboard({
+      fetchProjects: async () => Success(plantProjects),
+      fetchContributors: async (_source, projectId) => projectId === 1
         ? Success([jane])
         : Success([{ name: 'Other Person', email: 'other@example.org', commits: 1 }]),
       fetchLatestCommit: async () => Success(null),
     })
-    renderWithTheme(<DataHubDashboard connections={[conn]} onArcClick={vi.fn()} now={now} />)
+    renderWithTheme(<DataHubDashboard {...props} onArcClick={vi.fn()} now={now} />)
     await screen.findByRole('button', { name: 'Open Alpha' })
     await waitFor(() => expect(screen.getAllByRole('button', { name: 'Jane Doe' }).length).toBeGreaterThan(0))
     await user.click(screen.getByRole('searchbox', { name: 'Search ARCs' }))
@@ -274,14 +274,10 @@ describe('DataHubDashboard table paging', () => {
     const many = Array.from({ length: 30 }, (_, index) => proj(100 + index, `Paged ${String(index).padStart(2, '0')}`,
       'https://git.nfdi4plants.org', new Date(Date.UTC(2026, 9, 12, 12 - index)).toISOString()))
     const few = many.slice(0, 5)
-    const fetchProjects = vi.fn<DataHubConnection['fetchProjects']>()
-      .mockResolvedValueOnce(projectsResult(many))
-      .mockResolvedValue(projectsResult(few))
-    const element = () => {
-      // A fresh connection object per render stands for a login change.
-      return <DataHubDashboard connections={[connection({ fetchProjects })]} onArcClick={vi.fn()} now={now} />
-    }
-    const { rerender } = renderWithTheme(element())
+    const fetchProjects = vi.fn<DataHubFetchers['fetchProjects']>()
+      .mockResolvedValueOnce(Success(many))
+      .mockResolvedValue(Success(few))
+    renderWithTheme(<DataHubDashboard {...dashboard({ fetchProjects })} />)
     const user = userEvent.setup()
     await screen.findByRole('button', { name: 'Open Paged 00' })
     // Primer's pagination labels contain non-breaking spaces that testing-library cannot match,
@@ -291,18 +287,17 @@ describe('DataHubDashboard table paging', () => {
     expect(pageTwo).toBeDefined()
     await user.click(pageTwo!)
     expect(screen.queryByRole('button', { name: 'Open Paged 00' })).not.toBeInTheDocument()
-    // Replacing the connection reloads the DataHUB with fewer ARCs; the table must not stay stranded past its last page.
-    rerender(element())
+    // Updating with fewer ARCs must not leave the table beyond its last page.
+    await user.click(screen.getByRole('button', { name: 'Update' }))
     expect(await screen.findByRole('button', { name: 'Open Paged 00' })).toBeVisible()
     expect(screen.getByRole('button', { name: 'Open Paged 04' })).toBeVisible()
-  })
+  }, 15000)
 })
 
 describe('DataHubDashboard loading', () => {
   it('shows no stats, charts or table while the first load is still running', async () => {
     const pending = new Promise<never>(() => {})
-    const conns = [connection({ fetchProjects: () => pending })]
-    renderWithTheme(<DataHubDashboard connections={conns} onArcClick={vi.fn()} now={now} />)
+    renderWithTheme(<DataHubDashboard {...dashboard({ fetchProjects: () => pending })} />)
     expect(screen.getByRole('status')).toHaveTextContent('Loading ARCs from 1 DataHUBs…')
     expect(screen.queryByRole('complementary', { name: 'Summary' })).not.toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'ARCs per DataHUB' })).not.toBeInTheDocument()
@@ -311,11 +306,11 @@ describe('DataHubDashboard loading', () => {
   })
 
   it('keeps the other DataHUB visible while one reloads after a login', async () => {
-    const [plant, other] = twoConnections()
-    const { rerender } = renderWithTheme(<DataHubDashboard connections={[plant, other]} onArcClick={vi.fn()} now={now} />)
+    const props = twoHubs({ fetchProjects: (source, options) => options?.token
+      ? new Promise(() => {}) : Promise.resolve(Success(source === plantdatahub.url ? plantProjects : otherProjects)) })
+    const { rerender } = renderWithTheme(<DataHubDashboard {...props} />)
     await screen.findByRole('button', { name: 'Open Delta' })
-    const loggingIn = fakeConnection({ hub: otherHub, includesPrivate: true, fetchProjects: () => new Promise(() => {}) })
-    rerender(<DataHubDashboard connections={[plant, loggingIn]} onArcClick={vi.fn()} now={now} />)
+    rerender(<DataHubDashboard {...props} tokens={{ [otherHub.id]: 'other-token' }} />)
     expect(await screen.findByRole('button', { name: 'Open Alpha' })).toBeVisible()
     expect(screen.queryByRole('button', { name: 'Open Delta' })).not.toBeInTheDocument()
     expect(screen.queryByText(/Loading ARCs/)).not.toBeInTheDocument()
@@ -323,7 +318,7 @@ describe('DataHubDashboard loading', () => {
   })
 
   it('shows ARC rows under StrictMode', async () => {
-    renderWithTheme(<DataHubDashboard connections={twoConnections()} onArcClick={vi.fn()} now={now} />, true)
+    renderWithTheme(<DataHubDashboard {...twoHubs()} onArcClick={vi.fn()} now={now} />, true)
     expect(await screen.findByRole('button', { name: 'Open Alpha' })).toBeVisible()
     expect(screen.getByRole('button', { name: 'Open Delta' })).toBeVisible()
   })

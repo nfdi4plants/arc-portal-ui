@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useReducer, useState } from 'react'
 import { Banner } from '@primer/react'
-import type { DataHubConnection, FilterKind } from '../../types/dashboard.ts'
+import type { DataHubFetchers, FilterKind } from '../../types/dashboard.ts'
+import type { GitLabInstance } from '../../types/gitlab.ts'
+import { availableDataHubs } from '../../config/gitlab.ts'
 import { DashboardHeader } from '../DashboardHeader/DashboardHeader.tsx'
 import { StatsSidebar } from '../StatsSidebar/StatsSidebar.tsx'
 import { BarList } from '../BarList/BarList.tsx'
@@ -16,16 +18,27 @@ import { arcsPerMonth, countBy, headlineNumbers } from './logic/summary.ts'
 import { sortArcs } from './logic/sort.ts'
 import styles from './DataHubDashboard.module.css'
 
-export interface DataHubDashboardProps {
-  /** One per configured DataHUB, in display order. A new array identity means "reload everything". */
-  connections: DataHubConnection[]
-  onArcClick: (url: string, name: string) => void
+export interface DataHubDashboardProps extends DataHubFetchers {
+  /** Configured DataHUBs, in display order. Defaults to all supported instances. */
+  dataHubs?: GitLabInstance[]
+  /** Session tokens keyed by DataHUB id. */
+  tokens?: Record<string, string>
+  onArcClick: (url: string, name: string, projectId: number, dataHub: GitLabInstance) => void
   /** Injected clock for tests. */
   now?: () => Date
 }
 
-function DataHubDashboard({ connections, onArcClick, now = () => new Date() }: DataHubDashboardProps) {
-  const { hubs, arcs, loading, updatedAt, retry, reload } = useArcIndex(connections)
+function DataHubDashboard({ dataHubs = availableDataHubs, tokens, fetchProjects, fetchGroups, fetchMemberProjectIds,
+  fetchContributors, fetchLatestCommit, onArcClick, now = () => new Date() }: DataHubDashboardProps) {
+  // Authentication status updates should not reload ARCs unless a token actually changes.
+  const tokenSignature = JSON.stringify(dataHubs.map(hub => tokens?.[hub.id] ?? null))
+  const connections = useMemo(() => {
+    const currentTokens: (string | null)[] = JSON.parse(tokenSignature)
+    return dataHubs.map((hub, index) => ({ hub, token: currentTokens[index] ?? undefined }))
+  }, [dataHubs, tokenSignature])
+  const { hubs, arcs, loading, updatedAt, retry, reload } = useArcIndex(connections, {
+    fetchProjects, fetchGroups, fetchMemberProjectIds,
+  })
   const [state, dispatch] = useReducer(dashboardReducer, initialDashboardState)
   const { filters, sort } = state
   // The input responds immediately; filtering follows after a short pause.
@@ -42,7 +55,7 @@ function DataHubDashboard({ connections, onArcClick, now = () => new Date() }: D
   const connectionsByHub = useMemo(() => new Map(connections.map(connection => [connection.hub.id, connection])), [connections])
   // Newest first keeps the newest ARCs' avatars filling in first.
   const detailOrder = useMemo(() => sortArcs(arcs, { column: 'lastChange', direction: 'DESC' }, hubNames), [arcs, hubNames])
-  const { details } = useArcDetails(detailOrder, connectionsByHub)
+  const { details } = useArcDetails(detailOrder, connectionsByHub, { fetchContributors, fetchLatestCommit })
 
   const filtered = useMemo(() => applyFilters(arcs, filters, details, { now: current }), [arcs, filters, details, current])
   const hubScoped = useMemo(() => applyFilters(arcs, filters, details, { now: current, ignore: 'hub' }), [arcs, filters, details, current])
@@ -79,7 +92,7 @@ function DataHubDashboard({ connections, onArcClick, now = () => new Date() }: D
   const membershipErrors = hubs.filter(hub => hub.membershipError !== undefined).map(hub => hub.hub.name)
 
   const rejectedIds = new Set(hubs.filter(hub => hub.tokenRejected).map(hub => hub.hub.id))
-  const loggedInHubs = connections.filter(connection => connection.includesPrivate && !rejectedIds.has(connection.hub.id))
+  const loggedInHubs = connections.filter(connection => connection.token && !rejectedIds.has(connection.hub.id))
   const signedIn = loggedInHubs.length > 0
   const privateState = loggedInHubs.length === 0 ? 'hidden' : loggedInHubs.length === connections.length ? 'all' : 'partial'
   const privateNote = privateState === 'partial'
@@ -125,7 +138,7 @@ function DataHubDashboard({ connections, onArcClick, now = () => new Date() }: D
                   onSortChange={next => dispatch({ type: 'setSort', sort: next })}
                   resetKey={JSON.stringify(filters) + JSON.stringify(sort)}
                   onClearFilters={filtering ? clearAll : undefined}
-                  onOpen={arc => onArcClick(arc.url, arc.title)} />
+                  onOpen={arc => onArcClick(arc.url, arc.title, arc.projectId, connectionsByHub.get(arc.hubId)!.hub)} />
               </div>
             </div>
           </div>

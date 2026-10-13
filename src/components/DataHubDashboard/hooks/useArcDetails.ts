@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ArcDetails, ArcSummary, DataHubConnection, DetailsMap } from '../../../types/dashboard.ts'
+import type { ArcDetails, ArcSummary, DataHubConnection, DataHubFetchers, DetailsMap } from '../../../types/dashboard.ts'
 import { toPeople } from '../logic/people.ts'
 
 const MAX_IN_FLIGHT = 4
 const EMIT_INTERVAL_MS = 250
+type DetailFetchers = Pick<DataHubFetchers, 'fetchContributors' | 'fetchLatestCommit'>
 
 /** Loads people and the latest commit for every ARC, at most 4 lookups at once. */
-export function useArcDetails(arcs: ArcSummary[], connectionsByHub: Map<string, DataHubConnection>) {
+export function useArcDetails(arcs: ArcSummary[], connectionsByHub: Map<string, DataHubConnection>,
+  { fetchContributors, fetchLatestCommit }: DetailFetchers) {
   const previousConnections = useRef(new Map<string, DataHubConnection>())
+  const fetchersRef = useRef<DetailFetchers>({ fetchContributors, fetchLatestCommit })
   const keysByHub = useRef(new Map<string, Set<string>>())
   const done = useRef(new Map<string, ArcDetails | 'unavailable'>())
   const inFlight = useRef(new Map<string, AbortController>())
@@ -40,8 +43,8 @@ export function useArcDetails(arcs: ArcSummary[], connectionsByHub: Map<string, 
     inFlight.current.set(key, controller)
     void (async () => {
       const [contributors, commit] = await Promise.all([
-        connection.fetchContributors(arc.projectId, controller.signal),
-        connection.fetchLatestCommit(arc.projectId, controller.signal),
+        fetchersRef.current.fetchContributors(connection.hub.url, arc.projectId, { token: connection.token, signal: controller.signal }),
+        fetchersRef.current.fetchLatestCommit(connection.hub.url, arc.projectId, { token: connection.token, signal: controller.signal }),
       ])
       if (controller.signal.aborted || !alive.current) return
       inFlight.current.delete(key)
@@ -75,10 +78,14 @@ export function useArcDetails(arcs: ArcSummary[], connectionsByHub: Map<string, 
   useEffect(() => {
     alive.current = true
     connectionsRef.current = connectionsByHub
-    // DataHUBs whose connection changed or disappeared lose their lookups; the changed ones start over.
+    const fetchersChanged = fetchersRef.current.fetchContributors !== fetchContributors
+      || fetchersRef.current.fetchLatestCommit !== fetchLatestCommit
+    fetchersRef.current = { fetchContributors, fetchLatestCommit }
+    // DataHUBs whose session changed or disappeared lose their lookups; the changed ones start over.
     let changed = false
     for (const [hubId, previous] of [...previousConnections.current]) {
-      if (previous === connectionsByHub.get(hubId)) continue
+      const connection = connectionsByHub.get(hubId)
+      if (!fetchersChanged && previous.hub === connection?.hub && previous.token === connection.token) continue
       previousConnections.current.delete(hubId)
       for (const key of keysByHub.current.get(hubId) ?? []) {
         inFlight.current.get(key)?.abort()
@@ -93,7 +100,7 @@ export function useArcDetails(arcs: ArcSummary[], connectionsByHub: Map<string, 
       scheduleFlush()
       queueMissing()
     }
-  }, [connectionsByHub])
+  }, [connectionsByHub, fetchContributors, fetchLatestCommit])
 
   useEffect(() => {
     const byKey = new Map(arcs.map(arc => [arc.key, arc]))

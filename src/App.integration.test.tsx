@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 vi.setConfig({ testTimeout: 15000 })
 import App from './App.tsx'
 import { TOKEN_STORAGE_KEY } from './auth/context.ts'
-import { defaultDataHub } from './config/gitlab.ts'
+import { availableDataHubs, defaultDataHub } from './config/gitlab.ts'
 import { deferred, gitLabProjectFull, openAccountMenu, projectResponse, stubGitLabFetch } from './test/helpers.tsx'
 
 const account = { id: 7, name: 'Jane Doe', username: 'jane' }
@@ -37,6 +37,27 @@ async function openLogin(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('optional login in the portal', () => {
+  it('uses the selected ARC DataHUB token when downloading its RO-Crate', async () => {
+    const otherHub = availableDataHubs.find(hub => hub.id === 'plantmicrobe')!
+    localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify({
+      [defaultDataHub.id]: 'official-token', [otherHub.id]: 'plantmicrobe-token',
+    }))
+    const transport = fetchCall.getMockImplementation()!
+    fetchCall.mockImplementation((input, init) => new URL(String(input)).pathname.includes('/packages/generic/')
+      ? new Promise(() => {}) : transport(input, init))
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByRole('button', { name: 'Account menu' })
+    await waitFor(() => expect(projectCalls('gitlab.plantmicrobe.de').some(call => hasToken(call[1]))).toBe(true))
+    await user.click(await screen.findByRole('button', { name: 'Open gitlab.plantmicrobe.de ARC' }))
+    await waitFor(() => expect(fetchCall).toHaveBeenCalledWith(
+      'https://gitlab.plantmicrobe.de/api/v4/projects/1/packages/generic/isa_arc_json/0.0.1/arc-ro-crate-metadata.json',
+      { headers: expect.any(Headers), signal: expect.any(AbortSignal), credentials: 'omit' },
+    ))
+    const download = fetchCall.mock.calls.find(([input]) => String(input).includes('/packages/generic/'))!
+    expect(new Headers(download[1]?.headers).get('PRIVATE-TOKEN')).toBe('plantmicrobe-token')
+  })
+
   it('keeps discovery public, authenticates through Enter and reloads the ARCs with the token', async () => {
     const user = userEvent.setup()
     render(<App />)

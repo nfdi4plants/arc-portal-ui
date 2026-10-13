@@ -1,6 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { groupNamesFrom, toArcSummary } from '../logic/toArcSummary.ts'
-import type { ArcSummary, DataHubConnection, HubState } from '../../../types/dashboard.ts'
+import type { ArcSummary, DataHubConnection, DataHubFetchers, HubState } from '../../../types/dashboard.ts'
+import { AUTH_FAILED_MESSAGE } from '../../../api/gitlab/client.ts'
+import { Success, type Result } from '../../../types/result.ts'
+
+type IndexFetchers = Pick<DataHubFetchers, 'fetchProjects' | 'fetchGroups' | 'fetchMemberProjectIds'>
+
+/** An expired token falls back to the public list once and reports the rejection. */
+async function withAnonymousFallback<T>(token: string | undefined, call: (token?: string) => Promise<Result<T>>) {
+  const result = await call(token)
+  if (token && result.success === false && result.error === AUTH_FAILED_MESSAGE) return { result: await call(), rejected: true }
+  return { result, rejected: false }
+}
 
 const initialHub = (connection: DataHubConnection): HubState => ({ hub: connection.hub, status: 'loading', arcs: [] })
 
@@ -23,26 +34,29 @@ function nextState(state: IndexState, hubId: string, change: (hub: HubState) => 
 type Apply = (hubId: string, change: (hub: HubState) => HubState) => void
 
 /** Loads one DataHUB independently; a failure here never hides another's ARCs. */
-async function loadHub(connection: DataHubConnection, signal: AbortSignal, apply: Apply) {
+async function loadHub(connection: DataHubConnection, fetchers: IndexFetchers, signal: AbortSignal, apply: Apply) {
   const id = connection.hub.id
+  const { hub, token } = connection
   apply(id, hub => hub.status === 'loading' ? hub : { ...hub, status: 'loading', error: undefined })
   try {
     const [projects, groups, memberships] = await Promise.all([
-      connection.fetchProjects(signal), connection.fetchGroups(signal),
-      connection.fetchMemberProjectIds(signal),
+      withAnonymousFallback(token, current => fetchers.fetchProjects(hub.url, { token: current, signal })),
+      withAnonymousFallback(token, current => fetchers.fetchGroups(hub.url, { allAvailable: true, token: current, signal })),
+      token ? fetchers.fetchMemberProjectIds(hub.url, { token, signal }) : Promise.resolve(Success([])),
     ])
     if (signal.aborted) return
-    if (projects.success === false) {
-      apply(id, hub => ({ ...hub, status: 'failed', error: projects.error }))
+    if (projects.result.success === false) {
+      const error = projects.result.error
+      apply(id, hub => ({ ...hub, status: 'failed', error }))
       return
     }
     // Group names are cosmetic: without them labels fall back to paths.
-    const names = groups.success === true ? groupNamesFrom(groups.value) : new Map<string, string>()
+    const names = groups.result.success === true ? groupNamesFrom(groups.result.value) : new Map<string, string>()
     const memberIds = memberships.success === true ? new Set(memberships.value) : null
     // A rejected token means the list is the anonymous, public one.
-    const tokenRejected = projects.value.tokenRejected
-    const arcs = projects.value.projects.map(project =>
-      toArcSummary(project, connection.hub, names, !connection.includesPrivate || tokenRejected, memberIds ?? new Set()))
+    const tokenRejected = projects.rejected
+    const arcs = projects.result.value.map(project =>
+      toArcSummary(project, hub, names, !token || tokenRejected, memberIds ?? new Set()))
     apply(id, hub => ({
       ...hub,
       status: 'loaded',
@@ -61,12 +75,13 @@ async function loadHub(connection: DataHubConnection, signal: AbortSignal, apply
 }
 
 /** Loads every DataHUB independently; a login change reloads only that DataHUB. */
-export function useArcIndex(connections: DataHubConnection[]) {
+export function useArcIndex(connections: DataHubConnection[], { fetchProjects, fetchGroups, fetchMemberProjectIds }: IndexFetchers) {
   const [state, setState] = useState<IndexState>(() => ({
     hubs: connections.map(initialHub), arcs: [], updatedAt: null,
   }))
   const controllers = useRef(new Map<string, AbortController>())
   const previous = useRef(new Map<string, DataHubConnection>())
+  const previousFetchers = useRef<IndexFetchers | null>(null)
   const [reloadNonce, setReloadNonce] = useState(0)
   const forceRef = useRef(false)
 
@@ -75,6 +90,11 @@ export function useArcIndex(connections: DataHubConnection[]) {
   useEffect(() => {
     const force = forceRef.current
     forceRef.current = false
+    const fetchers = { fetchProjects, fetchGroups, fetchMemberProjectIds }
+    const fetchersChanged = previousFetchers.current?.fetchProjects !== fetchProjects
+      || previousFetchers.current?.fetchGroups !== fetchGroups
+      || previousFetchers.current?.fetchMemberProjectIds !== fetchMemberProjectIds
+    previousFetchers.current = fetchers
     const currentIds = new Set(connections.map(connection => connection.hub.id))
 
     // Drop DataHUBs that disappeared from the configuration.
@@ -89,11 +109,11 @@ export function useArcIndex(connections: DataHubConnection[]) {
       })
     }
 
-    // Reload DataHUBs whose connection object changed (login/logout) or on Update.
+    // Reload only changed sessions, or every DataHUB on Update/a changed fetch callback.
     for (const connection of connections) {
       const id = connection.hub.id
       const last = previous.current.get(id)
-      if (!force && last === connection) continue
+      if (!force && !fetchersChanged && last?.hub === connection.hub && last.token === connection.token) continue
       if (last !== undefined) {
         controllers.current.get(id)?.abort()
         controllers.current.delete(id)
@@ -111,9 +131,9 @@ export function useArcIndex(connections: DataHubConnection[]) {
         // a logged-out account); an Update keeps them visible until the new list arrives.
         return nextState(previousState, id, hub => ({ ...hub, status: 'loading', arcs: force ? hub.arcs : [], error: undefined }))
       })
-      void loadHub(connection, controller.signal, apply)
+      void loadHub(connection, fetchers, controller.signal, apply)
     }
-  }, [connections, reloadNonce])
+  }, [connections, reloadNonce, fetchProjects, fetchGroups, fetchMemberProjectIds])
 
   useEffect(() => () => {
     for (const controller of controllers.current.values()) controller.abort()
@@ -129,7 +149,7 @@ export function useArcIndex(connections: DataHubConnection[]) {
     const controller = new AbortController()
     controllers.current.set(hubId, controller)
     setState(previousState => nextState(previousState, hubId, hub => ({ ...hub, status: 'loading', error: undefined })))
-    void loadHub(connection, controller.signal, apply)
+    void loadHub(connection, { fetchProjects, fetchGroups, fetchMemberProjectIds }, controller.signal, apply)
   }
   const reload = () => {
     forceRef.current = true
