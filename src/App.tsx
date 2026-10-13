@@ -1,126 +1,69 @@
 import '@primer/primitives/dist/css/functional/themes/light.css'
 import '@primer/css/dist/primer.css'
-import {BaseStyles} from '@primer/react'
-import {ThemeProvider} from '@primer/react/next'
-import {WebViewer} from '@nfdi4plants/arc-web-view'
-import {Component, useCallback, useEffect, useRef, useState, type ReactNode} from 'react'
+import { BaseStyles, Button } from '@primer/react'
+import { lazy, Suspense, useCallback, useState } from 'react'
+import { ThemeProvider } from '@primer/react/next'
+import DataHubDashboard from './components/DataHubDashboard/DataHubDashboard.tsx'
+import { getGroupProjects, getTopStarredProjects, listAllGroups, searchProjects } from './api/gitlab/index.ts'
+import { referenceGitLab } from './config/gitlab.ts'
+import type { FetchArcs, SearchArcs } from './types/arc.ts'
+import type { FetchGroupArcs, FetchGroups } from './types/organisation.ts'
+import { AuthenticationProvider } from './auth/AuthenticationProvider.tsx'
+import { useAuthentication } from './auth/context.ts'
+import { Navbar } from './components/Navbar/Navbar.tsx'
+import ArcDashboard from './components/ArcDashboard/ArcDashboard.tsx'
+const ArcViewer = lazy(() => import('./ArcViewer.tsx'))
 
-const defaultArcUrl = `${import.meta.env.BASE_URL}arc-ro-crate-metadata.json`
+const fetchPublicGroups: FetchGroups = signal => listAllGroups(referenceGitLab.source, { visibility: 'public', signal })
 
-function validateCrate(json: string) {
-  const parsed: unknown = JSON.parse(json)
-  if (!parsed || typeof parsed !== 'object' || !('@graph' in parsed) || !Array.isArray(parsed['@graph'])) {
-    throw new Error('The ARC metadata must contain an @graph array.')
+type PageState =
+  | { type: "arc-web-viewer" }
+  | {
+    type: "datahub-dashboard";
   }
-  return json
-}
-
-class ViewerErrorBoundary extends Component<{children: ReactNode}, {failed: boolean}> {
-  state = {failed: false}
-
-  static getDerivedStateFromError() {
-    return {failed: true}
-  }
-
-  render() {
-    return this.state.failed
-      ? <p role="alert">Could not display this ARC. Check the bundled ARC metadata and refresh the page.</p>
-      : this.props.children
-  }
-}
-
-function ExpandedWebViewer({ provideJson }: { provideJson: () => Promise<string> }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const initialized = useRef(false);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    // WebViewer uses a dialog below Primer's wide breakpoint (1400px).
-    // It has no initial-sidebar prop, so activate its own toggle once ready.
-    if (!container || initialized.current) return;
-    const desktop = window.matchMedia('(min-width: 1400px)');
-
-    const openSidebar = () => {
-      if (initialized.current || !desktop.matches) return;
-      const toggle = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => {
-        const label = button.getAttribute('aria-label') ??
-          (button.getAttribute('aria-labelledby') ?? '').split(/\s+/)
-            .map((id) => document.getElementById(id)?.textContent ?? '').join(' ');
-        return label.trim() === 'Expand sidebar';
-      });
-      if (!toggle) return;
-      initialized.current = true;
-      observer.disconnect();
-      toggle.click();
+  | {
+    type: "arc-dashboard";
+    data: {
+      url: string;
+      name: string;
     };
-    const observer = new MutationObserver(openSidebar);
-    observer.observe(container, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-label', 'aria-labelledby'] });
-    desktop.addEventListener('change', openSidebar);
-    openSidebar();
-    return () => {
-      observer.disconnect();
-      desktop.removeEventListener('change', openSidebar);
-    };
-  }, []);
+  };
 
-  return <div ref={containerRef} className="viewer-content"><WebViewer jsonString={provideJson} /></div>;
-}
+function Portal() {
+  const { session } = useAuthentication()
+  const [pageState, setPageState] = useState<PageState>({ type: "datahub-dashboard" })
+  const token = session?.token
+  const fetchTopStarred = useCallback<FetchArcs>(options =>
+    getTopStarredProjects(referenceGitLab.source, { ...options, token }), [token])
+  const fetchSearch = useCallback<SearchArcs>((query, options) =>
+    searchProjects(referenceGitLab.source, query, { ...options, token }), [token])
+  const fetchMembershipGroups = useCallback<FetchGroups>(signal =>
+    listAllGroups(referenceGitLab.source, { token, allAvailable: false, signal }), [token])
+  const fetchGroupProjects = useCallback<FetchGroupArcs>((groupId, options) =>
+    getGroupProjects(referenceGitLab.source, groupId, { ...options, token }), [token])
 
-
-function ArcViewer() {
-  const [document, setDocument] = useState<{name: string; json: string} | null>(null)
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(true)
-  const provideJson = useCallback(async () => document?.json ?? '', [document])
-
-  useEffect(() => {
-    const controller = new AbortController()
-    async function loadDefaultArc() {
-      try {
-        const response = await fetch(defaultArcUrl, {signal: controller.signal})
-        if (!response.ok) {
-          throw new Error(`Could not load the bundled ARC (HTTP ${response.status}). Please refresh the page to try again.`)
-        }
-        const json = validateCrate(await response.text())
-        if (!controller.signal.aborted) setDocument({name: 'Project 42 / arc-ro-crate-metadata.json', json})
-      } catch (cause) {
-        if (!controller.signal.aborted) setError(cause instanceof TypeError
-          ? 'The local ARC file could not be loaded. Please refresh the page to try again.'
-          : cause instanceof Error ? cause.message : 'Could not load the ARC.')
-      } finally {
-        if (!controller.signal.aborted) setLoading(false)
-      }
+  return <>
+    <Navbar />
+    <div style={{padding: '16px 32px'}}>
+      <Button onClick={() => setPageState({type: pageState.type === 'arc-web-viewer' ? 'datahub-dashboard' : 'arc-web-viewer'})}>
+        {pageState.type === 'arc-web-viewer' ? 'Back to DataHub' : 'ARC web viewer'}
+      </Button>
+    </div>
+    {
+      pageState.type === "arc-web-viewer" ? <Suspense fallback={<p role="status">Loading ARC viewer…</p>}><ArcViewer /></Suspense> :
+      pageState.type === "arc-dashboard" ? (
+        <ArcDashboard url={pageState.data.url} name={pageState.data.name} onBack={() => setPageState({ type: "datahub-dashboard" })} />
+      ) :
+      <DataHubDashboard
+        onArcClick={(url, name) => setPageState({ type: "arc-dashboard", data: { url, name } })}
+        fetchTopStarred={fetchTopStarred} fetchSearch={fetchSearch} signedIn={!!session}
+        organisations={{ fetchPublicGroups, fetchMembershipGroups: session ? fetchMembershipGroups : null, fetchGroupProjects }} />
     }
-    void loadDefaultArc()
-    return () => controller.abort()
-  }, [])
-
-  return (
-    <main className="arc-portal">
-      <header className="portal-header">
-        <div>
-          <h1>ARC web viewer</h1>
-          <p>Explore an Annotated Research Context and its metadata.</p>
-          <a href={defaultArcUrl} download>Download source ARC JSON</a>
-        </div>
-      </header>
-      {error && <p className="portal-error" role="alert">{error}</p>}
-      {document ? (
-        <section aria-label="ARC contents" className="arc-viewer">
-          <ViewerErrorBoundary key={document.json}>
-            <ExpandedWebViewer provideJson={provideJson} />
-          </ViewerErrorBoundary>
-        </section>
-      ) : (
-        <section className="empty-state">
-          <h2>{loading ? 'Loading ARC…' : 'ARC unavailable'}</h2>
-          <p>{loading ? 'Loading the ARC metadata and file view.' : 'Please refresh the page to try again.'}</p>
-        </section>
-      )}
-    </main>
-  )
+  </>
 }
 
 export default function App() {
-  return <ThemeProvider colorMode="day"><BaseStyles><ArcViewer /></BaseStyles></ThemeProvider>
+  return <ThemeProvider><BaseStyles>
+    <AuthenticationProvider source={referenceGitLab.source}><Portal /></AuthenticationProvider>
+  </BaseStyles></ThemeProvider>
 }

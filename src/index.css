@@ -1,13 +1,8 @@
-:root {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  color: #1f2328;
-  background: #ffffff;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-}
+:root { font-family: system-ui, 'Segoe UI', sans-serif; color: #1f2328; background: #f6f8fa; font-synthesis: none; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
+body { margin: 0; }
+*, *::before, *::after { box-sizing: border-box; }
 
-body { margin: 0; font-size: 0.875rem; }
+/* Local ARC viewer styles. */
 #root { min-height: 100vh; }
 .arc-portal { padding: 32px; max-width: 1800px; margin: 0 auto; }
 .portal-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
