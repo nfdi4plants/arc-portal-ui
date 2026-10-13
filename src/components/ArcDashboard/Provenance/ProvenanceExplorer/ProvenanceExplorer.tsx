@@ -91,10 +91,15 @@ function Breadcrumbs({ crumbs, onNavigate }: { crumbs: Crumb[]; onNavigate: (vie
   )
 }
 
+const focusElement = (element: HTMLElement | null) => element?.focus()
+
 // The index comes ready-built from the parent. The explorer runs the queries itself, one per level.
 // The parent box must have a height. The card fills it and the graph scrolls inside the card.
 export function ProvenanceExplorer({ index }: { index: ProvenanceIndex }) {
   const [nav, setNav] = useState<Navigation>(START)
+  // After the first navigation, whatever replaces the view takes focus, because the clicked node
+  // or crumb is gone.
+  const [navigated, setNavigated] = useState(false)
   // A new index is another ARC, so the selection of the old one must not outlive it. React lets a
   // component reset state while it renders, so nothing of the old selection is drawn.
   // The parent keeps the index identity stable while the ARC stays the same.
@@ -102,7 +107,12 @@ export function ProvenanceExplorer({ index }: { index: ProvenanceIndex }) {
   if (seenIndex !== index) {
     setSeenIndex(index)
     setNav(START)
+    setNavigated(false)
   }
+  const navigate = useCallback((next: Navigation | ((current: Navigation) => Navigation)) => {
+    setNavigated(true)
+    setNav(next)
+  }, [])
   const { view, selectedDataset, selectedProcess, selectedGroup, selectedNode } = nav
 
   // A level is only computed while its selection is active. The queries return undefined for an id
@@ -129,11 +139,11 @@ export function ProvenanceExplorer({ index }: { index: ProvenanceIndex }) {
     (id: string) => {
       switch (view) {
         case 'datasets':
-          setNav({ view: 'processes', selectedDataset: id })
+          navigate({ view: 'processes', selectedDataset: id })
           break
         case 'processes': {
           const process = processes?.nodes.find((node) => node.key === id)
-          setNav({
+          navigate({
             view: 'groups',
             selectedDataset: process?.external ? process.datasetId : selectedDataset,
             selectedProcess: id,
@@ -141,17 +151,17 @@ export function ProvenanceExplorer({ index }: { index: ProvenanceIndex }) {
           break
         }
         case 'groups':
-          setNav({ ...nav, view: 'detail', selectedGroup: id })
+          navigate({ ...nav, view: 'detail', selectedGroup: id })
           break
         case 'detail':
-          setNav({ ...nav, view: 'lineage', selectedNode: id })
+          navigate({ ...nav, view: 'lineage', selectedNode: id })
           break
         case 'lineage':
-          setNav({ ...nav, selectedNode: id })
+          navigate({ ...nav, selectedNode: id })
           break
       }
     },
-    [nav, view, processes, selectedDataset],
+    [nav, view, processes, selectedDataset, navigate],
   )
 
   // The canvas input of the current view. It is null when the index has no result for the selection.
@@ -211,7 +221,7 @@ export function ProvenanceExplorer({ index }: { index: ProvenanceIndex }) {
   return (
     <section className={styles.root} aria-label="Provenance explorer">
       <header className={styles.header}>
-        <Breadcrumbs crumbs={crumbs} onNavigate={(target) => setNav((current) => backTo(current, target))} />
+        <Breadcrumbs crumbs={crumbs} onNavigate={(target) => navigate((current) => backTo(current, target))} />
         <code className={styles.queryName}>{QUERY_NAMES[view]}</code>
       </header>
       <div className={styles.body}>
@@ -229,10 +239,13 @@ export function ProvenanceExplorer({ index }: { index: ProvenanceIndex }) {
               onNodeClick={handleNodeClick}
               centerNodeId={canvas.centerNodeId}
               resetKey={JSON.stringify([view, selectedDataset, selectedProcess, selectedGroup, selectedNode])}
+              focusOnMount={navigated}
             />
           </div>
         ) : (
-          <p className={styles.empty}>{emptyMessage}</p>
+          <p className={styles.empty} tabIndex={-1} ref={navigated ? focusElement : undefined}>
+            {emptyMessage}
+          </p>
         )}
         {view === 'detail' && emptyMessage === null && <p className={styles.hint}>Select a node to see its lineage.</p>}
       </div>

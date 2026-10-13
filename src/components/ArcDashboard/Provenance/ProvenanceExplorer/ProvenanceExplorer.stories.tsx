@@ -59,9 +59,11 @@ async function toDetail(canvasElement: HTMLElement) {
   await clickNode(canvasElement, 'Inputs A')
 }
 
-// Waits for the layout of the last view, so the story rests on a finished drawing.
+// Waits for the layout of the last view, so the story rests on a finished drawing. The region
+// shows up before the layout ends, its node buttons only after.
 async function layoutDone(canvasElement: HTMLElement, graphLabel: RegExp) {
-  await within(canvasElement).findByRole('group', { name: graphLabel }, LAYOUT_TIMEOUT)
+  const region = await within(canvasElement).findByRole('region', { name: graphLabel }, LAYOUT_TIMEOUT)
+  await within(region).findAllByRole('button', {}, LAYOUT_TIMEOUT)
 }
 
 export const Datasets: Story = {}

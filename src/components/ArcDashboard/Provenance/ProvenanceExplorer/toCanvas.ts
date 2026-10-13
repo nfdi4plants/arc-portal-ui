@@ -176,7 +176,7 @@ function detailNodes(
       emphasized: node.emphasized,
       pills: propertyPills(own, 'p'),
       tooltip: movedText ? `${tooltip}: ${movedText}` : tooltip,
-      ariaLabel: `${node.id}, ${node.kind}${describe(node)}`,
+      ariaLabel: `${node.id}, ${node.kind}${movedText ? `, ${movedText}` : ''}${describe(node)}`,
     }
   })
 }

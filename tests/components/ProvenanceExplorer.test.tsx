@@ -25,9 +25,13 @@ function renderExplorer(index: ProvenanceIndex = sampleIndex) {
   return user
 }
 
-// The canvas region is there while the layout runs, so a view is ready once its svg group exists.
-// The edges are groups named "From X to Y". The svg is the only other group.
-const canvas = async () => within(await screen.findByRole('group', { name: (name) => !name.startsWith('From ') }))
+// The canvas region is there while the layout runs, so a view is ready once the region holds a
+// node. Every node of the explorer is a button.
+async function canvas() {
+  const region = await screen.findByRole('region', { name: (name) => name !== 'Provenance explorer' })
+  await within(region).findAllByRole('button')
+  return within(region)
+}
 const noCanvas = () => screen.queryByRole('region', { name: (name) => name !== 'Provenance explorer' })
 const crumbs = () => within(screen.getByRole('navigation', { name: 'Breadcrumb' }))
 const crumbTexts = () =>
@@ -254,7 +258,18 @@ describe('ProvenanceExplorer', () => {
     await clickNode(user, 'mass_spec')
 
     expect(screen.getByText('This process has no inputs or outputs.')).toBeInTheDocument()
-    expect(screen.queryByRole('group')).not.toBeInTheDocument()
+    expect(noCanvas()).not.toBeInTheDocument()
+  })
+
+  it('keeps the focus in the card when a view without a graph comes and goes', async () => {
+    const user = renderExplorer()
+
+    await clickNode(user, 'deseq2')
+    expect(screen.getByText('This dataset has no annotated processes.')).toHaveFocus()
+
+    await user.click(crumbs().getByRole('button', { name: 'Datasets' }))
+    await canvas()
+    expect(screen.getByRole('region', { name: 'Dataset provenance graph' })).toHaveFocus()
   })
 
   it('returns to the datasets when the parent passes the index of another ARC', async () => {

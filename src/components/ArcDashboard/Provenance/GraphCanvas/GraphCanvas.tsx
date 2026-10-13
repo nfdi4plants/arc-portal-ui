@@ -119,8 +119,9 @@ interface NodeProps {
 function NodeShape({ laid, onClick }: NodeProps) {
   const { node, width, height } = laid
   const clickable = onClick !== undefined && node.clickable !== false
-  // The pills and the tooltip hold information that a screen reader would otherwise miss.
-  const label = [node.ariaLabel, ...laid.pills.map(({ view }) => view.fullText), node.tooltip].filter(Boolean).join(', ')
+  // The pills hold information that a screen reader would otherwise miss. The tooltip is left out,
+  // because ariaLabel already carries what it says.
+  const label = [node.ariaLabel, ...laid.pills.map(({ view }) => view.fullText)].join(', ')
   const classes = cx(
     colorClass(node.color, styles.nodeNeutral),
     node.dashed && styles.dashed,
@@ -177,7 +178,15 @@ interface Outcome {
   layout: GraphLayout | null
 }
 
-export function GraphCanvas({ nodes, edges, ariaLabel, onNodeClick, centerNodeId, resetKey }: GraphCanvasProps) {
+export function GraphCanvas({
+  nodes,
+  edges,
+  ariaLabel,
+  onNodeClick,
+  centerNodeId,
+  resetKey,
+  focusOnMount = false,
+}: GraphCanvasProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const scrolledFor = useRef<string | null>(null)
   const markerPrefix = useId().replace(/:/g, '')
@@ -223,9 +232,9 @@ export function GraphCanvas({ nodes, edges, ariaLabel, onNodeClick, centerNodeId
   const titles = new Map((layout?.nodes ?? []).map((laid) => [laid.node.id, laid.node.title]))
 
   // After a navigation the container takes focus, because the focused node is gone. The first
-  // mount leaves focus alone.
+  // mount leaves focus alone unless focusOnMount is set.
   const lastKey = useRef(resetKey)
-  const focusOnDraw = useRef(false)
+  const focusOnDraw = useRef(focusOnMount)
   useLayoutEffect(() => {
     if (lastKey.current === resetKey) return
     lastKey.current = resetKey
@@ -233,14 +242,17 @@ export function GraphCanvas({ nodes, edges, ariaLabel, onNodeClick, centerNodeId
   }, [resetKey])
 
   // A new view starts at the top left, or on centerNodeId. Expanding an edge keeps the scroll position.
+  // A failed layout takes the focus too, because the container then shows the alert.
+  const failed = shown !== null && layout === null
   useLayoutEffect(() => {
     const root = rootRef.current
-    if (!root || !layout || scrolledFor.current === resetKey) return
-    scrolledFor.current = resetKey
+    if (!root || (!layout && !failed) || scrolledFor.current === resetKey) return
     if (focusOnDraw.current) {
       focusOnDraw.current = false
       root.focus({ preventScroll: true })
     }
+    if (!layout) return
+    scrolledFor.current = resetKey
     root.scrollLeft = 0
     root.scrollTop = 0
     const target = centerNodeId ? layout.nodes.find((laid) => laid.node.id === centerNodeId) : undefined
@@ -248,7 +260,7 @@ export function GraphCanvas({ nodes, edges, ariaLabel, onNodeClick, centerNodeId
     const clamp = (value: number, max: number) => Math.max(0, Math.min(value, max))
     root.scrollLeft = clamp(target.x + target.width / 2 - root.clientWidth / 2, root.scrollWidth - root.clientWidth)
     root.scrollTop = clamp(target.y + target.height / 2 - root.clientHeight / 2, root.scrollHeight - root.clientHeight)
-  }, [layout, resetKey, centerNodeId])
+  }, [layout, failed, resetKey, centerNodeId])
 
   return (
     <div ref={rootRef} className={styles.root} role="region" aria-label={ariaLabel} tabIndex={-1}>
@@ -260,7 +272,6 @@ export function GraphCanvas({ nodes, edges, ariaLabel, onNodeClick, centerNodeId
           height={layout.height}
           viewBox={`0 0 ${layout.width} ${layout.height}`}
           role="group"
-          aria-label={ariaLabel}
         >
           <defs>
             {ARROWS.map(({ name, className }) => (
@@ -280,7 +291,11 @@ export function GraphCanvas({ nodes, edges, ariaLabel, onNodeClick, centerNodeId
           </defs>
           {layout.edges.map((laid) => {
             const owner = `${titles.get(laid.edge.from) ?? laid.edge.from} to ${titles.get(laid.edge.to) ?? laid.edge.to}`
-            const texts = laid.pills.filter(({ view }) => view.kind !== 'toggle').map(({ view }) => view.fullText)
+            // A count pill is a bare number, so its tooltip says what is counted. Property pills keep the full
+            // text, because their tooltip only adds the category.
+            const texts = laid.pills
+              .filter(({ view }) => view.kind !== 'toggle')
+              .map(({ view }) => (view.kind === 'property' ? view.fullText : (view.tooltip ?? view.fullText)))
             return (
               <g
                 key={laid.edge.id}

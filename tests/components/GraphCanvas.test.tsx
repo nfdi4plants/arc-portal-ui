@@ -71,6 +71,14 @@ describe('GraphCanvas', () => {
     expect(screen.getByRole('button', { name: 'Beta, select to open' })).toBeInTheDocument()
   })
 
+  it('gives the graph its name once, on the region', async () => {
+    render(canvas())
+
+    await screen.findByRole('button', { name: 'Alpha, select to open' })
+
+    expect(screen.getAllByLabelText('Test graph')).toEqual([region()])
+  })
+
   it('calls onNodeClick on click and on Enter', async () => {
     const onNodeClick = vi.fn()
     const user = userEvent.setup()
@@ -99,17 +107,31 @@ describe('GraphCanvas', () => {
     expect(screen.queryByRole('button', { name: 'Alpha, select to open' })).toBeNull()
   })
 
-  it('appends the pill texts and the tooltip to the label of a node', async () => {
+  it('names a node by its ariaLabel and pill texts, without the tooltip', async () => {
     const node: CanvasNode = {
       ...plainNode('a'),
+      title: 'Alpha',
       ariaLabel: 'Alpha, select to open',
       tooltip: 'Alpha (study)',
       pills: [{ key: 'n1', kind: 'property', name: 'species', value: 'Talinum', category: 'characteristic' }],
     }
     render(canvas({ nodes: [node], edges: [] }))
 
+    expect(await screen.findByRole('button', { name: 'Alpha, select to open, species: Talinum' })).toBeInTheDocument()
+  })
+
+  it('names a count pill by its tooltip in the label of its edge', async () => {
+    const countEdge: CanvasEdge = {
+      id: 'ab',
+      from: 'a',
+      to: 'b',
+      color: 'neutral',
+      pills: [{ key: 'count', kind: 'count', value: '6', tooltip: '6 shared inputs and outputs' }],
+    }
+    render(canvas({ nodes: nodes.slice(0, 2), edges: [countEdge] }))
+
     expect(
-      await screen.findByRole('button', { name: 'Alpha, select to open, species: Talinum, Alpha (study)' }),
+      await screen.findByRole('group', { name: 'From Alpha to Beta: 6 shared inputs and outputs' }),
     ).toBeInTheDocument()
   })
 
@@ -195,6 +217,28 @@ describe('GraphCanvas', () => {
     await screen.findByRole('button', { name: 'Alpha, select to open' })
 
     expect(region()).toHaveFocus()
+  })
+
+  it('moves focus to the container after the first layout when focusOnMount is set', async () => {
+    render(canvas({ focusOnMount: true }))
+    expect(document.body).toHaveFocus()
+
+    await screen.findByRole('button', { name: 'Alpha, select to open' })
+
+    expect(region()).toHaveFocus()
+  })
+
+  it('moves focus to the container that shows the alert when the layout of a new view fails', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { rerender } = render(canvas())
+    await screen.findByRole('button', { name: 'Alpha, select to open' })
+    vi.mocked(layoutGraph).mockRejectedValueOnce(new Error('elk failed'))
+
+    rerender(canvas({ resetKey: 'two' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not lay out this graph.')
+    expect(region()).toHaveFocus()
+    expect(log).toHaveBeenCalled()
   })
 
   it('scrolls back to the top left when the view changes', async () => {

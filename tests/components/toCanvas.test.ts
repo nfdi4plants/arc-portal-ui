@@ -158,6 +158,14 @@ describe('detailToCanvas', () => {
     expect(b.pills).toMatchObject([{ name: 'tissue', value: 'root' }])
     expect(a.tooltip).toBe('a (sample): Characteristic · species: Talinum')
     expect(b.tooltip).toBe('b (sample): Characteristic · species: Talinum')
+    expect(a.ariaLabel).toContain('a, sample, Characteristic · species: Talinum')
+  })
+
+  it('keeps the annotations of a single node as pills', () => {
+    const canvas = detailToCanvas(detail([detailNode('a', 'sample', [species])]))
+
+    expect(canvas.nodes[0].pills).toMatchObject([{ kind: 'property', name: 'species', value: 'Talinum' }])
+    expect(canvas.nodes[0].tooltip).toBe('a (sample)')
   })
 
   it('marks the emphasized nodes, sets monospace titles and adds no process pill', () => {
