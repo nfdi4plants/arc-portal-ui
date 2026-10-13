@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useState } from 'react'
+import { ActionList, ActionMenu } from '@primer/react'
+import { Fragment, useCallback, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { datasetGraph, lineage, processDetail, processGraph, processGroups } from '../../../../arc/provenance/queries'
 import type { ProvenanceIndex } from '../../../../arc/provenance/types'
 import { GraphCanvas } from '../GraphCanvas'
@@ -60,35 +61,165 @@ function backTo(nav: Navigation, view: ProvenanceView): Navigation {
   }
 }
 
-function Breadcrumbs({ crumbs, onNavigate }: { crumbs: Crumb[]; onNavigate: (view: ProvenanceView) => void }) {
+const cutLabel = (label: string) =>
+  label.length > CRUMB_MAX_LENGTH ? `${label.slice(0, CRUMB_MAX_LENGTH - 1)}…` : label
+
+// The crumbs between the first one and the last two, in the narrow header. With three or fewer
+// crumbs nothing collapses.
+const hiddenCrumbs = (crumbs: Crumb[], narrow: boolean) => (narrow && crumbs.length > 3 ? crumbs.slice(1, -2) : [])
+
+function HiddenCrumbsMenu({ hidden, onNavigate }: { hidden: Crumb[]; onNavigate: (view: ProvenanceView) => void }) {
   return (
-    <nav aria-label="Breadcrumb">
+    <ActionMenu>
+      <ActionMenu.Anchor>
+        <button
+          type="button"
+          className={`${styles.crumbButton} ${styles.crumbMore}`}
+          aria-label={`Show ${hidden.length} more ${hidden.length === 1 ? 'level' : 'levels'}`}
+        >
+          …
+        </button>
+      </ActionMenu.Anchor>
+      <ActionMenu.Overlay>
+        <ActionList>
+          {hidden.map(({ label, view }) => (
+            <ActionList.Item key={view} onSelect={() => onNavigate(view)}>
+              {cutLabel(label)}
+            </ActionList.Item>
+          ))}
+        </ActionList>
+      </ActionMenu.Overlay>
+    </ActionMenu>
+  )
+}
+
+function Separator() {
+  return (
+    <span className={styles.separator} aria-hidden="true">
+      &gt;
+    </span>
+  )
+}
+
+function Breadcrumbs({
+  crumbs,
+  narrow,
+  onNavigate,
+}: {
+  crumbs: Crumb[]
+  narrow: boolean
+  onNavigate: (view: ProvenanceView) => void
+}) {
+  const hidden = hiddenCrumbs(crumbs, narrow)
+  const visible = hidden.length > 0 ? [crumbs[0], ...crumbs.slice(-2)] : crumbs
+  return (
+    <nav aria-label="Breadcrumb" className={styles.nav}>
       <ol className={styles.crumbs}>
-        {crumbs.map(({ label, view }, index) => {
-          const shown = label.length > CRUMB_MAX_LENGTH ? `${label.slice(0, CRUMB_MAX_LENGTH - 1)}…` : label
-          const title = shown === label ? undefined : label
+        {visible.map(({ label, view }, position) => {
+          const isLast = position === visible.length - 1
+          const shown = cutLabel(label)
+          // The last crumb of the narrow header can also be cut by the CSS, so it always carries its full text.
+          const title = shown === label && !(narrow && isLast) ? undefined : label
           return (
-            <li key={view} className={styles.crumb}>
-              {index > 0 && (
-                <span className={styles.separator} aria-hidden="true">
-                  &gt;
-                </span>
+            <Fragment key={view}>
+              {position === 1 && hidden.length > 0 && (
+                <li className={styles.crumb}>
+                  <Separator />
+                  <HiddenCrumbsMenu hidden={hidden} onNavigate={onNavigate} />
+                </li>
               )}
-              {index === crumbs.length - 1 ? (
-                <span className={styles.crumbCurrent} aria-current="page" title={title}>
-                  {shown}
-                </span>
-              ) : (
-                <button type="button" className={styles.crumbButton} title={title} onClick={() => onNavigate(view)}>
-                  {shown}
-                </button>
-              )}
-            </li>
+              <li className={narrow && isLast ? `${styles.crumb} ${styles.crumbShrinking}` : styles.crumb}>
+                {position > 0 && <Separator />}
+                {isLast ? (
+                  <span className={styles.crumbCurrent} aria-current="page" title={title}>
+                    {shown}
+                  </span>
+                ) : (
+                  <button type="button" className={styles.crumbButton} title={title} onClick={() => onNavigate(view)}>
+                    {shown}
+                  </button>
+                )}
+              </li>
+            </Fragment>
           )
         })}
       </ol>
     </nav>
   )
+}
+
+// An invisible copy of the full header content (all crumbs and the query name in one line). It
+// draws its text with CSS content, so the page holds each label once for assistive technology.
+// The outer box has the width of the header content area, and the copy inside has its natural width.
+function HeaderRuler({
+  crumbs,
+  queryName,
+  boxRef,
+  fullRef,
+}: {
+  crumbs: Crumb[]
+  queryName: string
+  boxRef: RefObject<HTMLDivElement | null>
+  fullRef: RefObject<HTMLDivElement | null>
+}) {
+  return (
+    <div className={styles.rulerBox} ref={boxRef} aria-hidden="true">
+      <div className={styles.ruler} ref={fullRef}>
+        <div className={styles.crumbs}>
+          {crumbs.map(({ label, view }, index) => (
+            <span key={view} className={styles.crumb}>
+              {index > 0 && <span className={styles.separator} data-text=">" />}
+              <span
+                className={index === crumbs.length - 1 ? styles.crumbCurrent : styles.crumbButton}
+                data-text={cutLabel(label)}
+              />
+            </span>
+          ))}
+        </div>
+        <span className={styles.queryName} data-text={queryName} />
+      </div>
+    </div>
+  )
+}
+
+// The header switches to its narrow layout when the full content does not fit on one line.
+// A ResizeObserver reports two widths: the header content area (the ruler box) and the natural
+// width of the full content (the ruler). Both are independent of the layout on screen, because
+// the header is as wide as the card and the ruler always holds the full content. The answer is
+// therefore the same in either layout, so the header cannot flip back and forth. The observed
+// elements keep their height in both layouts, so a layout switch does not fire the observer again.
+function useNarrowHeader() {
+  const boxRef = useRef<HTMLDivElement>(null)
+  const fullRef = useRef<HTMLDivElement>(null)
+  const [narrow, setNarrow] = useState(false)
+  useLayoutEffect(() => {
+    const box = boxRef.current
+    const full = fullRef.current
+    if (!box || !full) return
+    let available = Infinity
+    let natural = 0
+    let frame = 0
+    const observer = new ResizeObserver((entries) => {
+      for (const { target, contentRect } of entries) {
+        if (target === box) available = contentRect.width
+        else natural = contentRect.width
+      }
+      // The switch waits for the next frame. Changing the layout inside the callback would resize
+      // elements other observers already measured, and the browser reports that as a ResizeObserver loop.
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        // A fraction of a pixel counts against fitting, so rounding never pushes the full header past its line.
+        setNarrow(Math.ceil(natural) > Math.floor(available))
+      })
+    })
+    observer.observe(box)
+    observer.observe(full)
+    return () => {
+      cancelAnimationFrame(frame)
+      observer.disconnect()
+    }
+  }, [])
+  return { narrow, boxRef, fullRef }
 }
 
 const focusElement = (element: HTMLElement | null) => element?.focus()
@@ -114,6 +245,7 @@ export function ProvenanceExplorer({ index }: { index: ProvenanceIndex }) {
     setNav(next)
   }, [])
   const { view, selectedDataset, selectedProcess, selectedGroup, selectedNode } = nav
+  const { narrow, boxRef, fullRef } = useNarrowHeader()
 
   // A level is only computed while its selection is active. The queries return undefined for an id
   // the index does not have.
@@ -221,8 +353,13 @@ export function ProvenanceExplorer({ index }: { index: ProvenanceIndex }) {
   return (
     <section className={styles.root} aria-label="Provenance explorer">
       <header className={styles.header}>
-        <Breadcrumbs crumbs={crumbs} onNavigate={(target) => navigate((current) => backTo(current, target))} />
-        <code className={styles.queryName}>{QUERY_NAMES[view]}</code>
+        <Breadcrumbs
+          crumbs={crumbs}
+          narrow={narrow}
+          onNavigate={(target) => navigate((current) => backTo(current, target))}
+        />
+        {!narrow && <code className={styles.queryName}>{QUERY_NAMES[view]}</code>}
+        <HeaderRuler crumbs={crumbs} queryName={QUERY_NAMES[view]} boxRef={boxRef} fullRef={fullRef} />
       </header>
       <div className={styles.body}>
         {note && (

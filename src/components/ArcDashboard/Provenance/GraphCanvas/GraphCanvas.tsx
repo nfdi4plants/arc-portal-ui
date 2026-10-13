@@ -1,11 +1,17 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
-import type { KeyboardEvent, MouseEvent } from 'react'
+import type { KeyboardEvent, MouseEvent, RefObject } from 'react'
 import styles from './GraphCanvas.module.css'
-import { layoutGraph, type GraphLayout, type LaidOutEdge, type LaidOutNode, type PlacedPill } from './layout'
-import { createTextMeasure, PILL_HEIGHT } from './pills'
-import type { CanvasColor, GraphCanvasProps } from './types'
+import { fitsInline, layoutGraph, type GraphLayout, type LaidOutEdge, type LaidOutNode, type PlacedPill } from './layout'
+import { createTextMeasure, describePill, PILL_HEIGHT, pillListText } from './pills'
+import type { CanvasColor, CanvasPill, GraphCanvasProps } from './types'
 
 const NO_EXPANSION: ReadonlySet<string> = new Set()
+
+// A measured size that changes by fewer pixels keeps its old value, so rounding cannot start a new layout.
+const RESIZE_NOISE = 4
+// Space between a list and its toggle, and between a list and the edge of the visible area.
+const MENU_GAP = 4
+const VIEW_MARGIN = 8
 
 const NODE_RADIUS = 6
 const STRIPE_WIDTH = 4
@@ -54,10 +60,12 @@ interface PillProps {
   highlighted?: boolean
   // "<from> to <to>" of the edge. Toggle pills name it, because several edges have the same toggle.
   owner?: string
-  onToggle?: () => void
+  // Set when the toggle opens a list instead of expanding the edge, and tells whether the list is open.
+  listOpen?: boolean
+  onToggle?: (anchor: Element) => void
 }
 
-function Pill({ placed, highlighted = false, owner, onToggle }: PillProps) {
+function Pill({ placed, highlighted = false, owner, listOpen, onToggle }: PillProps) {
   const { view } = placed
   const hasDot = view.category !== undefined
   const valueClass = view.kind === 'process' ? styles.pillStrong : view.empty ? styles.pillEmpty : styles.pillValue
@@ -83,16 +91,17 @@ function Pill({ placed, highlighted = false, owner, onToggle }: PillProps) {
   if (view.toggle && onToggle) {
     const activate = (event: MouseEvent | KeyboardEvent) => {
       event.stopPropagation()
-      onToggle()
+      onToggle(event.currentTarget)
     }
     return (
       <g
-        className={cx(styles.pill, styles.toggle)}
+        className={cx(styles.pill, styles.toggle, colorClassName)}
         transform={transform}
         role="button"
         tabIndex={0}
         aria-label={owner ? `${view.tooltip} of ${owner}` : view.tooltip}
-        aria-expanded={view.toggle === 'less'}
+        aria-haspopup={listOpen === undefined ? undefined : 'dialog'}
+        aria-expanded={listOpen ?? view.toggle === 'less'}
         onClick={activate}
         onKeyDown={(event) => {
           if (!isActivationKey(event)) return
@@ -172,6 +181,102 @@ function arrowName(laid: LaidOutEdge): string {
   return laid.edge.color
 }
 
+interface MenuProps {
+  label: string
+  pills: CanvasPill[]
+  // Height of the box, so the list fits again when the box changes its height while the list is open.
+  boxHeight: number
+  rootRef: RefObject<HTMLDivElement | null>
+  // The toggle that opened the list. It takes the focus back when the list closes from inside.
+  opener: Element
+  onClose: () => void
+}
+
+// The list of pills that did not fit on an edge. It sits in the scrolling content, so it moves with its toggle.
+function PillMenu({ label, pills, boxHeight, rootRef, opener, onClose }: MenuProps) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLUListElement>(null)
+
+  // The list takes the visible area of the box as its limit: it opens on the side of the toggle with
+  // more room and scrolls inside itself when it needs more. The width follows the text up to the visible width.
+  useLayoutEffect(() => {
+    const dialog = dialogRef.current
+    const root = rootRef.current
+    const canvas = dialog?.parentElement
+    if (!dialog || !root || !canvas) return
+    const box = root.getBoundingClientRect()
+    const visible = {
+      left: box.left + root.clientLeft,
+      top: box.top + root.clientTop,
+      right: box.left + root.clientLeft + root.clientWidth,
+      bottom: box.top + root.clientTop + root.clientHeight,
+    }
+    const anchor = opener.getBoundingClientRect()
+    const origin = canvas.getBoundingClientRect()
+
+    dialog.style.maxWidth = `${Math.max(0, visible.right - visible.left - 2 * VIEW_MARGIN)}px`
+    const below = visible.bottom - anchor.bottom - MENU_GAP - VIEW_MARGIN
+    const above = anchor.top - visible.top - MENU_GAP - VIEW_MARGIN
+    const openAbove = below < above
+    dialog.style.maxHeight = `${Math.max(0, openAbove ? above : below)}px`
+    dialog.style.top = openAbove ? 'auto' : `${anchor.bottom - origin.top + MENU_GAP}px`
+    dialog.style.bottom = openAbove ? `${origin.bottom - anchor.top + MENU_GAP}px` : 'auto'
+    const rightmost = visible.right - VIEW_MARGIN - dialog.offsetWidth
+    dialog.style.left = `${Math.max(visible.left + VIEW_MARGIN, Math.min(anchor.left, rightmost)) - origin.left}px`
+  }, [rootRef, opener, boxHeight])
+
+  useLayoutEffect(() => {
+    const dialog = dialogRef.current
+    listRef.current?.focus()
+    // The list closes when the focus leaves it, and a tap on a blank spot moves no focus on some touch browsers.
+    const close = (event: Event) => {
+      const target = event.target as Node
+      if (!dialog?.contains(target) && !opener.contains(target)) onClose()
+    }
+    const escape = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+    document.addEventListener('pointerdown', close, true)
+    document.addEventListener('keydown', escape)
+    return () => {
+      document.removeEventListener('pointerdown', close, true)
+      document.removeEventListener('keydown', escape)
+      if (dialog?.contains(document.activeElement) && opener.isConnected) (opener as HTMLElement).focus()
+    }
+  }, [opener, onClose])
+
+  return (
+    <div
+      ref={dialogRef}
+      className={styles.menu}
+      role="dialog"
+      aria-label={label}
+      tabIndex={-1}
+      onBlur={(event) => {
+        const next = event.relatedTarget as Node | null
+        if (!dialogRef.current?.contains(next) && !(next && opener.contains(next))) onClose()
+      }}
+    >
+      <ul ref={listRef} className={styles.menuList} tabIndex={0} aria-label={label}>
+        {pills.map((pill) => {
+          const colorClass =
+            pill.kind === 'process' ? styles.process : pill.category ? CATEGORY_CLASS[pill.category] : undefined
+          return (
+            <li
+              key={pill.key}
+              className={cx(styles.menuItem, colorClass)}
+              title={pill.kind === 'property' ? describePill(pill).tooltip : undefined}
+            >
+              <span className={styles.menuDot} aria-hidden="true" />
+              <span>{pillListText(pill)}</span>
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
+}
+
 interface Outcome {
   resetKey: string
   // null when ELK failed.
@@ -208,12 +313,38 @@ export function GraphCanvas({
     [],
   )
 
+  // Size of the box the canvas is shown in, null until it is measured.
+  const [box, setBox] = useState<{ width: number; height: number } | null>(null)
+  useLayoutEffect(() => {
+    const root = rootRef.current
+    if (!root) return
+    const measureBox = () =>
+      setBox((current) => {
+        const next = { width: root.clientWidth, height: root.clientHeight }
+        const same =
+          current && Math.abs(next.width - current.width) < RESIZE_NOISE && Math.abs(next.height - current.height) < RESIZE_NOISE
+        return same ? current : next
+      })
+    measureBox()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(measureBox)
+    observer.observe(root)
+    return () => observer.disconnect()
+  }, [])
+  const measured = box !== null
+  const boxWidth = box?.width ?? 0
+  const portrait = boxWidth > 0 && (box?.height ?? 0) > boxWidth
+  // The width shapes the layout only through the rows of an expanded edge. A portrait box takes the
+  // compact layout, which has no expanded edges and does not depend on the width.
+  const layoutWidth = !portrait && expanded.size > 0 ? boxWidth : 0
+
   // The previous drawing stays until the next layout resolves, unless it belongs to another view.
   const [outcome, setOutcome] = useState<Outcome | null>(null)
   useEffect(() => {
+    if (!measured) return
     let current = true
     const family = rootRef.current ? getComputedStyle(rootRef.current).fontFamily : ''
-    layoutGraph(nodes, edges, expanded, createTextMeasure(family || 'sans-serif')).then(
+    layoutGraph(nodes, edges, expanded, createTextMeasure(family || 'sans-serif'), { width: layoutWidth, portrait }).then(
       (layout) => {
         if (current) setOutcome({ resetKey, layout })
       },
@@ -225,11 +356,21 @@ export function GraphCanvas({
     return () => {
       current = false
     }
-  }, [nodes, edges, expanded, resetKey])
+  }, [nodes, edges, expanded, resetKey, measured, layoutWidth, portrait])
 
   const shown = outcome && outcome.resetKey === resetKey ? outcome : null
   const layout = shown?.layout ?? null
   const titles = new Map((layout?.nodes ?? []).map((laid) => [laid.node.id, laid.node.title]))
+  const ownerOf = (laid: LaidOutEdge) =>
+    `${titles.get(laid.edge.from) ?? laid.edge.from} to ${titles.get(laid.edge.to) ?? laid.edge.to}`
+
+  // One list at a time. It belongs to the layout and the width it was opened on, so a new layout (an
+  // expansion, other data, a resize that relays out) or a new width closes it. The expanded edges of a
+  // box that became too narrow are drawn collapsed, and they expand again when the box grows.
+  const [menu, setMenu] = useState<{ edgeId: string; layout: GraphLayout; width: number; opener: Element } | null>(null)
+  const openMenu = menu && menu.layout === layout && menu.width === boxWidth ? menu : null
+  const closeMenu = useCallback(() => setMenu(null), [])
+  const menuEdge = openMenu ? layout?.edges.find((laid) => laid.edge.id === openMenu.edgeId) : undefined
 
   // After a navigation the container takes focus, because the focused node is gone. The first
   // mount leaves focus alone unless focusOnMount is set.
@@ -258,79 +399,101 @@ export function GraphCanvas({
     const target = centerNodeId ? layout.nodes.find((laid) => laid.node.id === centerNodeId) : undefined
     if (!target) return
     const clamp = (value: number, max: number) => Math.max(0, Math.min(value, max))
-    root.scrollLeft = clamp(target.x + target.width / 2 - root.clientWidth / 2, root.scrollWidth - root.clientWidth)
+    // The compact layout keeps its main flow on the left, so it only scrolls down to the node.
+    if (!layout.compact) {
+      root.scrollLeft = clamp(target.x + target.width / 2 - root.clientWidth / 2, root.scrollWidth - root.clientWidth)
+    }
     root.scrollTop = clamp(target.y + target.height / 2 - root.clientHeight / 2, root.scrollHeight - root.clientHeight)
   }, [layout, failed, resetKey, centerNodeId])
 
   return (
     <div ref={rootRef} className={styles.root} role="region" aria-label={ariaLabel} tabIndex={-1}>
       {layout ? (
-        <svg
-          className={styles.svg}
-          xmlns="http://www.w3.org/2000/svg"
-          width={layout.width}
-          height={layout.height}
-          viewBox={`0 0 ${layout.width} ${layout.height}`}
-          role="group"
-        >
-          <defs>
-            {ARROWS.map(({ name, className }) => (
-              <marker
-                key={name}
-                id={`${markerPrefix}-${name}`}
-                className={className}
-                markerWidth={8}
-                markerHeight={8}
-                refX={7}
-                refY={4}
-                orient="auto"
-              >
-                <path className={styles.arrowHead} d="M0,0 L8,4 L0,8 z" />
-              </marker>
+        <div className={cx(styles.canvas, layout.compact && styles.canvasCompact)}>
+          <svg
+            className={styles.svg}
+            xmlns="http://www.w3.org/2000/svg"
+            width={layout.width}
+            height={layout.height}
+            viewBox={`0 0 ${layout.width} ${layout.height}`}
+            role="group"
+          >
+            <defs>
+              {ARROWS.map(({ name, className }) => (
+                <marker
+                  key={name}
+                  id={`${markerPrefix}-${name}`}
+                  className={className}
+                  markerWidth={8}
+                  markerHeight={8}
+                  refX={7}
+                  refY={4}
+                  orient="auto"
+                >
+                  <path className={styles.arrowHead} d="M0,0 L8,4 L0,8 z" />
+                </marker>
+              ))}
+            </defs>
+            {layout.edges.map((laid) => {
+              const owner = ownerOf(laid)
+              // The list takes over the "+N" toggle when the expanded edge would not fit the box, and in compact mode.
+              const listed = layout.compact || !fitsInline(laid.minInlineWidth, boxWidth)
+              // A count pill is a bare number, so its tooltip says what is counted. Property pills keep the full
+              // text, because their tooltip only adds the category.
+              const texts = laid.pills
+                .filter(({ view }) => view.kind !== 'toggle')
+                .map(({ view }) => (view.kind === 'property' ? view.fullText : (view.tooltip ?? view.fullText)))
+              return (
+                <g
+                  key={laid.edge.id}
+                  role="group"
+                  aria-label={`From ${owner}${texts.length ? `: ${texts.join(', ')}` : ''}`}
+                >
+                  {laid.path && (
+                    <path
+                      className={cx(
+                        styles.edge,
+                        colorClass(laid.edge.color, styles.edgeNeutral),
+                        laid.edge.highlighted && styles.highlighted,
+                      )}
+                      d={laid.path}
+                      markerEnd={`url(#${markerPrefix}-${arrowName(laid)})`}
+                    >
+                      {laid.edge.tooltip && <title>{laid.edge.tooltip}</title>}
+                    </path>
+                  )}
+                  {laid.pills.map((placed) => (
+                    <Pill
+                      key={placed.view.key}
+                      placed={placed}
+                      highlighted={laid.edge.highlighted}
+                      owner={owner}
+                      listOpen={listed && placed.view.toggle === 'more' ? openMenu?.edgeId === laid.edge.id : undefined}
+                      onToggle={(anchor) => {
+                        if (!listed || placed.view.toggle === 'less') toggle(laid.edge.id)
+                        else if (openMenu?.edgeId === laid.edge.id) closeMenu()
+                        else setMenu({ edgeId: laid.edge.id, layout, width: boxWidth, opener: anchor })
+                      }}
+                    />
+                  ))}
+                </g>
+              )
+            })}
+            {layout.nodes.map((laid) => (
+              <NodeShape key={laid.node.id} laid={laid} onClick={onNodeClick} />
             ))}
-          </defs>
-          {layout.edges.map((laid) => {
-            const owner = `${titles.get(laid.edge.from) ?? laid.edge.from} to ${titles.get(laid.edge.to) ?? laid.edge.to}`
-            // A count pill is a bare number, so its tooltip says what is counted. Property pills keep the full
-            // text, because their tooltip only adds the category.
-            const texts = laid.pills
-              .filter(({ view }) => view.kind !== 'toggle')
-              .map(({ view }) => (view.kind === 'property' ? view.fullText : (view.tooltip ?? view.fullText)))
-            return (
-              <g
-                key={laid.edge.id}
-                role="group"
-                aria-label={`From ${owner}${texts.length ? `: ${texts.join(', ')}` : ''}`}
-              >
-                {laid.path && (
-                  <path
-                    className={cx(
-                      styles.edge,
-                      colorClass(laid.edge.color, styles.edgeNeutral),
-                      laid.edge.highlighted && styles.highlighted,
-                    )}
-                    d={laid.path}
-                    markerEnd={`url(#${markerPrefix}-${arrowName(laid)})`}
-                  >
-                    {laid.edge.tooltip && <title>{laid.edge.tooltip}</title>}
-                  </path>
-                )}
-                {laid.pills.map((placed) => (
-                  <Pill
-                    key={placed.view.key}
-                    placed={placed}
-                    highlighted={laid.edge.highlighted}
-                    owner={owner}
-                    onToggle={() => toggle(laid.edge.id)}
-                  />
-                ))}
-              </g>
-            )
-          })}
-          {layout.nodes.map((laid) => (
-            <NodeShape key={laid.node.id} laid={laid} onClick={onNodeClick} />
-          ))}
-        </svg>
+          </svg>
+          {openMenu && menuEdge && (
+            <PillMenu
+              boxHeight={box?.height ?? 0}
+              rootRef={rootRef}
+              label={`${layout.compact ? 'Properties' : 'More properties'} of ${ownerOf(menuEdge)}`}
+              pills={layout.compact ? [...menuEdge.edge.pills, ...(menuEdge.edge.morePills ?? [])] : (menuEdge.edge.morePills ?? [])}
+              opener={openMenu.opener}
+              onClose={closeMenu}
+            />
+          )}
+        </div>
       ) : shown ? (
         <p className={styles.status} role="alert">
           Could not lay out this graph.

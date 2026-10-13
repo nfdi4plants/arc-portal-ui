@@ -102,17 +102,25 @@ export function toPillView(pill: CanvasPill, measure: MeasureText): PillView {
   return { key: pill.key, kind: pill.kind, category, ...text, width }
 }
 
-function toggleView(key: string, toggle: 'more' | 'less', text: string, label: string, measure: MeasureText): PillView {
+function toggleView(
+  key: string,
+  toggle: 'more' | 'less',
+  text: string,
+  label: string,
+  measure: MeasureText,
+  category?: AnnotationCategory,
+): PillView {
   return {
     key,
     kind: 'toggle',
+    category,
     namePart: '',
     valuePart: text,
     empty: false,
     fullText: label,
     tooltip: label,
     toggle,
-    width: Math.ceil(measure(text, 400, 11)) + 14,
+    width: Math.ceil(measure(text, 400, 11)) + 14 + (category ? 10 : 0),
   }
 }
 
@@ -131,7 +139,62 @@ export function edgePillViews(edge: CanvasEdge, expanded: boolean, measure: Meas
   return views
 }
 
-// Width of the edge label ELK reserves: the pills plus the gaps between them, with 16px of room on each side.
-export function pillRunWidth(views: PillView[]): number {
-  return views.reduce((sum, view) => sum + view.width, 0) + (views.length - 1) * PILL_GAP + 32
+// The pills an edge shows in compact mode. A lone pill stays on the edge. Several pills, hidden ones
+// included, become one chip with the number of pills and the category dot of the first property.
+export function compactPillViews(edge: CanvasEdge, measure: MeasureText): PillView[] {
+  const all = [...edge.pills, ...(edge.morePills ?? [])]
+  if (all.length <= 1) return all.map((pill) => toPillView(pill, measure))
+  const category = all.find((pill) => pill.kind === 'property')?.category
+  return [toggleView(`${edge.id}:toggle`, 'more', `${all.length}`, `Show the ${all.length} properties`, measure, category)]
+}
+
+// Plain text of a pill for lists and screen readers: a property in full, any other pill by its tooltip.
+export function pillListText(pill: CanvasPill): string {
+  const text = describePill(pill)
+  return pill.kind === 'property' ? text.fullText : text.tooltip
+}
+
+// Room the edge label keeps free on each side of the pills.
+export const LABEL_PADDING = 16
+
+export function rowWidth(row: PillView[]): number {
+  return row.reduce((sum, view) => sum + view.width, 0) + (row.length - 1) * PILL_GAP
+}
+
+// Fills the rows from left to right. A pill that does not fit starts the next row, and a pill wider
+// than maxWidth stands alone in its row, because pills are never cut.
+export function wrapPillRows(views: PillView[], maxWidth: number): PillView[][] {
+  const rows: PillView[][] = []
+  let used = 0
+  for (const view of views) {
+    const current = rows[rows.length - 1]
+    if (current && used + PILL_GAP + view.width <= maxWidth) {
+      current.push(view)
+      used += PILL_GAP + view.width
+    } else {
+      rows.push([view])
+      used = view.width
+    }
+  }
+  return rows
+}
+
+export interface PillBlock {
+  rows: PillView[][]
+  // Widest row plus the label padding on both sides, which is what ELK reserves.
+  width: number
+  // All rows with the gaps between them.
+  height: number
+}
+
+// A collapsed edge (no rowCap) keeps its pills in one row however wide it is. An expanded edge wraps
+// at rowCap, but never below its widest pill, so the block is at least as wide as that pill needs.
+export function pillBlock(views: PillView[], rowCap?: number): PillBlock {
+  const rows =
+    rowCap === undefined ? [views] : wrapPillRows(views, Math.max(rowCap, ...views.map((view) => view.width)))
+  return {
+    rows,
+    width: Math.max(...rows.map(rowWidth)) + 2 * LABEL_PADDING,
+    height: rows.length * PILL_HEIGHT + (rows.length - 1) * PILL_GAP,
+  }
 }

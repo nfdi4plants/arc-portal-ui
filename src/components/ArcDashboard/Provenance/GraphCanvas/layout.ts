@@ -1,5 +1,17 @@
 import type { ELK, ElkLabel, ElkNode } from 'elkjs/lib/elk.bundled.js'
-import { edgePillViews, PILL_GAP, PILL_HEIGHT, pillRunWidth, toPillView, type MeasureText, type PillView } from './pills'
+import {
+  compactPillViews,
+  edgePillViews,
+  LABEL_PADDING,
+  PILL_GAP,
+  PILL_HEIGHT,
+  pillBlock,
+  rowWidth,
+  toPillView,
+  wrapPillRows,
+  type MeasureText,
+  type PillView,
+} from './pills'
 import type { CanvasEdge, CanvasNode } from './types'
 
 // Builds the ELK graph from the canvas props and runs ELK. The result holds everything the renderer needs as plain numbers.
@@ -34,13 +46,17 @@ export interface LaidOutEdge {
   edge: CanvasEdge
   route: Point[]
   path: string
-  // Positions relative to the canvas origin.
+  // Positions relative to the canvas origin. An expanded edge has several rows, the first one on the route.
   pills: PlacedPill[]
+  // Smallest available width at which this edge can expand inline, see fitsInline.
+  minInlineWidth: number
 }
 
 export interface GraphLayout {
   width: number
   height: number
+  // Top to bottom with one chip per edge, see layoutGraph.
+  compact: boolean
   nodes: LaidOutNode[]
   edges: LaidOutEdge[]
 }
@@ -67,17 +83,37 @@ const ELK_OPTIONS = {
   'org.eclipse.elk.layered.spacing.edgeEdgeBetweenLayers': '12',
   'org.eclipse.elk.spacing.edgeLabel': '0',
   'org.eclipse.elk.layered.edgeLabels.centerLabelPlacementStrategy': 'MEDIAN_LAYER',
-  'org.eclipse.elk.layered.edgeLabels.sideSelection': 'SMART_DOWN',
+  'org.eclipse.elk.layered.edgeLabels.sideSelection': 'ALWAYS_DOWN',
   'org.eclipse.elk.randomSeed': '1',
   'org.eclipse.elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
   // Separate components are packed into rows by size, so widening one label would move whole nodes between layers.
   'org.eclipse.elk.separateConnectedComponents': 'false',
 }
 
-const LABEL_OPTIONS = {
+// ELK names the node alignments for the left to right layout. In the top to bottom layout RIGHTDOWN
+// lines a parent up with its first child, so the main flow stays on the left and the other children
+// fan out to the right. On random graphs it has the smallest mean x of the alignments.
+const COMPACT_OPTIONS = {
+  ...ELK_OPTIONS,
+  'org.eclipse.elk.direction': 'DOWN',
+  'org.eclipse.elk.layered.nodePlacement.bk.fixedAlignment': 'RIGHTDOWN',
+}
+
+// A one-row pill run sits on its edge. The label is as high as a pill and the edge runs through its middle.
+const INLINE_LABEL_OPTIONS = {
   'org.eclipse.elk.edgeLabels.placement': 'CENTER',
   'org.eclipse.elk.edgeLabels.inline': 'true',
 }
+
+// The rows below the first one hang under the edge. ALWAYS_DOWN in ELK_OPTIONS keeps this label below it.
+const BELOW_LABEL_OPTIONS = {
+  'org.eclipse.elk.edgeLabels.placement': 'CENTER',
+  'org.eclipse.elk.edgeLabels.inline': 'false',
+}
+
+// What ELK adds to the width of a two-layer graph besides the nodes and the label: its default 12px
+// padding on both sides, and the 40px between each node layer and the label layer.
+const TWO_LAYER_OVERHEAD = 2 * 12 + 2 * 40
 
 // ELK is a large bundle, so it loads on the first layout. A failed import is dropped from the cache and the next layout retries it.
 let elkPromise: Promise<ELK> | undefined
@@ -112,21 +148,8 @@ function measureNode(node: CanvasNode, measure: MeasureText, busiestSide: number
   const textWidth = Math.ceil(Math.max(titleWidth, subtitleWidth) + 34)
 
   const views = (node.pills ?? []).map((pill) => toPillView(pill, measure))
-  const rowWidth = Math.max(PILL_ROW_WIDTH, ...views.map((view) => view.width))
-  const rows: PillView[][] = []
-  let used = 0
-  let widest = 0
-  for (const view of views) {
-    const current = rows[rows.length - 1]
-    if (current && used + PILL_GAP + view.width <= rowWidth) {
-      current.push(view)
-      used += PILL_GAP + view.width
-    } else {
-      rows.push([view])
-      used = view.width
-    }
-    widest = Math.max(widest, used)
-  }
+  const rows = wrapPillRows(views, Math.max(PILL_ROW_WIDTH, ...views.map((view) => view.width)))
+  const widest = Math.max(0, ...rows.map(rowWidth))
 
   const pillTop = subtitleText ? 62 : 46
   const pills = rows.flatMap((row, r) => {
@@ -187,92 +210,178 @@ export function roundedPath(points: Point[], radius: number = CORNER_RADIUS): st
   return `${d} L ${at(points[points.length - 1])}`
 }
 
-// y of the horizontal route segment that runs under the label. The label sits on the route
-// and, when the route bends, ELK may offer several horizontal segments, so the nearest one wins.
-function runY(route: Point[], label: ElkLabel): number {
+// y of the horizontal route segment that runs under the label. When the route bends, ELK may
+// offer several horizontal segments, so the one nearest to y wins.
+function runY(route: Point[], label: ElkLabel, y: number): number {
   const left = label.x ?? 0
   const right = left + (label.width ?? 0)
-  const middle = (label.y ?? 0) + (label.height ?? 0) / 2
   let best: number | undefined
   for (let i = 1; i < route.length; i++) {
     const a = route[i - 1]
     const b = route[i]
     if (Math.abs(a.y - b.y) > 0.5) continue
     if (Math.min(a.x, b.x) > left + 1 || Math.max(a.x, b.x) < right - 1) continue
-    if (best === undefined || Math.abs(a.y - middle) < Math.abs(best - middle)) best = a.y
+    if (best === undefined || Math.abs(a.y - y) < Math.abs(best - y)) best = a.y
+  }
+  return best ?? y
+}
+
+// x of the vertical route segment that runs through the label, the counterpart of runY for compact mode.
+function runX(route: Point[], label: ElkLabel): number {
+  const top = label.y ?? 0
+  const bottom = top + (label.height ?? 0)
+  const middle = (label.x ?? 0) + (label.width ?? 0) / 2
+  let best: number | undefined
+  for (let i = 1; i < route.length; i++) {
+    const a = route[i - 1]
+    const b = route[i]
+    if (Math.abs(a.x - b.x) > 0.5) continue
+    if (Math.min(a.y, b.y) > top + 1 || Math.max(a.y, b.y) < bottom - 1) continue
+    if (best === undefined || Math.abs(a.x - middle) < Math.abs(best - middle)) best = a.x
   }
   return best ?? middle
 }
 
+// An edge expands inline when its widest pill fits next to the widest nodes of both sides within
+// availableWidth. An unmeasured box (width 0, as in jsdom) counts as wide enough.
+export function fitsInline(minInlineWidth: number, availableWidth: number): boolean {
+  return availableWidth <= 0 || availableWidth >= minInlineWidth
+}
+
+// The box the canvas is shown in. Both fields are optional because the layout also runs without one.
+export interface LayoutBox {
+  // Visible width, 0 while unknown (before the first measurement, and in jsdom).
+  width?: number
+  // The box is measured and taller than it is wide.
+  portrait?: boolean
+}
+
+const NOTHING_EXPANDED: ReadonlySet<string> = new Set()
+
+// An expanded edge wraps its pills so that a graph of two layers (the groups and detail views) still fits
+// box.width: the gap between the layers has to leave room for the widest node on each side. Deeper
+// graphs have more gaps, so they may scroll, and an edge that does not fit stays collapsed. Without a
+// width the rows are as wide as the widest pill.
+//
+// A portrait box gets the compact layout instead: top to bottom and left aligned, with one chip per
+// edge. Only the shape of the box decides, so a layout cannot make the choice flip back and forth.
 export async function layoutGraph(
   nodes: CanvasNode[],
   edges: CanvasEdge[],
   expanded: ReadonlySet<string>,
   measure: MeasureText,
+  box: LayoutBox = {},
 ): Promise<GraphLayout> {
+  const availableWidth = box.width ?? 0
   const outgoing = countBy(edges.map((edge) => edge.from))
   const incoming = countBy(edges.map((edge) => edge.to))
   const boxes = nodes.map((node) =>
     measureNode(node, measure, Math.max(outgoing.get(node.id) ?? 0, incoming.get(node.id) ?? 0)),
   )
-  const views = edges.map((edge) => edgePillViews(edge, expanded.has(edge.id), measure))
 
-  // Each edge with pills gets one inline label as wide as its pill run. ELK widens only that
-  // gap, and expanding an edge only changes its label width.
-  const graph: ElkNode = {
-    id: 'root',
-    layoutOptions: ELK_OPTIONS,
-    children: nodes.map((node, i) => ({ id: node.id, width: boxes[i].width, height: boxes[i].height })),
-    edges: edges.map((edge, i) => ({
-      id: edge.id,
-      sources: [edge.from],
-      targets: [edge.to],
-      ...(views[i].length
-        ? {
-            labels: [
-              {
-                id: `${edge.id}-pills`,
-                text: 'pills',
-                width: pillRunWidth(views[i]),
-                height: PILL_HEIGHT,
-                layoutOptions: LABEL_OPTIONS,
-              },
-            ],
-          }
-        : {}),
-    })),
-  }
+  const widthOf = new Map(nodes.map((node, i) => [node.id, boxes[i].width]))
+  const widest = (ids: string[]) => Math.max(0, ...ids.map((id) => widthOf.get(id) ?? 0))
+  const sideWidths = widest(edges.map((edge) => edge.from)) + widest(edges.map((edge) => edge.to))
+  const labelSpace = sideWidths + TWO_LAYER_OVERHEAD + 2 * LABEL_PADDING
+  const rowCap = Math.max(0, availableWidth - labelSpace)
 
-  const laid = await (await getElk()).layout(graph)
+  const minInlineWidths = edges.map((edge) => {
+    const widestPill = Math.max(0, ...edgePillViews(edge, true, measure).map((view) => view.width))
+    return edge.morePills?.length ? labelSpace + widestPill : 0
+  })
 
-  const positions = new Map((laid.children ?? []).map((child) => [child.id, child]))
-  const routes = new Map((laid.edges ?? []).map((edge) => [edge.id, edge]))
-
-  return {
-    width: Math.ceil(laid.width ?? 0),
-    height: Math.ceil(laid.height ?? 0),
-    nodes: nodes.map((node, i) => ({
-      node,
-      x: positions.get(node.id)?.x ?? 0,
-      y: positions.get(node.id)?.y ?? 0,
-      ...boxes[i],
-    })),
-    edges: edges.map((edge, i) => {
-      const laidEdge = routes.get(edge.id)
-      const section = laidEdge?.sections?.[0]
-      const route = section ? [section.startPoint, ...(section.bendPoints ?? []), section.endPoint] : []
-      const pills: PlacedPill[] = []
-      if (views[i].length) {
-        const label = laidEdge?.labels?.[0]
-        if (!label) throw new Error(`ELK returned no label for edge ${edge.id}`)
-        const y = runY(route, label) - PILL_HEIGHT / 2
-        let x = (label.x ?? 0) + 16
-        for (const view of views[i]) {
-          pills.push({ view, x, y })
-          x += view.width + PILL_GAP
-        }
+  async function place(compact: boolean, open: ReadonlySet<string>): Promise<GraphLayout> {
+    const blocks = edges.map((edge) => {
+      if (compact) {
+        const views = compactPillViews(edge, measure)
+        return { block: pillBlock(views), views }
       }
-      return { edge, route, path: roundedPath(route), pills }
-    }),
+      const isOpen = open.has(edge.id)
+      const views = edgePillViews(edge, isOpen, measure)
+      return { block: pillBlock(views, isOpen ? rowCap : undefined), views }
+    })
+
+    // Each edge with pills gets one label as wide as its widest pill row. ELK widens only that gap, and
+    // expanding an edge changes only its label. The first row sits on the edge. When rows follow, the
+    // label hangs under the edge and is as high as those rows plus the lower half of the first.
+    const graph: ElkNode = {
+      id: 'root',
+      layoutOptions: compact ? COMPACT_OPTIONS : ELK_OPTIONS,
+      children: nodes.map((node, i) => ({ id: node.id, width: boxes[i].width, height: boxes[i].height })),
+      edges: edges.map((edge, i) => {
+        const { block, views } = blocks[i]
+        if (!views.length) return { id: edge.id, sources: [edge.from], targets: [edge.to] }
+        const stacked = block.rows.length > 1
+        return {
+          id: edge.id,
+          sources: [edge.from],
+          targets: [edge.to],
+          labels: [
+            {
+              id: `${edge.id}-pills`,
+              text: 'pills',
+              width: block.width,
+              height: stacked ? block.height - PILL_HEIGHT / 2 : PILL_HEIGHT,
+              layoutOptions: stacked ? BELOW_LABEL_OPTIONS : INLINE_LABEL_OPTIONS,
+            },
+          ],
+        }
+      }),
+    }
+
+    const laid = await (await getElk()).layout(graph)
+
+    const positions = new Map((laid.children ?? []).map((child) => [child.id, child]))
+    const routes = new Map((laid.edges ?? []).map((edge) => [edge.id, edge]))
+
+    return {
+      width: Math.ceil(laid.width ?? 0),
+      height: Math.ceil(laid.height ?? 0),
+      compact,
+      nodes: nodes.map((node, i) => ({
+        node,
+        x: positions.get(node.id)?.x ?? 0,
+        y: positions.get(node.id)?.y ?? 0,
+        ...boxes[i],
+      })),
+      edges: edges.map((edge, i) => {
+        const laidEdge = routes.get(edge.id)
+        const section = laidEdge?.sections?.[0]
+        const route = section ? [section.startPoint, ...(section.bendPoints ?? []), section.endPoint] : []
+        const pills: PlacedPill[] = []
+        const { block, views } = blocks[i]
+        if (views.length) {
+          const label = laidEdge?.labels?.[0]
+          if (!label) throw new Error(`ELK returned no label for edge ${edge.id}`)
+          if (compact) {
+            pills.push({
+              view: views[0],
+              x: runX(route, label) - views[0].width / 2,
+              y: (label.y ?? 0) + ((label.height ?? 0) - PILL_HEIGHT) / 2,
+            })
+          } else {
+            const labelTop = label.y ?? 0
+            const near = block.rows.length > 1 ? labelTop : labelTop + (label.height ?? 0) / 2
+            const top = runY(route, label, near) - PILL_HEIGHT / 2
+            block.rows.forEach((row, r) => {
+              let x = (label.x ?? 0) + LABEL_PADDING
+              for (const view of row) {
+                pills.push({ view, x, y: top + r * (PILL_HEIGHT + PILL_GAP) })
+                x += view.width + PILL_GAP
+              }
+            })
+          }
+        }
+        return { edge, route, path: roundedPath(route), pills, minInlineWidth: minInlineWidths[i] }
+      }),
+    }
   }
+
+  if (box.portrait) return place(true, NOTHING_EXPANDED)
+  const open = new Set(
+    edges
+      .filter((edge, i) => expanded.has(edge.id) && fitsInline(minInlineWidths[i], availableWidth))
+      .map((edge) => edge.id),
+  )
+  return place(false, open)
 }

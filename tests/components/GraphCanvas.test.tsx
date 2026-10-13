@@ -316,3 +316,304 @@ describe('GraphCanvas', () => {
     })
   })
 })
+
+// The edge from Alpha to Beta needs a box of 543px to expand inline: its widest pill (143px), the 132px of the
+// widest node on each side, 32px of label padding and 104px of ELK padding and spacing.
+describe('GraphCanvas in a measured box', () => {
+  let size = { width: 0, height: 0 }
+  let notifyResize: Array<() => void> = []
+
+  function measureBox(width: number, height: number) {
+    size = { width, height }
+    notifyResize = []
+    vi.spyOn(Element.prototype, 'clientWidth', 'get').mockImplementation(() => size.width)
+    vi.spyOn(Element.prototype, 'clientHeight', 'get').mockImplementation(() => size.height)
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: () => void) {
+          notifyResize.push(callback)
+        }
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    )
+  }
+
+  async function resize(width: number, height: number) {
+    size = { width, height }
+    await act(async () => notifyResize.forEach((notify) => notify()))
+  }
+
+  const layoutCalls = () => vi.mocked(layoutGraph).mock.calls.length
+  const dialog = () => screen.queryByRole('dialog', { name: 'More properties of Alpha to Beta' })
+  const listTexts = (list: HTMLElement) => within(list).getAllByRole('listitem').map((item) => item.textContent)
+
+  it('expands the edge inline in a box that is wide enough', async () => {
+    measureBox(1200, 700)
+    const user = userEvent.setup()
+    render(canvas())
+
+    await user.click(await showMore())
+
+    expect(await screen.findByRole('img', { name: 'Parameter · duration: 2 h' })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(vi.mocked(layoutGraph).mock.lastCall?.[4]).toEqual({ width: 1200, portrait: false })
+  })
+
+  it('opens a list of the hidden properties in a box that is too narrow, without a new layout', async () => {
+    measureBox(500, 300)
+    const user = userEvent.setup()
+    render(canvas())
+    const more = await showMore()
+    const before = layoutCalls()
+
+    await user.click(more)
+
+    const list = await screen.findByRole('dialog', { name: 'More properties of Alpha to Beta' })
+    expect(listTexts(list)).toEqual(['duration: 2 h', 'volume: 5 ml'])
+    expect(more).toHaveAttribute('aria-expanded', 'true')
+    expect(more).toHaveAccessibleName('Show 2 more properties of Alpha to Beta')
+    expect(more).toHaveTextContent('+2')
+    expect(hiddenPill()).toBeNull()
+    expect(layoutCalls()).toBe(before)
+  })
+
+  it('moves the focus into the list and back to the toggle on Escape', async () => {
+    measureBox(500, 300)
+    const user = userEvent.setup()
+    render(canvas())
+    const more = await showMore()
+    more.focus()
+
+    await user.keyboard('{Enter}')
+    const list = await screen.findByRole('dialog', { name: 'More properties of Alpha to Beta' })
+    expect(within(list).getByRole('list')).toHaveFocus()
+
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(dialog()).toBeNull())
+    expect(more).toHaveFocus()
+    expect(more).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('closes the list on a click outside and on a second click on the toggle', async () => {
+    measureBox(500, 300)
+    const user = userEvent.setup()
+    render(canvas())
+    const more = await showMore()
+
+    await user.click(more)
+    await screen.findByRole('dialog')
+    await user.click(document.body)
+    await waitFor(() => expect(dialog()).toBeNull())
+
+    await user.click(more)
+    await screen.findByRole('dialog')
+    await user.click(more)
+    await waitFor(() => expect(dialog()).toBeNull())
+  })
+
+  it('keeps one list open at a time', async () => {
+    measureBox(300, 200)
+    const user = userEvent.setup()
+    const both = edges.map((e) => ({ ...e, morePills: [{ key: `${e.id}-more`, kind: 'count' as const, value: '9' }] }))
+    render(canvas({ edges: both }))
+
+    await user.click(await screen.findByRole('button', { name: 'Show 1 more properties of Alpha to Beta' }))
+    await screen.findByRole('dialog', { name: 'More properties of Alpha to Beta' })
+    await user.click(screen.getByRole('button', { name: 'Show 1 more properties of Beta to Gamma' }))
+
+    expect(await screen.findByRole('dialog', { name: 'More properties of Beta to Gamma' })).toBeInTheDocument()
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+  })
+
+  it('relays out on a resize only while an edge is expanded', async () => {
+    measureBox(1200, 700)
+    const user = userEvent.setup()
+    render(canvas())
+    const more = await showMore()
+    const collapsed = layoutCalls()
+
+    await resize(1000, 700)
+    await act(async () => {})
+    expect(layoutCalls()).toBe(collapsed)
+
+    await user.click(more)
+    await screen.findByRole('img', { name: 'Parameter · duration: 2 h' })
+    const expanded = layoutCalls()
+
+    await resize(1002, 702)
+    await act(async () => {})
+    expect(layoutCalls()).toBe(expanded)
+
+    await resize(900, 700)
+    await waitFor(() => expect(layoutCalls()).toBe(expanded + 1))
+    expect(vi.mocked(layoutGraph).mock.lastCall?.[4]).toEqual({ width: 900, portrait: false })
+  })
+
+  it('draws an expanded edge collapsed while the box is too narrow and expands it again when the box grows', async () => {
+    measureBox(1200, 700)
+    const user = userEvent.setup()
+    render(canvas())
+    await user.click(await showMore())
+    await screen.findByRole('img', { name: 'Parameter · duration: 2 h' })
+
+    await resize(400, 300)
+    expect(await showMore()).toHaveAttribute('aria-expanded', 'false')
+    await waitFor(() => expect(hiddenPill()).toBeNull())
+
+    await resize(1200, 700)
+    expect(await screen.findByRole('img', { name: 'Parameter · duration: 2 h' })).toBeInTheDocument()
+  })
+
+  // The root fills the box. The toggle of the edge from Alpha to Beta is 18px high and sits anchorTop px below the top.
+  function placeToggle(anchorTop: number) {
+    const rect = (top: number, bottom: number, left = 0, right = 500) =>
+      ({ top, bottom, left, right, x: left, y: top, width: right - left, height: bottom - top, toJSON() {} }) as DOMRect
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+      if (this.getAttribute('role') === 'region') return rect(0, size.height)
+      if (this.getAttribute('aria-label')?.startsWith('Show 2 more')) return rect(anchorTop, anchorTop + 18, 100, 160)
+      if (this.getAttribute('class')?.includes('canvas')) return rect(0, 300)
+      return rect(0, 0)
+    })
+  }
+
+  it('opens the list below the toggle when there is more room below and limits its height to that room', async () => {
+    measureBox(500, 300)
+    placeToggle(40)
+    const user = userEvent.setup()
+    render(canvas())
+
+    await user.click(await showMore())
+
+    const list = await screen.findByRole('dialog')
+    // 300 visible, minus the bottom of the toggle (58), the 4px gap and the 8px margin.
+    expect(list.style.maxHeight).toBe('230px')
+    expect(list.style.top).toBe('62px')
+    expect(list.style.bottom).toBe('auto')
+    expect(list.style.maxWidth).toBe('484px')
+  })
+
+  it('opens the list above the toggle when there is more room above', async () => {
+    measureBox(500, 300)
+    placeToggle(240)
+    const user = userEvent.setup()
+    render(canvas())
+
+    await user.click(await showMore())
+
+    const list = await screen.findByRole('dialog')
+    // 240 above the toggle, minus the gap and the margin.
+    expect(list.style.maxHeight).toBe('228px')
+    expect(list.style.top).toBe('auto')
+    expect(list.style.bottom).toBe('64px')
+  })
+
+  it('fits an open list to the new height of the box', async () => {
+    measureBox(500, 300)
+    placeToggle(40)
+    const user = userEvent.setup()
+    render(canvas())
+    await user.click(await showMore())
+    const list = await screen.findByRole('dialog')
+    expect(list.style.maxHeight).toBe('230px')
+
+    await resize(500, 200)
+
+    expect(screen.getByRole('dialog')).toBe(list)
+    expect(list.style.maxHeight).toBe('130px')
+  })
+
+  it('closes an open list when the box grows', async () => {
+    measureBox(500, 300)
+    const user = userEvent.setup()
+    render(canvas())
+    await user.click(await showMore())
+    await screen.findByRole('dialog')
+
+    await resize(900, 300)
+
+    await waitFor(() => expect(dialog()).toBeNull())
+    expect(await showMore()).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  describe('in a portrait box', () => {
+    it('shows one chip per edge with several pills, keeps a single pill and lists every pill on the chip', async () => {
+      measureBox(358, 760)
+      const user = userEvent.setup()
+      render(canvas())
+
+      const chip = await screen.findByRole('button', { name: 'Show the 3 properties of Alpha to Beta' })
+      expect(chip).toHaveTextContent('3')
+      expect(screen.getByRole('img', { name: '3' })).toBeInTheDocument()
+      expect(screen.queryByRole('img', { name: 'Parameter · temperature: 20 C' })).toBeNull()
+      // A portrait box takes the compact layout, which does not depend on the width.
+      expect(vi.mocked(layoutGraph).mock.lastCall?.[4]).toEqual({ width: 0, portrait: true })
+
+      await user.click(chip)
+
+      const list = await screen.findByRole('dialog', { name: 'Properties of Alpha to Beta' })
+      expect(listTexts(list)).toEqual(['temperature: 20 C', 'duration: 2 h', 'volume: 5 ml'])
+      expect(chip).toHaveAttribute('aria-expanded', 'true')
+    })
+
+    it('uses the compact layout in a portrait box even when the normal layout would fit', async () => {
+      measureBox(1200, 1500)
+      render(canvas())
+
+      expect(await screen.findByRole('button', { name: 'Show the 3 properties of Alpha to Beta' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /^Show 2 more properties/ })).toBeNull()
+    })
+
+    it('keeps the normal layout in a landscape box even when the graph overflows it', async () => {
+      measureBox(300, 200)
+      render(canvas())
+
+      expect(await showMore()).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /^Show the \d+ properties/ })).toBeNull()
+      expect(vi.mocked(layoutGraph).mock.lastCall?.[4]).toEqual({ width: 0, portrait: false })
+    })
+
+    it('does not lay out again when a portrait box changes its width', async () => {
+      measureBox(358, 760)
+      render(canvas())
+      await screen.findByRole('button', { name: 'Show the 3 properties of Alpha to Beta' })
+      const before = layoutCalls()
+
+      await resize(500, 760)
+      await act(async () => {})
+
+      expect(layoutCalls()).toBe(before)
+    })
+
+    it('starts the graph at the left edge of the box, where a normal graph is centered', async () => {
+      measureBox(358, 760)
+      const { unmount } = render(canvas())
+      await screen.findByRole('button', { name: 'Show the 3 properties of Alpha to Beta' })
+      expect(region().querySelector('svg')?.parentElement?.className).toContain('canvasCompact')
+      unmount()
+
+      measureBox(1200, 700)
+      render(canvas())
+      await showMore()
+      expect(region().querySelector('svg')?.parentElement?.className).not.toContain('canvasCompact')
+    })
+
+    it('scrolls to a centered node only vertically', async () => {
+      vi.spyOn(Element.prototype, 'scrollWidth', 'get').mockReturnValue(5000)
+      vi.spyOn(Element.prototype, 'scrollHeight', 'get').mockReturnValue(5000)
+      measureBox(200, 300)
+      const target = (await layoutGraph(nodes, edges, new Set(), estimateTextWidth, { portrait: true })).nodes.find(
+        (laid) => laid.node.id === 'c',
+      )
+      vi.mocked(layoutGraph).mockClear()
+
+      render(canvas({ centerNodeId: 'c' }))
+      await screen.findByRole('button', { name: 'Alpha, select to open' })
+
+      expect(region().scrollLeft).toBe(0)
+      expect(region().scrollTop).toBe((target?.y ?? 0) + (target?.height ?? 0) / 2 - 150)
+    })
+  })
+})

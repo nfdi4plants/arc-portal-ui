@@ -40,27 +40,66 @@
 }
 
 .header {
+  --header-padding: 14px;
+  --header-gap: 14px;
+
+  position: relative;
   display: flex;
   flex: none;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 6px 14px;
-  padding: 10px 14px;
+  column-gap: var(--header-gap);
+  padding: 10px var(--header-padding);
   border-bottom: 1px solid var(--borderColor-default, #d1d9e0);
   background: var(--bgColor-muted, #f6f8fa);
 }
 
+.nav {
+  min-width: 0;
+}
+
+/*
+ * The ruler is the invisible full content of the header, measured to decide between the two
+ * layouts. The box has the width of the header content area and no height. The ruler inside it
+ * has its natural width and takes its text from data-text.
+ */
+.rulerBox {
+  position: absolute;
+  top: 0;
+  right: var(--header-padding);
+  left: var(--header-padding);
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.ruler {
+  display: flex;
+  align-items: center;
+  gap: var(--header-gap);
+  width: max-content;
+  white-space: nowrap;
+}
+
+.ruler [data-text]::before {
+  content: attr(data-text);
+}
+
+/*
+ * The header is one line in both layouts. Its height never depends on the width, so the canvas
+ * below does not change size while the explorer decides between the layouts.
+ */
 .crumbs {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 4px 7px;
+  column-gap: 7px;
   min-width: 0;
   margin: 0;
   padding: 0;
   list-style: none;
   font-size: var(--text-body-size-medium, 0.875rem);
+  white-space: nowrap;
 }
 
 .crumb {
@@ -69,7 +108,19 @@
   gap: 7px;
 }
 
+/* In the narrow header the last crumb gives way when the line is still too long. */
+.crumbShrinking {
+  min-width: 0;
+}
+
+.crumbShrinking .crumbCurrent {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .separator {
+  flex: none;
   color: var(--fgColor-muted, #59636e);
 }
 
@@ -92,6 +143,10 @@
   outline-offset: 2px;
 }
 
+.crumbMore {
+  padding: 2px 4px;
+}
+
 .crumbCurrent {
   padding: 2px 0;
   font-weight: 600;
@@ -101,6 +156,7 @@
   color: var(--fgColor-muted, #59636e);
   font-family: var(--fontStack-monospace, ui-monospace, monospace);
   font-size: 12px;
+  white-space: nowrap;
 }
 
 .body {

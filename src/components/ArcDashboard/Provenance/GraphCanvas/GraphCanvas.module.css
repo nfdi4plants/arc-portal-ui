@@ -9,6 +9,8 @@
   width: 100%;
   height: 100%;
   overflow: auto;
+  /* A scrollbar that appears must not narrow the box, because the width of the box shapes the layout. */
+  scrollbar-gutter: stable;
   color: var(--fgColor-default, #1f2328);
 }
 
@@ -24,11 +26,20 @@
 }
 
 /* margin: auto centers a small graph and lets a large one start at the top left and scroll. */
+.canvas {
+  position: relative;
+  flex: none;
+  margin: auto;
+}
+
+/* The compact layout starts at the left edge of the box, and a small graph is still centered vertically. */
+.canvasCompact {
+  margin: auto auto auto 0;
+}
+
 .svg {
   display: block;
-  flex: none;
   max-width: none;
-  margin: auto;
 }
 
 .study {
@@ -193,4 +204,50 @@
 
 .toggle:hover .pillBox {
   stroke: var(--fgColor-muted, #59636e);
+}
+
+.menu {
+  position: absolute;
+  z-index: 1;
+  box-sizing: border-box;
+  width: max-content;
+  overflow: auto;
+  padding: 4px 0;
+  border: 1px solid var(--borderColor-default, #d1d9e0);
+  border-radius: 6px;
+  background: var(--overlay-bgColor, var(--bgColor-default, #ffffff));
+  box-shadow: var(--shadow-floating-small, 0 4px 12px rgba(31, 35, 40, 0.2));
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.menu:focus {
+  outline: none;
+}
+
+.menuList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.menuList:focus-visible {
+  outline: 2px solid var(--borderColor-accent-emphasis, #0969da);
+  outline-offset: -2px;
+}
+
+.menuItem {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 10px;
+  overflow-wrap: anywhere;
+}
+
+.menuDot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--pill-color, var(--borderColor-default, #d1d9e0));
 }

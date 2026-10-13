@@ -1,7 +1,7 @@
 import { ARC } from '@nfdi4plants/arctrl'
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   ProvenanceDataset,
   ProvenanceIndex,
@@ -303,5 +303,155 @@ describe('ProvenanceExplorer', () => {
 
     expect(await screen.findByText('Showing 80 of 100 nodes.')).toBeInTheDocument()
     expect(await nodeLabels()).toHaveLength(80)
+  })
+})
+
+// jsdom has no layout, so this stub reports the widths a test sets. The explorer observes two
+// elements: a box with the width of the header content area and, inside it, the invisible full
+// content of the header.
+class StubResizeObserver {
+  static all: StubResizeObserver[] = []
+  targets: Element[] = []
+  callback: ResizeObserverCallback
+  constructor(callback: ResizeObserverCallback) {
+    this.callback = callback
+    StubResizeObserver.all.push(this)
+  }
+  observe(target: Element) {
+    this.targets.push(target)
+  }
+  unobserve() {}
+  disconnect() {
+    this.targets = []
+  }
+}
+
+// Reports the width of the header content area and the natural width of its full content.
+function setHeaderWidths(available: number, natural: number) {
+  const explorer = screen.getByRole('region', { name: 'Provenance explorer' })
+  const observer = StubResizeObserver.all.find(
+    ({ targets: [box, full] }) => box && full && explorer.contains(box) && box.contains(full),
+  )
+  if (!observer) throw new Error('The explorer observes no header box.')
+  const [box, full] = observer.targets
+  const entries = [
+    { target: box, contentRect: { width: available } },
+    { target: full, contentRect: { width: natural } },
+  ] as ResizeObserverEntry[]
+  act(() => observer.callback(entries, observer as unknown as ResizeObserver))
+}
+
+const queryName = (name: string) => screen.queryByText(name)
+const moreButton = () => screen.queryByRole('button', { name: /^Show \d+ more levels?$/ })
+
+describe('ProvenanceExplorer header', () => {
+  beforeEach(() => {
+    StubResizeObserver.all = []
+    vi.stubGlobal('ResizeObserver', StubResizeObserver)
+    // The header applies a measurement in the next animation frame, which the tests run at once.
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      callback(0)
+      return 0
+    })
+  })
+
+  async function openLineage() {
+    const user = await openGroupsOfGasChromatography()
+    await clickNode(user, 'Inputs A')
+    await clickNode(user, 'Std. Mix 5µM')
+    return user
+  }
+
+  it('shows all crumbs and the query name when the full header fits', async () => {
+    await openLineage()
+
+    setHeaderWidths(900, 640)
+
+    expect(crumbTexts()).toEqual(['Datasets', 'GCqTOF_targets', 'gas_chromatography', 'Inputs A', 'Std. Mix 5µM'])
+    expect(queryName('lineage(index, nodeId)')).toBeInTheDocument()
+    expect(moreButton()).not.toBeInTheDocument()
+    expect(crumbs().getByText('Std. Mix 5µM')).not.toHaveAttribute('title')
+  })
+
+  it('keeps the full header when it fits to the pixel and switches when it is a fraction wider', async () => {
+    await openLineage()
+
+    setHeaderWidths(640.4, 640)
+    expect(queryName('lineage(index, nodeId)')).toBeInTheDocument()
+
+    setHeaderWidths(640, 640.2)
+    expect(queryName('lineage(index, nodeId)')).not.toBeInTheDocument()
+  })
+
+  it('shows the first crumb, a menu button and the last two crumbs when the full header does not fit', async () => {
+    await openLineage()
+
+    setHeaderWidths(330, 640)
+
+    expect(crumbTexts()).toEqual(['Datasets', '…', 'Inputs A', 'Std. Mix 5µM'])
+    expect(queryName('lineage(index, nodeId)')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Show 2 more levels' })).toBeInTheDocument()
+    expect(crumbs().getByText('Std. Mix 5µM')).toHaveAttribute('aria-current', 'page')
+    expect(crumbs().getByText('Std. Mix 5µM')).toHaveAttribute('title', 'Std. Mix 5µM')
+  })
+
+  it('lists the hidden crumbs in the menu and navigates to the chosen one', async () => {
+    const user = await openLineage()
+    setHeaderWidths(330, 640)
+
+    await user.click(screen.getByRole('button', { name: 'Show 2 more levels' }))
+
+    expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual(['GCqTOF_targets', 'gas_chromatography'])
+
+    await user.click(screen.getByRole('menuitem', { name: 'gas_chromatography' }))
+
+    expect(crumbTexts()).toEqual(['Datasets', 'GCqTOF_targets', 'gas_chromatography'])
+    expect(await nodeLabels()).toHaveLength(6)
+    expect(screen.getByRole('region', { name: /^Input groups and output groups/ })).toHaveFocus()
+  })
+
+  it('brings the full header back when the box grows', async () => {
+    await openLineage()
+    setHeaderWidths(330, 640)
+
+    setHeaderWidths(900, 640)
+
+    expect(crumbTexts()).toHaveLength(5)
+    expect(queryName('lineage(index, nodeId)')).toBeInTheDocument()
+    expect(moreButton()).not.toBeInTheDocument()
+  })
+
+  it('brings the full header back when the path gets shorter', async () => {
+    const user = await openLineage()
+    setHeaderWidths(330, 640)
+    await user.click(screen.getByRole('button', { name: 'Show 2 more levels' }))
+    await user.click(screen.getByRole('menuitem', { name: 'GCqTOF_targets' }))
+    expect(queryName('processGraph(index, datasetId)')).not.toBeInTheDocument()
+
+    setHeaderWidths(330, 250)
+
+    expect(crumbTexts()).toEqual(['Datasets', 'GCqTOF_targets'])
+    expect(queryName('processGraph(index, datasetId)')).toBeInTheDocument()
+  })
+
+  it('collapses nothing with three crumbs and still hides the query name', async () => {
+    await openGroupsOfGasChromatography()
+
+    setHeaderWidths(200, 480)
+
+    expect(crumbTexts()).toEqual(['Datasets', 'GCqTOF_targets', 'gas_chromatography'])
+    expect(moreButton()).not.toBeInTheDocument()
+    expect(queryName('processGroups(index, processKey)')).not.toBeInTheDocument()
+    expect(crumbs().getByText('gas_chromatography')).toHaveAttribute('title', 'gas_chromatography')
+  })
+
+  it('collapses the one crumb in the middle of four', async () => {
+    const user = await openGroupsOfGasChromatography()
+    await clickNode(user, 'Inputs A')
+
+    setHeaderWidths(300, 560)
+
+    expect(crumbTexts()).toEqual(['Datasets', '…', 'gas_chromatography', 'Inputs A'])
+    expect(screen.getByRole('button', { name: 'Show 1 more level' })).toBeInTheDocument()
   })
 })

@@ -1,6 +1,7 @@
 import { ARC } from '@nfdi4plants/arctrl'
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { userEvent, within } from 'storybook/test'
+import { INITIAL_VIEWPORTS } from 'storybook/viewport'
 import crateJson from '../../../../../public/sample-arcs/facultative-cam-in-talinum/ro-crate-metadata.json?raw'
 import { buildProvenanceIndex } from '../../../../arc/provenance/buildIndex'
 import { ProvenanceExplorer } from './ProvenanceExplorer'
@@ -100,6 +101,32 @@ export const Lineage: Story = {
 export const SmallBox: Story = {
   args: { width: 480, height: 320 },
   play: Detail.play,
+}
+
+// The box fills the preview, so the device chosen in the viewport toolbar sets the size of the explorer.
+function ViewportBox() {
+  return (
+    <div style={{ boxSizing: 'border-box', width: '100vw', height: '100vh', padding: 8 }}>
+      <ProvenanceExplorer index={sampleIndex} />
+    </div>
+  )
+}
+
+export const Viewport: Story = {
+  render: () => <ViewportBox />,
+  parameters: {
+    viewport: { options: INITIAL_VIEWPORTS },
+    docs: {
+      description: {
+        story:
+          'Opens the groups of gas_chromatography, whose edges carry "+N" pills. Pick a device in the viewport toolbar, or rotate it, to try the behaviors: in a wide box "+N" wraps the hidden pills below the edge, in a narrow box it opens a list, and in a box taller than wide the graph flows top to bottom with one chip per edge. The header collapses its middle crumbs when the path does not fit.',
+      },
+    },
+  },
+  play: async ({ canvasElement }) => {
+    await toGroups(canvasElement)
+    await layoutDone(canvasElement, /Input groups and output groups/)
+  },
 }
 
 export const Expanded: Story = {
