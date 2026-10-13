@@ -35,6 +35,7 @@ async function renderDetails(props: Omit<DashboardProps, 'arcJson'> = { reposito
   const store = createArcStore(sampleCrateSource())
   await store.load()
   renderWithTheme(<ArcProvider store={store}><Dashboard {...props} arcJson={crateJson} /></ArcProvider>)
+  await screen.findByText('ARC contents preview', {}, { timeout: 5000 })
   return userEvent.setup()
 }
 

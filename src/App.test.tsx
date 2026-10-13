@@ -29,7 +29,7 @@ it('lists the public ARCs of every configured DataHUB in the dashboard table', a
   const hosts = new Set(fetchCall.mock.calls
     .filter(call => new URL(String(call[0])).pathname === '/api/v4/projects')
     .map(call => new URL(String(call[0])).host))
-  expect(hosts).toEqual(new Set(['git.nfdi4plants.org', 'gitlab.plantmicrobe.de', 'datahub.rz.rptu.de']))
+  expect(hosts).toEqual(new Set(['git.nfdi4plants.org', 'gitlab.plantmicrobe.de']))
 })
 
 it('opens an ARC using its project id and the URL of its source DataHUB', async () => {

@@ -1,18 +1,56 @@
 import { Banner, Spinner, Stack, Text } from '@primer/react'
+import { lazy, Suspense, type ReactNode } from 'react'
 import { useArcSelector, useArcStatus } from '../../../arc/hooks'
+import { buildProvenanceIndex } from '../../../arc/provenance/buildIndex'
+import type { ProvenanceIndex } from '../../../arc/provenance/types'
 import { Dashlet, DashboardWindow } from '../../DashboardWindow'
 import { ArcDetails, type ArcDetailsProps } from '../ArcDetails'
 import { InvestigationDetails } from '../Investigation/InvestigationDetails'
-import ArcViewer from '../ArcViewer/ArcViewer'
+import { ProvenanceExplorer } from '../Provenance/ProvenanceExplorer'
 import { selectInvestigationMetadata } from '../Investigation/selectInvestigationMetadata'
+import type { InvestigationMetadata } from '../Investigation/types'
 import '../Investigation/investigation.css'
 import './dashboard.css'
 
+// The provenance index holds Maps, so it is compared by identity. The comparator lives here and
+// not inline, because a new comparator on every render would build the index again each time.
+const sameIndex = (a: unknown, b: unknown) => a === b
+const ArcViewer = lazy(() => import('../ArcViewer/ArcViewer'))
+
 export type DashboardProps = Omit<ArcDetailsProps, 'metadata'> & { arcJson: string }
+
+export function DashboardContent({ metadata, provenance, actions, ...props }: DashboardProps & {
+  metadata: InvestigationMetadata
+  provenance?: ProvenanceIndex
+  actions?: ReactNode
+}) {
+  return (
+    <main className="arc-dashboard-layout">
+      {actions && <div className="arc-dashboard-actions">{actions}</div>}
+      <ArcDetails {...props} metadata={metadata} />
+      <Dashlet label="Investigation details">
+        <InvestigationDetails metadata={metadata} />
+      </Dashlet>
+      <Dashlet label="ArcWebView">
+        <Suspense fallback={<Text as="p" role="status">Loading ARC viewer…</Text>}>
+          <ArcViewer jsonString={props.arcJson} embedded />
+        </Suspense>
+      </Dashlet>
+      {provenance && (
+        <Dashlet label="Provenance">
+          <div className="provenance-dashlet">
+            <ProvenanceExplorer index={provenance} />
+          </div>
+        </Dashlet>
+      )}
+    </main>
+  )
+}
 
 export function Dashboard(props: DashboardProps) {
   const status = useArcStatus()
   const metadata = useArcSelector(selectInvestigationMetadata)
+  const provenance = useArcSelector(buildProvenanceIndex, sameIndex)
 
   return (
     <DashboardWindow label="ARC-Dashboard" fillHeight>
@@ -30,15 +68,7 @@ export function Dashboard(props: DashboardProps) {
           <Text as="span">Loading ARC…</Text>
         </Stack>
       ) : (
-        <main className="arc-dashboard-layout">
-          <ArcDetails {...props} metadata={metadata} />
-          <Dashlet label="Investigation details">
-            <InvestigationDetails metadata={metadata} />
-          </Dashlet>
-          <Dashlet label="ArcWebView">
-            <ArcViewer jsonString={props.arcJson} embedded />
-          </Dashlet>
-        </main>
+        <DashboardContent {...props} metadata={metadata} provenance={provenance} />
       )}
     </DashboardWindow>
   )

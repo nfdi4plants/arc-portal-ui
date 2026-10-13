@@ -99,6 +99,7 @@ ArcRegistry: one ArcStore per ArcKey (multi-ARC views)
 | `ArcProvider.tsx` | `<ArcProvider>`, `<ArcRegistryProvider>` |
 | `hooks.ts` | `useROCrate`, `State<T>`, `useArcStore`, `useArcRegistry`, `useArcStatus`, `useArcSelector`, `useStoreSelector`, `useArcKeys` |
 | `selectors/*.ts` | Pure selectors, named hooks and view-model types |
+| `provenance/` | `types.ts`, `buildIndex.ts`, `queries.ts` |
 
 ### Setup options
 
@@ -297,6 +298,42 @@ export const App = () => (
 - `add(source)` returns the existing store if the key is already registered. `remove(key)` disposes the store.
 - `ArcKey` says where an ARC comes from (e.g. `git.nfdi4plants.org/group/project@main`), not its investigation identifier, which can repeat across GitLab instances.
 - Without a provider per ARC, pass the store explicitly: `useStoreSelector(store, selectInvestigationSummary)`.
+
+### Provenance graph
+
+The provenance graph shows how the inputs and outputs of an ARC connect across its datasets and processes. The component that holds the ARC builds the index once with `buildProvenanceIndex(arc)` and passes it down. Components below it run the query functions on that index.
+
+```tsx
+import type { ARC } from '@nfdi4plants/arctrl'
+import { useMemo } from 'react'
+import { buildProvenanceIndex } from '../../arc/provenance/buildIndex'
+import { ProvenanceExplorer } from './Provenance/ProvenanceExplorer'
+
+function LoadedArc({ arc }: { arc: ARC }) {
+  const index = useMemo(() => buildProvenanceIndex(arc), [arc])
+
+  return <ProvenanceExplorer index={index} />
+}
+```
+
+The explorer fills its parent box, so that box needs a height, and the graph scrolls inside the explorer. Keep the index identity stable while the ARC stays the same, as `useMemo` does above. The explorer treats a new index as another ARC and goes back to the datasets.
+
+Each query function in `provenance/queries.ts` is one detail level, from all datasets down to the lineage of a single input or output.
+
+- `datasetGraph(index)` returns the datasets, linked by shared inputs and outputs.
+- `processGraph(index, datasetId)` returns the processes of one dataset plus the processes connected to them.
+- `processGroups(index, processKey)` returns the input and output groups of one process.
+- `processDetail(index, groupId)` returns the single inputs and outputs of one group.
+- `lineage(index, nodeId)` returns everything upstream and downstream of one input or output.
+
+The four functions with an id return `undefined` for an id the index does not have. None of them changes the index, so a component can call them in `useMemo` whenever the user selects something else.
+
+`buildProvenanceIndex` builds the index by these rules.
+
+- Inputs and outputs connect across the ARC by name, and a leading `./` is removed from each name first.
+- One row of an annotation table is one row of the index.
+- A process is one annotation table of a dataset.
+- Rows with identical annotations form a signature. Inputs or outputs that appear in the same set of signatures form a group.
 
 ### Gotchas
 
