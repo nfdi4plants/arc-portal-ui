@@ -212,3 +212,72 @@ it('destroys the game when the dashlet unmounts', async () => {
 
   expect(handle.destroy).toHaveBeenCalledTimes(1)
 })
+
+async function startRun(strictMode = false) {
+  const user = userEvent.setup()
+  const view = renderWithTheme(<ArcGameDashlet index={index} arcTitle="Talinum" />, strictMode)
+  await user.click(await screen.findByRole('button', { name: 'Start run' }))
+  await screen.findByRole('button', { name: 'Click to play' })
+  return view
+}
+
+// The death and victory screens live in Phaser, so the game reports the choice through its listener.
+function requestMenu(choice: 'retry' | 'newPath' | 'menu') {
+  const listener = vi.mocked(handle.on).mock.calls.at(-1)?.[0]
+  if (!listener) throw new Error('The dashlet registered no game listener')
+  act(() => listener({ type: 'menuRequested', choice }))
+}
+
+const startCommands = () => vi.mocked(handle.send).mock.calls.filter(([command]) => command.type === 'start')
+
+it('starts the same plan again on Retry without recreating the game', async () => {
+  await startRun()
+  expect(startCommands()).toHaveLength(1)
+
+  requestMenu('retry')
+
+  expect(startCommands()).toHaveLength(2)
+  expect(startCommands().at(-1)?.[0]).toEqual({ type: 'start', plan })
+  expect(handle.destroy).not.toHaveBeenCalled()
+  expect(createGame).toHaveBeenCalledTimes(1)
+})
+
+it('destroys the game and plans another path on New path', async () => {
+  await startRun()
+
+  requestMenu('newPath')
+
+  expect(await screen.findByRole('button', { name: 'Start run' })).toBeInTheDocument()
+  expect(handle.destroy).toHaveBeenCalledTimes(1)
+  const seeds = vi.mocked(planRun).mock.calls.map(([, , seed]) => seed)
+  expect(seeds.at(-1)).not.toBe(seeds[0])
+})
+
+it('destroys the game and shows the start screen on Menu', async () => {
+  await startRun()
+
+  requestMenu('menu')
+
+  expect(await screen.findByRole('button', { name: 'Start run' })).toBeInTheDocument()
+  expect(handle.destroy).toHaveBeenCalledTimes(1)
+})
+
+it('keeps exactly one live game under StrictMode', async () => {
+  const handles: GameHandle[] = []
+  vi.mocked(createGame).mockImplementation(() => {
+    const created = { ...handle, destroy: vi.fn() }
+    handles.push(created)
+    return created
+  })
+
+  const { unmount } = await startRun(true)
+
+  expect(handles.length).toBeGreaterThan(0)
+  const live = handles.at(-1)!
+  for (const stale of handles.slice(0, -1)) expect(stale.destroy).toHaveBeenCalledTimes(1)
+  expect(live.destroy).not.toHaveBeenCalled()
+
+  unmount()
+
+  expect(live.destroy).toHaveBeenCalledTimes(1)
+})

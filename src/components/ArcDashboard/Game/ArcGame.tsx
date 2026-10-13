@@ -93,6 +93,10 @@ function withSlot(list: Binding[], slot: number, binding: Binding): Binding[] {
   return next
 }
 
+function withoutSlot(list: Binding[], slot: number): Binding[] {
+  return list.filter((_, position) => position !== slot)
+}
+
 // The game fills the box of the dashlet. The start screen, the settings and the running game are
 // three modes of this one component, and the game itself lives in a Phaser canvas inside it.
 export default function ArcGame({ index, arcTitle }: { index: ProvenanceIndex; arcTitle: string }) {
@@ -222,9 +226,10 @@ export default function ArcGame({ index, arcTitle }: { index: ProvenanceIndex; a
     handleRef.current?.send({ type: 'setBindings', bindings: next })
   }, [])
 
-  // Waits for the next key or mouse button and binds it. Escape cancels. The capture ends only
-  // after the release, so the click or the Space release that follows does not press the slot
-  // button again.
+  // Waits for the next key or mouse button and binds it. Escape cancels, Delete and Backspace clear
+  // the slot. A mouse press on a button other than the capturing slot cancels the capture and the
+  // click goes through. The capture ends only after the release, so the click or the Space release
+  // that follows does not press the slot button again.
   useEffect(() => {
     if (!capture) return
     const { action, slot } = capture
@@ -234,15 +239,26 @@ export default function ArcGame({ index, arcTitle }: { index: ProvenanceIndex; a
       const current = bindingsRef.current
       updateBindings({ ...current, [action]: withSlot(current[action], slot, binding) })
     }
+    const clear = () => {
+      assigned = true
+      const current = bindingsRef.current
+      if (current[action][slot]) updateBindings({ ...current, [action]: withoutSlot(current[action], slot) })
+    }
     const onKeyDown = (event: KeyboardEvent) => {
       event.preventDefault()
       event.stopPropagation()
       if (assigned || event.repeat) return
       if (event.code === 'Escape') setCapture(null)
+      else if (event.code === 'Delete' || event.code === 'Backspace') clear()
       else assign({ device: 'key', code: event.code })
     }
     const onMouseDown = (event: MouseEvent) => {
       if (assigned || event.button > 2) return
+      const button = event.target instanceof Element ? event.target.closest('button') : null
+      if (button && !button.hasAttribute('data-capturing')) {
+        setCapture(null)
+        return
+      }
       event.preventDefault()
       event.stopPropagation()
       assign({ device: 'mouse', button: event.button as 0 | 1 | 2 })
@@ -312,7 +328,7 @@ export default function ArcGame({ index, arcTitle }: { index: ProvenanceIndex; a
           </Stack>
           <Text as="p" role="status" className={styles.hint}>
             {capture
-              ? `Press a key or a mouse button for ${ACTION_NAMES[capture.action]}. Escape cancels.`
+              ? `Press a key or a mouse button for ${ACTION_NAMES[capture.action]}. Delete or Backspace clears the binding and Escape cancels.`
               : 'Click a binding, then press a key or a mouse button. Each action takes up to two.'}
           </Text>
           <ul className={styles.bindings} aria-label="Controls">
@@ -332,6 +348,7 @@ export default function ArcGame({ index, arcTitle }: { index: ProvenanceIndex; a
                           size="small"
                           className={styles.slot}
                           aria-label={`${ACTION_NAMES[action]} binding ${slot + 1}: ${text}`}
+                          data-capturing={capturing ? '' : undefined}
                           onClick={() => {
                             if (!capture) setCapture({ action, slot })
                           }}
