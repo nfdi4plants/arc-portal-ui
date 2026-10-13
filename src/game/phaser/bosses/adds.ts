@@ -83,10 +83,11 @@ export function createAdds(deps: AddsDeps): Adds {
       isInvulnerable: () => false,
       isDead: () => slot.hp <= 0,
       receiveHit(hit: HitEvent) {
-        if (slot.hp <= 0) return
+        if (slot.hp <= 0) return 0
         slot.hp -= hit.damage
         slot.flashMs = FLASH_MS
         if (slot.hp <= 0) slot.dyingMs = DYING_MS
+        return hit.damage
       },
     }
     return slot
@@ -157,7 +158,12 @@ export function createAdds(deps: AddsDeps): Adds {
       }
     },
     clear() {
-      for (const slot of slots) if (slot.alive) free(slot)
+      for (const slot of slots) {
+        if (!slot.alive) continue
+        // A contact hitbox follows its owner, so it would keep hurting after the add is gone.
+        combat.cancelOwnedBy(slot)
+        free(slot)
+      }
     },
     destroy() {
       for (const slot of slots) {

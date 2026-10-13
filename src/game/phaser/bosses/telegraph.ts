@@ -41,11 +41,6 @@ const ORIGIN: Record<FillMode, readonly [number, number]> = {
 const WARN = { base: 0.28, fill: 0.6 }
 const LIVE = { base: 0.55, fill: 0.9 }
 const SAFE_ALPHA = 0.6
-// Zone textures come in steps of this many world units (coarser for long zones), so the art draws
-// few distinct sizes. The image is then stretched by up to half a step.
-const SIZE_STEP = 8
-const LONG_SIZE_STEP = 32
-const LONG_ZONE = 128
 const MIN_PROGRESS = 0.001
 
 interface Slot extends Zone {
@@ -62,10 +57,6 @@ export interface TelegraphPool {
   destroy(): void
 }
 
-function quantize(size: number): number {
-  const step = size > LONG_ZONE ? LONG_SIZE_STEP : SIZE_STEP
-  return Math.max(SIZE_STEP, Math.round(size / step) * step)
-}
 
 // Danger zones and safe spots share a pool of image pairs: a dim image of the whole zone and a
 // bright copy on top that grows over the telegraph time.
@@ -127,7 +118,8 @@ export function createTelegraphPool(scene: Phaser.Scene, art: ScribbleArt): Tele
   return {
     show(spec) {
       const slot = free.pop() ?? create()
-      const texture = art.telegraph(scene, spec.shape, quantize(spec.w), quantize(spec.h))
+      // The art snaps the size to a few cached textures. The images are stretched to the zone below.
+      const texture = art.telegraph(scene, spec.shape, spec.w, spec.h)
       const [ox, oy] = ORIGIN[spec.fill]
       const depth = spec.safe ? DEPTH.telegraphs + 1 : DEPTH.telegraphs
       slot.used = true

@@ -1,6 +1,7 @@
 import type Phaser from 'phaser'
 import type { ProjectileArt, ScribbleArt } from '../../contracts/art'
 import type { Combatant, CombatWorld, HitShape } from '../../contracts/combat'
+import { STEP_MS } from '../../contracts/constants'
 import type { BossArchetype, BossAttackKind, BossAttackSpec } from '../../contracts/content'
 import type { PlayerHandle } from '../../contracts/player'
 import type { Rng } from '../../contracts/rng'
@@ -44,7 +45,8 @@ interface Wave {
   fired: boolean
 }
 
-// The running attack. One object per boss, reset for each attack, so a step allocates nothing.
+// The running attack. One object per boss, reset for each attack. Spawning a hitbox or a shot
+// still allocates its spec.
 export interface AttackRun {
   spec: BossAttackSpec
   phase: AttackPhase
@@ -552,6 +554,10 @@ const summon: AttackKind = {
 // spot lies, the wave is cut in pieces so the spot stays empty.
 const WAVE_SPEED = 250
 const WAVE_BAND = 18
+const WAVE_WIDTH = 14
+// The wave is WAVE_WIDTH wide around its path and moves a step at a time, so its path has to stop
+// this far from a safe spot to leave the whole spot untouched.
+const WAVE_MARGIN = WAVE_WIDTH / 2 + (WAVE_SPEED * STEP_MS) / 1000
 
 const shockwave: AttackKind = {
   begin(run, env) {
@@ -571,7 +577,7 @@ const shockwave: AttackKind = {
     for (const dir of [-1, 1] as const) {
       const edge = body.x + dir * (body.hurtW / 2)
       const far = dir === 1 ? arena.right : arena.left
-      for (const part of openIntervals(Math.min(edge, far), Math.max(edge, far), run.safe)) {
+      for (const part of openIntervals(Math.min(edge, far), Math.max(edge, far), run.safe, WAVE_MARGIN)) {
         const start = dir === 1 ? part.from : part.to
         const stop = dir === 1 ? part.to : part.from
         const at = (Math.abs(start - edge) / WAVE_SPEED) * 1000
@@ -596,7 +602,7 @@ const shockwave: AttackKind = {
         gravity: 0,
         lifetimeMs: wave.lifeMs,
         radius: 0,
-        rect: { w: 14, h: WAVE_BAND },
+        rect: { w: WAVE_WIDTH, h: WAVE_BAND },
         knock: { x: 90, y: -230 },
         reflectable: false,
       })

@@ -1,6 +1,7 @@
 import type { Annotation } from '../../../arc/provenance/types'
 import type { HitShape } from '../../contracts/combat'
 import type { Rng } from '../../contracts/rng'
+import { JUMP_VELOCITY, MOTOR } from '../../model/input/motor'
 
 // Plain-data helpers for boss attacks. Nothing here imports Phaser.
 
@@ -70,15 +71,18 @@ export function safeIntervals(rng: Rng, left: number, right: number, count: numb
   return spots
 }
 
-// The parts of [from, to] that no safe spot covers. `safe` is sorted and does not overlap.
-export function openIntervals(from: number, to: number, safe: readonly Interval[]): Interval[] {
+// The parts of [from, to] that no safe spot covers, with every spot widened by `margin` on both
+// sides. `safe` is sorted and does not overlap.
+export function openIntervals(from: number, to: number, safe: readonly Interval[], margin = 0): Interval[] {
   const open: Interval[] = []
   let cursor = from
   for (const spot of safe) {
-    if (spot.to <= cursor) continue
-    if (spot.from >= to) break
-    if (spot.from > cursor) open.push({ from: cursor, to: spot.from })
-    cursor = Math.max(cursor, spot.to)
+    const spotFrom = spot.from - margin
+    const spotTo = spot.to + margin
+    if (spotTo <= cursor) continue
+    if (spotFrom >= to) break
+    if (spotFrom > cursor) open.push({ from: cursor, to: spotFrom })
+    cursor = Math.max(cursor, spotTo)
   }
   if (cursor < to) open.push({ from: cursor, to })
   return open
@@ -92,6 +96,14 @@ export function insideAny(x: number, spots: readonly Interval[], margin: number)
 // How far the player's body can be from a weak point and still count as hitting it.
 export const WEAK_REACH = 64
 export const WEAK_MARGIN_Y = 16
+
+const JUMP_APEX = JUMP_VELOCITY ** 2 / (2 * MOTOR.gravity)
+
+// The highest a weak point of this size can sit above the floor and still match a hit from a
+// player at the top of a jump.
+export function highestWeakPoint(size: number): number {
+  return JUMP_APEX + size / 2 + WEAK_MARGIN_Y
+}
 
 // A weak point takes the double damage when the hitter stands within melee reach of the boss, at the
 // height of the glowing spot. A rear spot only counts from behind the boss. The combat world does not

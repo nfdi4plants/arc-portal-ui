@@ -45,7 +45,7 @@ export const BOSS_ATTACKS: Record<BossArchetype, AttackTemplate[]> = {
   ],
 }
 
-// Every final boss phase ends with the crate falling apart.
+// Every final boss phase adds this attack to the three it draws from its archetype table.
 export const SHARED_HEAVY_ATTACK: AttackTemplate = {
   name: 'Crate Collapse',
   kind: 'rain',

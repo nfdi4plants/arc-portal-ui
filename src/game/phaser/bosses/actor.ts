@@ -4,6 +4,7 @@ import type { PartRef, ProjectileArt, SpriteRef } from '../../contracts/art'
 import type { Combatant, HitEvent, KillerInfo } from '../../contracts/combat'
 import type { BossArchetype, BossAttackSpec } from '../../contracts/content'
 import { DEPTH, PALETTE } from '../../contracts/constants'
+import { cssColor } from '../color'
 import { createAdds } from './adds'
 import { ATTACK_KINDS, createRun, resetRun } from './attacks'
 import type { AttackEnv, BossBody } from './attacks'
@@ -11,7 +12,7 @@ import type { Arena, BossDeps, BossHandle } from './index'
 import { createScheduler, OPENING_DELAY_MS, windupMs } from './scheduler'
 import { applyRef, setOriginOf, stillTexture } from './sprites'
 import { createTelegraphPool, createTextPool } from './telegraph'
-import { clamp, formatTell, hitsWeakPoint } from './zones'
+import { clamp, formatTell, highestWeakPoint, hitsWeakPoint } from './zones'
 
 // What a boss looks like to the actor in one phase. A node boss has one phase, the final boss one
 // per segment.
@@ -33,7 +34,7 @@ export interface ActorConfig {
   hp: number
   phases: readonly PhaseConfig[]
   killerFor(phase: number): KillerInfo
-  // False keeps the art unmirrored when the boss faces left (the final boss has its title written on it).
+  // False keeps the body and its limbs as drawn when the boss faces left (the final boss has its title written on it).
   mirror?: boolean
   deps: BossDeps
   arena: Arena
@@ -62,9 +63,13 @@ const HOVER = 22
 const HOP_MS = 520
 const HOP_HEIGHT = 36
 const EPSILON = 1e-6
+// scenes/arena.ts builds the arena this many camera views wide.
+const ARENA_VIEWS = 1.6
+// How far the boss may start from the player, in views. A little under one leaves the body on screen.
+const START_REACH = 0.75
 
-const CREAM = `#${PALETTE.cream.toString(16).padStart(6, '0')}`
-const OUTLINE = `#${PALETTE.outline.toString(16).padStart(6, '0')}`
+const CREAM = cssColor(PALETTE.cream)
+const OUTLINE = cssColor(PALETTE.outline)
 
 interface Limb {
   sprite: Phaser.GameObjects.Sprite
@@ -118,8 +123,12 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
   const move = { hopping: false, hopMs: 0, fromX: 0, toX: 0, waitMs: 700, blinkInMs: 2500 }
 
   const first = phases[0]
+  // The camera starts at the left wall with the player, so a boss further right than the first view
+  // would be off screen when the fight begins.
+  const viewReachX = player.position().x + ((arena.right - arena.left) / ARENA_VIEWS) * START_REACH - hurtW / 2
+  const startX = first.archetype === 'rootTreant' ? homeX : homeX + (arena.right - arena.left) * 0.22
   const body: BossBody = {
-    x: first.archetype === 'rootTreant' ? homeX : clamp(homeX + (arena.right - arena.left) * 0.22, minX, maxX),
+    x: clamp(startX, minX, Math.max(minX, Math.min(maxX, viewReachX))),
     lift: hoverOf(first.archetype),
     facing: -1,
     alpha: 1,
@@ -247,7 +256,9 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
     tellMs = 0
   }
 
-  // Stops the attack that is running. Shots already in the air keep flying unless asked.
+  // Stops the attack that is running. With clearShots it also cancels that attack's own shots.
+  // Shots of earlier attacks keep flying, and a phase change or the defeat cancels them through
+  // the combat world.
   function interrupt(clearShots: boolean) {
     if (run.phase === 'none') return
     releaseZones()
@@ -381,12 +392,12 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
     const bottom = floorY - body.lift
     weakSpot.rear = index === 2
     if (index === 0) {
-      // Where the art puts its marker, on the chest.
+      // Where the art puts its marker.
       const part = art.parts.weakPoint
       weakSpot.x = part ? body.x + body.facing * part.rest.x : body.x
       weakSpot.y = part ? bottom + part.rest.y - part.height / 2 : bottom - height * 0.5
     } else if (index === 1) {
-      // The head. The mage has to jump to reach it.
+      // The head. A mage on the ground cannot reach it, a jump does.
       weakSpot.x = body.x
       weakSpot.y = bottom - height * 0.88
     } else {
@@ -394,6 +405,8 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
       weakSpot.x = body.x - body.facing * hurtW * 0.4
       weakSpot.y = bottom - height * 0.3
     }
+    // A tall boss or a hovering one would put the head above what a jump reaches.
+    weakSpot.y = Math.max(weakSpot.y, floorY - highestWeakPoint(WEAK_SIZE))
   }
 
   function isWeakHit(attacker: Combatant): boolean {
@@ -434,6 +447,7 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
     staggerMs = 0
     hitCount = 0
     interrupt(true)
+    combat.cancelOwnedBy(self)
     adds.clear()
     releaseTell()
     const next = cfg()
@@ -450,7 +464,9 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
     state = 'dying'
     defeatMs = 0
     staggerMs = 0
+    landFromHop()
     interrupt(true)
+    combat.cancelOwnedBy(self)
     adds.clear()
     releaseTell()
     hurtFlashMs = 200
@@ -466,8 +482,8 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
     fx.play({ key: deps.art.fx(scene, 'death'), repeat: 0 })
   }
 
-  function receiveHit(hit: HitEvent) {
-    if (state !== 'fighting' || self.isInvulnerable()) return
+  function receiveHit(hit: HitEvent): number {
+    if (state !== 'fighting' || self.isInvulnerable()) return 0
     let damage = hit.damage
     if (isWeakHit(hit.attacker)) damage *= WEAK_MULTIPLIER
     if (staggerMs > 0) damage *= STAGGER_MULTIPLIER
@@ -476,18 +492,19 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
     hurtFlashMs = HURT_FLASH_MS
     if (hp <= 0) {
       startDefeat()
-      return
+      return damage
     }
     if (hp <= floor + EPSILON) {
       startTransition()
-      return
+      return damage
     }
     // Six hits within three seconds stagger the boss. The oldest of the last six sits where the
     // next hit will be written.
     hitTimes[hitCount % STAGGER_HITS] = clock
     hitCount++
-    if (staggerMs > 0 || cfg().staggerWindowMs <= 0 || hitCount < STAGGER_HITS) return
+    if (staggerMs > 0 || cfg().staggerWindowMs <= 0 || hitCount < STAGGER_HITS) return damage
     if (clock - hitTimes[hitCount % STAGGER_HITS] <= STAGGER_WITHIN_MS) startStagger()
+    return damage
   }
 
   function update(dtMs: number) {
@@ -531,6 +548,8 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
     const now = scene.time.now
     const facing = body.facing
     const mirrored = config.mirror !== false && facing < 0
+    // Limbs follow the body, so an unmirrored body keeps them where they are drawn.
+    const limbFacing = config.mirror === false ? 1 : facing
     const y = floorY - body.lift
 
     let alpha = body.alpha
@@ -578,11 +597,11 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
         setOriginOf(part, limb.ref, mirrored)
       }
       const { rest, pivot, height: partHeight } = limb.ref
-      const worldSide = limb.side * facing
+      const worldSide = limb.side * limbFacing
       // Arms swing from the shoulder, a hand or lid turns less.
       const reach = -pivot.y / partHeight >= 0.9 ? 2 : 0.7
-      const swing = worldSide === 0 ? -facing * 0.6 * raise : -worldSide * reach * raise
-      part.setPosition(body.x + facing * (rest.x + pivot.x), y + rest.y + pivot.y)
+      const swing = worldSide === 0 ? -limbFacing * 0.6 * raise : -worldSide * reach * raise
+      part.setPosition(body.x + limbFacing * (rest.x + pivot.x), y + rest.y + pivot.y)
       part.setRotation(swing + Math.sin(now / 500 + limb.phase) * 0.06)
       part.setAlpha(alpha)
       if (tintChanged) {
