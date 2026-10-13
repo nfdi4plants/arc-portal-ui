@@ -30,7 +30,6 @@ export async function requestPage<T>(
   params.set('per_page', String(perPage))
   const response = await requestGitLab<unknown>(source, resource, params, options)
   if (response.success === false) return Failure(response.error)
-  console.log(response)  
   const { data, headers } = response.value
   if (!Array.isArray(data) || !data.every(isItem)) return Failure(`GitLab returned an invalid ${label} list.`)
   return Success({

@@ -21,13 +21,16 @@ export interface DataHubDashboardProps {
     fetchMembershipGroups: ((source: string, signal: AbortSignal, token: string) => ReturnType<FetchGroups>) | null
     fetchGroupProjects: (source: string, groupId: number, options?: DataHubRequestOptions) => ReturnType<FetchGroupArcs>
   }
-  onArcClick?: (url: string, name: string) => void
+  onArcClick?: (url: string, name: string, projectId: number, dataHub: GitLabInstance) => void
 }
 
 function DataHubDashboard({ fetchTopStarred, fetchSearch, tokens, organisations, onArcClick }: DataHubDashboardProps) {
   const [activeGitLab, setActiveGitLab] = useState<GitLabInstance>(defaultDataHub)
   const source = activeGitLab.url
   const token = tokens?.[activeGitLab.id]
+  const selectArc = onArcClick
+    ? (url: string, name: string, projectId: number) => onArcClick(url, name, projectId, activeGitLab)
+    : undefined
   const loadTopStarred = useCallback<FetchArcs>(options => fetchTopStarred(source, { ...options, token }), [source, token, fetchTopStarred])
   const searchArcs = useCallback<SearchArcs>((query, options) => fetchSearch(source, query, { ...options, token }), [source, token, fetchSearch])
   const { fetchPublicGroups, fetchMembershipGroups, fetchGroupProjects } = organisations ?? {}
@@ -45,13 +48,13 @@ function DataHubDashboard({ fetchTopStarred, fetchSearch, tokens, organisations,
         <Link href={`${activeGitLab.url.replace(/\/+$/, '')}/explore/projects/active`} className={styles.source}>Explore {activeGitLab.name} ↗</Link>
       </header>
       <div key={`arcs:${source}`} className={styles.grid}>
-        <TopStarredArcs fetchCall={loadTopStarred} onArcClick={onArcClick} />
-        <ArcSearch fetchCall={searchArcs} signedIn={!!token} onArcClick={onArcClick} />
+        <TopStarredArcs fetchCall={loadTopStarred} onArcClick={selectArc} />
+        <ArcSearch fetchCall={searchArcs} signedIn={!!token} onArcClick={selectArc} />
       </div>
       {organisations && <OrganisationBrowser key={`organisations:${source}`}
         fetchPublicGroups={loadPublicGroups}
         fetchMembershipGroups={token && fetchMembershipGroups ? loadMembershipGroups : null}
-        fetchGroupProjects={loadGroupProjects} onArcClick={onArcClick} />}
+        fetchGroupProjects={loadGroupProjects} onArcClick={selectArc} />}
     </main>
   )
 }

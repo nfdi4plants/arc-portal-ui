@@ -14,3 +14,5 @@ export type ArcSearchOptions = ArcFetchOptions
 /** Expected failures resolve to a Result, including transport failures. */
 export type FetchArcs = (options?: ArcFetchOptions) => Promise<Result<ArcPage>>
 export type SearchArcs = (query: string, options?: ArcSearchOptions) => Promise<Result<ArcPage>>
+
+export type SelectArc = (url: string, name: string, projectId: number) => void

@@ -1,11 +1,12 @@
 import { Link, Stack, Text } from '@primer/react'
 import type { GitLabProject } from '../../types/gitlab.ts'
+import type { SelectArc } from '../../types/arc.ts'
 import styles from './ArcList.module.css'
 
 interface ArcListProps {
   projects: GitLabProject[]
   label: string
-  onArcClick?: (url: string, name: string) => void
+  onArcClick?: SelectArc
 }
 
 export function ArcList({ projects, label, onArcClick }: ArcListProps) {
@@ -14,7 +15,7 @@ export function ArcList({ projects, label, onArcClick }: ArcListProps) {
       {projects.map(project => (
         <li key={project.id} className={styles.item} onClick={onArcClick ? event => {
           event.preventDefault()
-          onArcClick(project.web_url, project.name)
+          onArcClick(project.web_url, project.name, project.id)
         } : undefined}>
           <Stack direction="horizontal" align="baseline" justify="space-between" gap="normal">
             <Link href={project.web_url} className={styles.name}>{project.name}</Link>
