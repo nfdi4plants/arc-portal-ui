@@ -9,6 +9,7 @@ export interface PublicationMetadata {
   authors?: string
   doi?: string
   url?: string
+  status?: string
 }
 
 export interface ExternalLink {

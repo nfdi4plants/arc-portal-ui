@@ -1,7 +1,7 @@
 import { Stack, Text } from '@primer/react'
 import type { ReactNode } from 'react'
 
-export function InvestigationWindow({ children }: { children: ReactNode }) {
+export function InvestigationWindow({ children, title = 'ARC Investigation' }: { children: ReactNode; title?: string }) {
   return (
     <div className="investigation-window-container">
       <section className="investigation-window" aria-label="Investigation preview">
@@ -12,7 +12,7 @@ export function InvestigationWindow({ children }: { children: ReactNode }) {
             <span />
           </Stack>
           <Text as="span" className="investigation-window-title">
-            ARC Investigation
+            {title}
           </Text>
         </header>
         <div className="investigation-window-content">{children}</div>
