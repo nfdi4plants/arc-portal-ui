@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react'
-import { render } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
+import type userEvent from '@testing-library/user-event'
 import { BaseStyles } from '@primer/react'
 import { ThemeProvider } from '@primer/react/next'
 import type { GitLabProject } from '../types/gitlab.ts'
@@ -11,6 +12,11 @@ export function renderWithTheme(element: ReactElement, strictMode = false) {
     reactStrictMode: strictMode,
     wrapper: ({ children }) => <ThemeProvider><BaseStyles>{children}</BaseStyles></ThemeProvider>,
   })
+}
+
+export async function openAccountMenu(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: 'Account menu' }))
+  return within(await screen.findByRole('dialog', { name: 'Signed-in accounts' }))
 }
 
 export function project(overrides: Partial<GitLabProject> = {}): GitLabProject {
