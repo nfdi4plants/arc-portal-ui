@@ -1,0 +1,162 @@
+.root {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  color: var(--fgColor-default);
+  background: var(--bgColor-default);
+}
+
+/* The start screen and the settings scroll inside the box when their content is taller. */
+.screen {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--base-size-24, 24px);
+  padding: var(--base-size-16, 16px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.screen[data-layout='stacked'] {
+  flex-direction: column;
+  gap: var(--base-size-12, 12px);
+}
+
+.mage {
+  flex: none;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--base-size-12, 12px);
+  min-width: 0;
+  text-align: left;
+}
+
+.screen[data-layout='stacked'] .content {
+  flex: none;
+  width: 100%;
+}
+
+.fullWidth {
+  align-self: stretch;
+}
+
+.hint {
+  margin: 0;
+  color: var(--fgColor-muted);
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--base-size-4, 4px) var(--base-size-16, 16px);
+  margin: 0;
+}
+
+.facts dt {
+  color: var(--fgColor-muted);
+}
+
+.facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.path {
+  align-self: stretch;
+}
+
+.bindings {
+  align-self: stretch;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bindingRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--base-size-4, 4px) var(--base-size-16, 16px);
+  padding: var(--base-size-6, 6px) 0;
+  border-bottom: 1px solid var(--borderColor-muted);
+}
+
+.actionName {
+  flex: 1 1 8em;
+  min-width: 0;
+}
+
+.slots {
+  display: flex;
+  gap: var(--base-size-8, 8px);
+}
+
+.slot {
+  min-width: 6em;
+}
+
+.conflict {
+  flex-basis: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--base-size-4, 4px);
+  color: var(--fgColor-attention);
+  font-size: var(--text-body-size-small, 12px);
+}
+
+.play {
+  position: absolute;
+  inset: 0;
+}
+
+.host {
+  position: absolute;
+  inset: 0;
+}
+
+.host canvas {
+  display: block;
+}
+
+.status {
+  position: absolute;
+  inset: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--base-size-12, 12px);
+  margin: 0;
+  padding: var(--base-size-16, 16px);
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  color: var(--fgColor-default);
+  font: inherit;
+  font-size: var(--text-title-size-medium, 20px);
+  background: color-mix(in srgb, var(--bgColor-default) 70%, transparent);
+  cursor: pointer;
+}
+
+.overlay:focus-visible {
+  outline: 3px solid var(--borderColor-accent-emphasis);
+  outline-offset: -3px;
+}

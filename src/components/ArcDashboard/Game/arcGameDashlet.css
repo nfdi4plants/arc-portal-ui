@@ -1,0 +1,18 @@
+.dashlet.arc-game-dashlet {
+  max-height: none;
+}
+
+.arc-dashboard-layout > .arc-game-dashlet {
+  grid-column: 1 / -1;
+}
+
+.arc-game-dashlet > .dashboard-component {
+  height: 100%;
+}
+
+.arc-game-dashlet > .dashboard-component > .dashboard-component-content {
+  flex: 1;
+  padding: 0;
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}
