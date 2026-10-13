@@ -13,12 +13,14 @@ export interface PopupDashletProps {
   className?: string
   showHeader?: boolean
   expandOnClick?: boolean
+  collapsed?: boolean
+  onToggleCollapsed?: () => void
   /** Replace compact content with a symbol; preserve the content's state while hidden. */
   symbol?: ReactNode
   children: ReactNode
 }
 
-export function PopupDashlet({ title, description, label, className, showHeader = true, expandOnClick = true, symbol, children }: PopupDashletProps) {
+export function PopupDashlet({ title, description, label, className, showHeader = true, expandOnClick = true, collapsed = false, onToggleCollapsed, symbol, children }: PopupDashletProps) {
   const [mode, setMode] = useState<PopupDashletMode>('compact')
   const expanded = mode === 'expanded'
   const focused = mode !== 'compact'
@@ -193,6 +195,15 @@ export function PopupDashlet({ title, description, label, className, showHeader 
         <Controls className={headerVisible ? 'dashboard-window-bar popup-dashlet-bar' : 'popup-dashlet-floating-controls'}>
           {headerVisible && <h2 className="dashboard-window-title">{title}</h2>}
           <div className="popup-dashlet-actions">
+            {!focused && onToggleCollapsed && <button
+              type="button"
+              className="popup-dashlet-toggle"
+              aria-label={`${collapsed ? 'Restore' : 'Collapse'} ${title}`}
+              aria-expanded={!collapsed}
+              onClick={(event) => { event.stopPropagation(); onToggleCollapsed() }}
+            >
+              <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d={collapsed ? 'M4 6l4 4 4-4' : 'M4 10l4-4 4 4'} /></svg>
+            </button>}
             <button
               ref={toggle}
               type="button"
@@ -207,10 +218,10 @@ export function PopupDashlet({ title, description, label, className, showHeader 
             </button>
           </div>
         </Controls>
-        <PopupDashletModeContext.Provider value={collapsing ? 'compact' : mode}>
+        <PopupDashletModeContext.Provider value={collapsing ? 'compact' : collapsed && !focused ? 'collapsed' : mode}>
           <PortalContext.Provider value={portalContext}>
-            {!focused && symbol && <div className="popup-dashlet-symbol" role="img" aria-label={`${title} symbol`}>{symbol}</div>}
-            <div className="dashboard-component-content" hidden={!focused && !!symbol} inert={!focused && expandOnClick}>{children}</div>
+            {!focused && !collapsed && symbol && <div className="popup-dashlet-symbol" role="img" aria-label={`${title} symbol`}>{symbol}</div>}
+            <div className="dashboard-component-content" hidden={!focused && (!!symbol || collapsed)} inert={!focused && expandOnClick}>{children}</div>
           </PortalContext.Provider>
         </PopupDashletModeContext.Provider>
       </dialog>

@@ -7,6 +7,7 @@ import { DashboardContent } from './Dashboard'
 import { NewDashboardContent } from './NewDashboard'
 import { StackedDashboardContent } from './StackedDashboard'
 import { CombinedDashboardContent } from './CombinedDashboard'
+import { SplitDashboardContent } from './SplitDashboard'
 import { DashboardWindow } from '../DashboardWindow'
 import { selectInvestigationMetadata } from './Investigation/selectInvestigationMetadata'
 import type { ArcRepositoryOverview } from '../../api/gitlab'
@@ -22,12 +23,12 @@ type ArcDashboardProps = {
 };
 
 function LoadedArc({ arc, name, url, onBack, dataHubData }: { arc: ARC } & Pick<ArcDashboardProps, 'name' | 'url' | 'onBack' | 'dataHubData'>) {
-    const [layout, setLayout] = useState<'classic' | 'radial' | 'stacked' | 'combined'>('classic')
+    const [layout, setLayout] = useState<'classic' | 'radial' | 'stacked' | 'combined' | 'split'>('classic')
     // Built once per ARC. A new index sends the explorer back to its datasets view.
     const provenance = useMemo(() => buildProvenanceIndex(arc), [arc])
     const metadata = useMemo(() => selectInvestigationMetadata(arc), [arc])
     const arcJson = useMemo(() => ARC.toROCrateJsonString()(arc), [arc])
-    const Content = layout === 'radial' ? NewDashboardContent : layout === 'stacked' ? StackedDashboardContent : layout === 'combined' ? CombinedDashboardContent : DashboardContent
+    const Content = layout === 'radial' ? NewDashboardContent : layout === 'stacked' ? StackedDashboardContent : layout === 'combined' ? CombinedDashboardContent : layout === 'split' ? SplitDashboardContent : DashboardContent
 
     return (
         <DashboardWindow label="ARC-Dashboard" fillHeight={layout === 'radial'}>
@@ -44,6 +45,7 @@ function LoadedArc({ arc, name, url, onBack, dataHubData }: { arc: ARC } & Pick<
                     </Button>
                     <Button aria-pressed={layout === 'stacked'} onClick={() => setLayout('stacked')}>Stacked dashboard</Button>
                     <Button aria-pressed={layout === 'combined'} onClick={() => setLayout('combined')}>Combined dashboard</Button>
+                    <Button aria-pressed={layout === 'split'} onClick={() => setLayout('split')}>Split dashboard</Button>
                 </>}
             />
         </DashboardWindow>

@@ -15,12 +15,14 @@ const ArcViewer = lazy(() => import('../ArcViewer/ArcViewer'))
 
 export type InvestigationDashletId = 'description' | 'contacts' | 'organizations' | 'publications' | 'assays' | 'studies' | 'webview'
 
-export function InvestigationDashlets({ metadata, arcJson, classNamePrefix, ids, interactive = false }: {
+export function InvestigationDashlets({ metadata, arcJson, classNamePrefix, ids, interactive = false, collapsed, onToggleCollapsed }: {
   metadata: InvestigationMetadata
   arcJson: string
   classNamePrefix: string
   ids?: readonly InvestigationDashletId[]
   interactive?: boolean
+  collapsed?: boolean
+  onToggleCollapsed?: () => void
 }) {
   const dashlets = [
     {
@@ -74,6 +76,8 @@ export function InvestigationDashlets({ metadata, arcJson, classNamePrefix, ids,
       description={description}
       symbol={interactive ? undefined : symbol}
       expandOnClick={!interactive}
+      collapsed={collapsed}
+      onToggleCollapsed={onToggleCollapsed}
       label={title === 'Description' ? title : `${title} dashlet`}
       className={`investigation-dashlet ${classNamePrefix}-tile ${classNamePrefix}-${id}`}
     >

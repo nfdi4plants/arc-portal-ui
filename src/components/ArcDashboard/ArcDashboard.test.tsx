@@ -82,14 +82,15 @@ describe('ArcDashboard', () => {
     expect(screen.queryByText('ARC viewer')).not.toBeInTheDocument()
   })
 
-  it.each(['Stacked dashboard', 'Combined dashboard'])('opens %s and switches back without fetching the ARC again', async (layout) => {
+  it.each(['Stacked dashboard', 'Combined dashboard', 'Split dashboard'])('opens %s and switches back without fetching the ARC again', async (layout) => {
     const user = userEvent.setup()
     vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValue(new Response(crateJson)))
     renderWithTheme(<ArcDashboard name="Selected ARC" url="https://datahub.example/lab/arc"
       source="https://datahub.example" projectId={42} onBack={vi.fn()} />)
     await user.click(await screen.findByRole('button', { name: layout }))
     if (layout === 'Stacked dashboard') expect(screen.getByRole('complementary', { name: 'Investigation dashlets' })).toBeVisible()
-    else expect(screen.getByRole('region', { name: 'Description, contacts, and organizations' })).toBeVisible()
+    else if (layout === 'Combined dashboard') expect(screen.getByRole('region', { name: 'Description, contacts, and organizations' })).toBeVisible()
+    else expect(screen.getByRole('separator', { name: 'Resize Webview and Graphview' })).toBeVisible()
     expect(screen.getByRole('region', { name: 'Graphview' })).toBeVisible()
     expect(screen.getByRole('button', { name: layout })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('link', { name: 'Selected ARC' })).toHaveAttribute('href', 'https://datahub.example/lab/arc')
