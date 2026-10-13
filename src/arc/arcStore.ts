@@ -28,11 +28,21 @@ export function createArcStore(source: ArcSource) {
     snapshot = { arc, revision: snapshot.revision + 1 }
   }
 
+  function cancelLoad() {
+    controller?.abort()
+    controller = null
+    pending = null
+    if (status.kind === 'loading') {
+      status = { kind: 'idle' }
+      notify()
+    }
+  }
+
   async function run(current: AbortController): Promise<void> {
     let result: { arc: ARC } | { error: unknown }
     try {
       const json = await source.fetchROCrate(current.signal)
-      // A newer load or dispose() took over: settle with the newer load instead.
+      // A newer load or cancellation took over: settle with the newer load instead.
       if (controller !== current) return pending ?? undefined
       result = { arc: ARC.fromROCrateJsonString(json) }
     } catch (error) {
@@ -84,6 +94,9 @@ export function createArcStore(source: ArcSource) {
       return pending
     },
 
+    // Stops the current load without disabling later loads or clearing parsed data.
+    cancelLoad,
+
     // The only sanctioned way to change the ARC, so subscribers re-read it.
     // Refused (returns false) before the first load, during a load (the change
     // would be overwritten by the fetched ARC) and after dispose.
@@ -105,13 +118,7 @@ export function createArcStore(source: ArcSource) {
     dispose() {
       if (disposed) return
       disposed = true
-      controller?.abort()
-      controller = null
-      pending = null
-      if (status.kind === 'loading') {
-        status = { kind: 'idle' }
-        notify()
-      }
+      cancelLoad()
     },
   }
 }

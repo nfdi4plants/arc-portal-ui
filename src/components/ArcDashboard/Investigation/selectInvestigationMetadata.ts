@@ -58,6 +58,7 @@ export function selectInvestigationMetadata(arc: ARC): InvestigationMetadata {
         key: doi ?? nonEmpty(publication.PubMedID) ?? `${publication.Title}#${index}`,
         title: nonEmpty(publication.Title) ?? 'Untitled publication',
         authors: nonEmpty(publication.Authors),
+        status: nonEmpty(publication.Status?.NameText),
         doi,
         url: doi ? `https://doi.org/${doi}` : undefined,
       }

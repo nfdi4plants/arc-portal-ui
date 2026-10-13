@@ -12,6 +12,7 @@ const liveRegionEntry = join(dirname(require.resolve('@primer/live-region-elemen
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  base: '/arc-portal-ui/',
   test: {
     // Primer hides responsive action copies with CSS; tests must see the visible UI.
     css: true,

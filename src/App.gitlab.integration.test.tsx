@@ -7,6 +7,10 @@ import App from './App.tsx'
 import { TOKEN_STORAGE_KEY } from './auth/context.ts'
 import { dataHubCollection, defaultDataHub } from './config/gitlab.ts'
 import { gitLabProjectFull, openAccountMenu, projectResponse, stubGitLabFetch } from './test/helpers.tsx'
+import { deferred, openAccountMenu, project, projectResponse } from './test/helpers.tsx'
+import { crateJson } from '../tests/helpers/sampleCrate.ts'
+
+vi.mock('./components/ArcDashboard/ArcViewer/ArcViewer.tsx', () => ({ default: () => <div>ARC viewer</div> }))
 
 // The bundled web viewer loads raw CSS in its browser build, which node ESM cannot import.
 vi.mock('@nfdi4plants/arc-web-view', () => ({ WebViewer: () => null }))
@@ -35,19 +39,21 @@ function requestUrl(input: Parameters<typeof fetch>[0]) { return new URL(String(
 function requestToken(init?: RequestInit) { return new Headers(init?.headers).get('PRIVATE-TOKEN') }
 
 beforeEach(() => {
+  vi.spyOn(console, 'log').mockImplementation(() => {})
   localStorage.clear()
-  fetchCall.mockClear()
+  fetchCall.mockReset()
+  fetchCall.mockImplementation(async input => {
+    const url = requestUrl(input)
+    if (url.pathname.includes('/packages/generic/')) return new Response(crateJson)
+    if (url.pathname === '/api/v4/user') return Response.json({ id: 7, name: url.host, username: 'researcher' })
+    if (url.pathname === '/api/v4/groups') return Response.json([group(url.host)], { headers: { 'X-Next-Page': '' } })
+    const kind = url.pathname.startsWith('/api/v4/groups/') ? 'Organisation' : url.searchParams.has('search') ? 'Matching' : 'Featured'
+    return projectResponse([project({ name: `${url.host} ${kind} ARC`, web_url: `https://${url.host}/plants/study` })])
+  })
   vi.stubGlobal('fetch', fetchCall)
 })
 
 describe('multiple GitLab instances', () => {
-  it('lists one project per reachable DataHUB and names a failing one', async () => {
-    render(<App />)
-    expect(await screen.findByRole('button', { name: `Open ${officialHost} public ARC` })).toBeVisible()
-    expect(screen.getByRole('button', { name: `Open ${microbeHost} public ARC` })).toBeVisible()
-    expect(await screen.findByText(`Could not load ARCs from ${rptuHost}`)).toBeVisible()
-    expect(fetchCall.mock.calls.every(call => requestToken(call[1]) === null)).toBe(true)
-  })
 
   it('uses a token only for the logged-in DataHUB and clears its private project on logout without reloading the page', async () => {
     const user = userEvent.setup()

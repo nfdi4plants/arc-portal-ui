@@ -4,25 +4,37 @@ Turns an ARC RO-Crate (`ro-crate-metadata.json`) into plain data for React compo
 
 ## Quickstart
 
-**1. Provide an ARC once, at the app root.**
+**1. Load the selected DataHub ARC and pass it to a component.**
 
 ```tsx
-import { useEffect, useState } from 'react'
-import { ArcProvider } from './arc/ArcProvider'
-import { createArcStore } from './arc/arcStore'
-import { sampleSources } from './arc/sources'
+import type { ARC } from '@nfdi4plants/arctrl'
+import { useROCrate } from './arc/hooks'
 
-export function App() {
-  const [store] = useState(() => createArcStore(sampleSources[0]))
-  useEffect(() => {
-    void store.load()
-  }, [store])
+export function ArcPage({ source, projectId, token }: {
+  source: string | null
+  projectId: number | null
+  token?: string
+}) {
+  const state = useROCrate(source, projectId, token)
 
-  return <ArcProvider store={store}>{/* your components */}</ArcProvider>
+  if (state.status === 'Error') return <p role="alert">Could not load ARC.</p>
+  if (state.status !== 'Result') return <p>Loading…</p>
+
+  return <LoadedArc arc={state.arc} />
+}
+
+function LoadedArc({ arc }: { arc: ARC }) {
+  return <h1>{arc.Title ?? arc.Identifier}</h1>
 }
 ```
 
+`useROCrate(source, projectId, token?)` returns `State<ARC>` with `Startup`, `Loading`, `Error` (an `Error` object), or `Result` (`arc`, the parsed ARC). It downloads the available generated main-branch export from `isa_arc_json/0.0.1/arc-ro-crate-metadata.json` and delegates parsing to `createArcStore`. `Result` means both downloading and parsing succeeded. Read `state.arc` after narrowing the status to `Result`; no context provider is required.
+
+Missing inputs produce `Startup` without a request. The hook starts loading automatically, keeps the internal store and returned ARC stable across ordinary rerenders, and replaces the store when the DataHub URL, project ID, or token changes. Cleanup cancels unfinished work without permanently disposing the store, so React Strict Mode can restart loading.
+
 **2. Read data in a component with a hook.**
+
+For the optional context and selector APIs below, create a store and wrap its consumers in `ArcProvider` as shown under [setup options](#setup-options). These APIs remain available separately from the direct ARC returned by `useROCrate`.
 
 ```tsx
 import { useAssays } from '../arc/selectors/studiesAndAssays'
@@ -59,7 +71,7 @@ A selector takes the parsed ARC and returns plain data. Call arctrl's getters di
 **Rules**
 
 - Selectors return plain data (strings, numbers, arrays, plain objects), never arctrl objects.
-- Change the ARC only through `store.mutate(...)`.
+- For store-based editing, change the ARC only through `store.mutate(...)`.
 - Handle `undefined` from hooks as "not loaded yet".
 
 That's enough to build a component. The sections below explain the details.
@@ -85,15 +97,35 @@ ArcRegistry: one ArcStore per ArcKey (multi-ARC views)
 | `arcStore.ts` | `createArcStore()`, `ArcStore` |
 | `arcRegistry.ts` | `createArcRegistry()`, `ArcRegistry` |
 | `ArcProvider.tsx` | `<ArcProvider>`, `<ArcRegistryProvider>` |
-| `hooks.ts` | `useArcStore`, `useArcRegistry`, `useArcStatus`, `useArcSelector`, `useStoreSelector`, `useArcKeys` |
+| `hooks.ts` | `useROCrate`, `State<T>`, `useArcStore`, `useArcRegistry`, `useArcStatus`, `useArcSelector`, `useStoreSelector`, `useArcKeys` |
 | `selectors/*.ts` | Pure selectors, named hooks and view-model types |
 
 ### Setup options
 
 - Any URL serving an RO-Crate works as a source: `urlSource({ key: 'demo', label: 'Demo ARC', url: '/arcs/demo/ro-crate-metadata.json' })`.
 - `load()` is idempotent, and concurrent calls share one load. `load({ force: true })` reloads.
+- `cancelLoad()` aborts unfinished work and resets a loading store to idle; later calls to `load()` still work. Parsed data is retained. `dispose()` permanently disables the store.
 - `store.getStatus()` returns `ArcStatus`: `idle` → `loading` → `ready`, or `error` (with `error`).
 - Create stores outside render: at module scope, with `useState(() => ...)`, or in a registry.
+
+For custom or bundled sources, the low-level API remains available:
+
+```tsx
+import { useEffect, useState } from 'react'
+import { ArcProvider } from './arc/ArcProvider'
+import { createArcStore } from './arc/arcStore'
+import { sampleSources } from './arc/sources'
+
+export function SampleArcPage() {
+  const [store] = useState(() => createArcStore(sampleSources[0]))
+  useEffect(() => {
+    void store.load()
+    return () => store.cancelLoad()
+  }, [store])
+
+  return <ArcProvider store={store}>{/* your components */}</ArcProvider>
+}
+```
 
 ### Loading and errors
 

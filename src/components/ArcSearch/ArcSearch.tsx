@@ -7,7 +7,7 @@ import { ArcList } from '../ArcList/ArcList.tsx'
 import { ArcListSkeleton } from '../ArcList/ArcListSkeleton.tsx'
 import styles from './ArcSearch.module.css'
 
-export function ArcSearch({ fetchCall, signedIn = false, onArcClick }: { fetchCall: SearchArcs; signedIn?: boolean; onArcClick?: (url: string, name: string) => void }) {
+export function ArcSearch({ fetchCall, signedIn = false, onArcClick }: { fetchCall: SearchArcs; signedIn?: boolean; onArcClick?: (url: string, name: string, projectId: number) => void }) {
   const headingId = useId()
   const [input, setInput] = useState('')
   const [request, setRequest] = useState<{ fetchCall: SearchArcs; query: string; page: number } | null>(null)

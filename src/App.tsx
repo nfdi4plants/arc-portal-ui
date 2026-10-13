@@ -13,6 +13,7 @@ import { AuthenticationProvider } from './auth/AuthenticationProvider.tsx'
 import { useAuthentication } from './auth/context.ts'
 import { Navbar } from './components/Navbar/Navbar.tsx'
 import ArcDashboard from './components/ArcDashboard/ArcDashboard.tsx'
+import type { GitLabInstance } from './types/gitlab.ts'
 
 
 type PageState =
@@ -24,6 +25,8 @@ type PageState =
     data: {
       url: string;
       name: string;
+      projectId: number;
+      dataHub: GitLabInstance;
     };
   };
 
@@ -72,10 +75,14 @@ function Portal() {
     <Navbar />
     {
       pageState.type === "arc-dashboard" ? (
-        <ArcDashboard url={pageState.data.url} name={pageState.data.name} onBack={() => setPageState({ type: "datahub-dashboard" })} />
+        <ArcDashboard name={pageState.data.name} url={pageState.data.url}
+          source={pageState.data.dataHub.url} projectId={pageState.data.projectId} token={tokens[pageState.data.dataHub.id]}
+          onBack={() => setPageState({ type: "datahub-dashboard" })} />
       ) :
-      <DataHubDashboard connections={connections}
-        onArcClick={(url, name) => setPageState({ type: "arc-dashboard", data: { url, name } })} />
+      <DataHubDashboard
+        onArcClick={(url, name, projectId, dataHub) => setPageState({ type: "arc-dashboard", data: { url, name, projectId, dataHub } })}
+        fetchTopStarred={getTopStarredProjects} fetchSearch={searchProjects} tokens={tokens}
+        organisations={{ fetchPublicGroups, fetchMembershipGroups, fetchGroupProjects: getGroupProjects }} />
     }
   </>
 }

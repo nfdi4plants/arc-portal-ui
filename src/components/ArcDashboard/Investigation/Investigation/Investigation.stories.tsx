@@ -28,7 +28,7 @@ function SampleInvestigation() {
 }
 
 const meta = {
-  title: 'Investigation/Investigation',
+  title: 'Dashboard/Investigation',
   component: SampleInvestigation,
   parameters: {
     docs: {

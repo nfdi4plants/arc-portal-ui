@@ -6,7 +6,7 @@ import { ArcList } from '../ArcList/ArcList.tsx'
 import { ArcListSkeleton } from '../ArcList/ArcListSkeleton.tsx'
 import styles from './TopStarredArcs.module.css'
 
-export function TopStarredArcs({ fetchCall, onArcClick }: { fetchCall: FetchArcs; onArcClick?: (url: string, name: string) => void }) {
+export function TopStarredArcs({ fetchCall, onArcClick }: { fetchCall: FetchArcs; onArcClick?: (url: string, name: string, projectId: number) => void }) {
   const headingId = useId()
   const load = useCallback((signal: AbortSignal) => fetchCall({ page: 1, perPage: 10, signal }), [fetchCall])
   const state = useProjectPage(load)
