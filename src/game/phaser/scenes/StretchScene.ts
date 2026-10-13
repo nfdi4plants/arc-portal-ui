@@ -3,7 +3,7 @@ import { DEPTH, PALETTE, SCENE, TILE } from '../../contracts/constants'
 import type { MonsterSpec } from '../../contracts/content'
 import type { Segment } from '../../contracts/run'
 import { monsterFromAnnotation } from '../../model/content'
-import { prewarm } from '../art'
+import { applySpriteRef, doorArt, prewarm, releaseMonsters } from '../art'
 import { spawnMob, updatePickups, type Mob, type MobDeps } from '../mobs'
 import { markOneWay } from '../player/Player'
 import type { View } from '../view'
@@ -82,17 +82,17 @@ export class StretchScene extends GameplayScene {
 
     const { door } = layout
     this.door.setTo(door.x, door.y, door.w, door.h)
-    this.add
-      .rectangle(door.x, door.y, door.w, door.h, PALETTE.navy)
-      .setOrigin(0, 0)
-      .setStrokeStyle(2, PALETTE.yellow)
-      .setDepth(DEPTH.tiles + 1)
+    const doorRef = doorArt(this, door.w, door.h)
+    const doorSprite = this.add.sprite(door.x + door.w / 2, door.y + door.h, doorRef.textureKey).setDepth(DEPTH.tiles + 1)
+    applySpriteRef(doorSprite, doorRef)
     addText(this, this.segment.toNodeId, 8, { color: PALETTE.navy, bold: true, align: 'center' })
       .setOrigin(0.5, 1)
       .setPosition(door.x + door.w / 2, door.y - 4)
       .setDepth(DEPTH.tiles + 1)
 
     this.specs = this.segment.annotations.map((annotation) => monsterFromAnnotation(annotation, this.segment.index))
+    // The previous stretch's mobs went down with its scene, so nothing displays these textures now.
+    releaseMonsters(this, new Set(this.specs.map((spec) => spec.id)))
     this.slots = this.specs.map((spec, i) => ({ spec, ...layout.spawns[i], mob: null, asleep: false, gone: false }))
     this.prewarmed = 0
     this.safeX = layout.start.x

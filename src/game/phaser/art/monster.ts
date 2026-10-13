@@ -1,12 +1,16 @@
 import type Phaser from 'phaser'
 import type { SpriteRef } from '../../contracts/art'
 import type { MonsterSpec } from '../../contracts/content'
-import { spriteFrom } from './atlas'
+import { animKeyOf, spriteFrom } from './atlas'
 import { BODIES, drawFace } from './bodies'
 import { drawEnemyWeapon } from './enemyWeapons'
 import { monsterLayout } from './layout'
 import { drawBodyMark, drawHeadMark } from './marks'
 import { swatch } from './palette'
+
+const KEY_PREFIX = 'scribble:monster:'
+// A summoner's minions are drawn from the summoner's spec under this id suffix.
+export const MINION_ID_SUFFIX = ':minion'
 
 // The id is a hash of the annotation, so the same annotation reuses its texture in every scene.
 export function monster(scene: Phaser.Scene, spec: MonsterSpec): SpriteRef {
@@ -14,7 +18,7 @@ export function monster(scene: Phaser.Scene, spec: MonsterSpec): SpriteRef {
   const sw = swatch(spec.hue)
   const { body } = layout
   return spriteFrom(scene, {
-    key: `scribble:monster:${spec.id}`,
+    key: `${KEY_PREFIX}${spec.id}`,
     width: layout.width,
     height: layout.height,
     anchors: {
@@ -29,4 +33,19 @@ export function monster(scene: Phaser.Scene, spec: MonsterSpec): SpriteRef {
       drawHeadMark(pen, spec.passive.kind, body, sw)
     },
   })
+}
+
+// Monster textures live as long as the game, so a long path would collect one per annotation it
+// ever met. This drops the ones whose spec id is not in `keepIds`, and the animations over them.
+// The animation goes first: removing it stops any sprite still playing it, so no sprite is left
+// pointing at a destroyed frame. The memoised SpriteRef sits on the texture, so it goes with it.
+export function releaseMonsters(scene: Phaser.Scene, keepIds: ReadonlySet<string>): void {
+  for (const key of scene.textures.getTextureKeys()) {
+    if (!key.startsWith(KEY_PREFIX)) continue
+    const id = key.slice(KEY_PREFIX.length)
+    const base = id.endsWith(MINION_ID_SUFFIX) ? id.slice(0, -MINION_ID_SUFFIX.length) : id
+    if (keepIds.has(id) || keepIds.has(base)) continue
+    scene.anims.remove(animKeyOf(key))
+    scene.textures.remove(key)
+  }
 }

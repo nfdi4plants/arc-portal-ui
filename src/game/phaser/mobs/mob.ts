@@ -3,14 +3,15 @@ import type { SpriteRef } from '../../contracts/art'
 import type { Combatant, CombatWorld, HitEvent } from '../../contracts/combat'
 import { DEPTH } from '../../contracts/constants'
 import type { EnemyWeaponKind, MonsterSpec } from '../../contracts/content'
-import { applySpriteRef } from '../art'
+import { MINION_ID_SUFFIX, applySpriteRef } from '../art'
+import { bodyOf, isOneWay } from '../player/oneWay'
 import { aimVelocity, lobFlightS, lobVelocity } from './aim'
 import type { Vec } from './aim'
 import { acquireBubble, releaseBubble } from './bubbles'
 import { bubbleAt, chatterText, chunkText } from './chatter'
 import { hitFromAbove, hitFromFront, incomingDamage } from './defense'
 import { playFx } from './fx'
-import { LEDGE_DEPTH, LEDGE_LOOKAHEAD, groundProbe, isOneWay, sameLevel, turnsAtLedge } from './ledge'
+import { LEDGE_DEPTH, LEDGE_LOOKAHEAD, groundProbe, sameLevel, turnsAtLedge } from './ledge'
 import type { Box } from './ledge'
 import { approach, blinkDestination } from './motion'
 import { dropShieldFragment } from './pickups'
@@ -97,14 +98,6 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
 }
 
-function bodyOf(object: unknown): Phaser.Physics.Arcade.Body | Phaser.Physics.Arcade.StaticBody | null {
-  if (typeof object !== 'object' || object === null) return null
-  const o = object as { isBody?: boolean; body?: unknown }
-  if (o.isBody) return object as Phaser.Physics.Arcade.Body
-  if (o.body && (o.body as { isBody?: boolean }).isBody) return o.body as Phaser.Physics.Arcade.Body
-  return null
-}
-
 function holdOnHitStop(combat: CombatWorld): Set<Phaser.Physics.Arcade.Body> {
   let bodies = awakeBodies.get(combat)
   if (!bodies) {
@@ -129,7 +122,7 @@ export function mobXp(target: Combatant): number {
 function minionSpecOf(spec: MonsterSpec): MonsterSpec {
   return {
     ...spec,
-    id: `${spec.id}:minion`,
+    id: `${spec.id}${MINION_ID_SUFFIX}`,
     label: `${spec.label} (summoned)`,
     body: 'slime',
     size: 'small',
@@ -178,7 +171,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
   // A one-way platform only stops a body that was above it on the previous step.
   const processCollision = (a: unknown, b: unknown): boolean => {
     const other = bodyOf(a === body ? b : a)
-    if (!other || !isOneWay(other.checkCollision)) return true
+    if (!other || !isOneWay(other)) return true
     return body.prev.y + H <= other.top + 1
   }
   const colliders = deps.colliders.map((target) => scene.physics.add.collider(body, target, undefined, processCollision))

@@ -13,11 +13,13 @@ import { telegraph } from './telegraph'
 import { tiles } from './tiles'
 
 export { TEXTURE_SCALE, textureBytes }
+export { MINION_ID_SUFFIX, releaseMonsters } from './monster'
+export { doorArt, shieldFragmentArt } from './props'
 export type { BossArt, PartRef } from './parts'
 
 // Puts a sprite on the texture of `ref`, standing on its origin (bottom centre), sized in world
 // units, and starts the boiling animation. Frame 0 is set first so the display size is computed
-// from a single variant instead of the whole strip.
+// from a single variant. The texture holds all variants side by side.
 export function applySpriteRef(sprite: Phaser.GameObjects.Sprite, ref: SpriteRef): void {
   // Placeholder textures have a single frame and no variant frames.
   const texture = sprite.scene.textures.get(ref.textureKey)

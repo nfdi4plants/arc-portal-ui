@@ -1,25 +1,23 @@
 import type Phaser from 'phaser'
-import { DEPTH, PALETTE } from '../../contracts/constants'
+import { DEPTH } from '../../contracts/constants'
 import type { PlayerHandle } from '../../contracts/player'
+import { applySpriteRef, shieldFragmentArt } from '../art'
 
 // Shield fragments dropped by component mobs. They bob in place until the player touches one.
 
-const TEXTURE = 'mob:shieldFragment'
-const WIDTH = 14
-const HEIGHT = 16
 const GRAB_MARGIN = 6
 const BOB_AMPLITUDE = 2.5
 const BOB_PERIOD_MS = 1300
 
 interface Pickup {
-  sprite: Phaser.GameObjects.Image
+  sprite: Phaser.GameObjects.Sprite
   baseY: number
   phase: number
 }
 
 interface PickupState {
   active: Pickup[]
-  free: Phaser.GameObjects.Image[]
+  free: Phaser.GameObjects.Sprite[]
 }
 
 const states = new WeakMap<Phaser.Scene, PickupState>()
@@ -35,26 +33,16 @@ function stateOf(scene: Phaser.Scene): PickupState {
   return state
 }
 
-// A small shield drawn once. Textures belong to the game, so later scenes find it ready.
-function ensureTexture(scene: Phaser.Scene): void {
-  if (scene.textures.exists(TEXTURE)) return
-  const g = scene.make.graphics({ x: 0, y: 0 }, false)
-  g.fillStyle(PALETTE.blue, 1)
-  g.fillRect(1, 1, WIDTH - 2, 8)
-  g.fillTriangle(1, 9, WIDTH - 1, 9, WIDTH / 2, HEIGHT - 1)
-  g.fillStyle(PALETTE.cream, 1)
-  g.fillRect(4, 3, 3, 3)
-  g.lineStyle(1.5, PALETTE.outline, 1)
-  g.strokeRect(1, 1, WIDTH - 2, 8)
-  g.strokeTriangle(1, 9, WIDTH - 1, 9, WIDTH / 2, HEIGHT - 1)
-  g.generateTexture(TEXTURE, WIDTH, HEIGHT)
-  g.destroy()
-}
-
 export function dropShieldFragment(scene: Phaser.Scene, x: number, y: number): void {
-  ensureTexture(scene)
   const state = stateOf(scene)
-  const sprite = state.free.pop() ?? scene.add.image(x, y, TEXTURE).setDepth(DEPTH.pickups)
+  let sprite = state.free.pop()
+  if (!sprite) {
+    const ref = shieldFragmentArt(scene)
+    sprite = scene.add.sprite(x, y, ref.textureKey).setDepth(DEPTH.pickups)
+    applySpriteRef(sprite, ref)
+    // The pickup bobs around its centre, not its feet.
+    sprite.setOrigin(0.5, 0.5)
+  }
   sprite.setPosition(x, y).setActive(true).setVisible(true)
   state.active.push({ sprite, baseY: y, phase: x })
 }
