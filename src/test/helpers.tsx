@@ -90,12 +90,17 @@ export function gitLabProjectFull(overrides: Partial<GitLabProject> = {}): GitLa
   })
 }
 
+/** A successful projects result without a token rejection. */
+export function projectsResult(projects: GitLabProject[]) {
+  return Success({ projects, tokenRejected: false })
+}
+
 /** Every callback resolves with an empty success unless overridden. */
 export function fakeConnection(overrides: Partial<DataHubConnection> = {}): DataHubConnection {
   return {
     hub: plantdatahub,
     includesPrivate: false,
-    fetchProjects: async () => Success([]),
+    fetchProjects: async () => projectsResult([]),
     fetchGroups: async () => Success([]),
     fetchMemberProjectIds: async () => Success([]),
     fetchContributors: async () => Success([]),

@@ -50,8 +50,10 @@ export interface HeadlineNumbers {
   public: number
   private: number
   hubs: number
-  /** Filled in once contributor details are loaded. */
-  people: number | null
+  /** 'counting' while any ARC in the set still lacks details; null before details load. */
+  people: number | 'counting' | null
+  /** True when some ARCs' details could not be loaded. */
+  peopleIncomplete: boolean
 }
 
 export interface CountItem { key: string; label: string; count: number }
@@ -66,6 +68,8 @@ export interface HubState {
   error?: string
   /** Set when the membership list could not be loaded; "My ARCs" then shows an error. */
   membershipError?: string
+  /** Set when a saved token was refused and the list fell back to the public ARCs. */
+  tokenRejected?: boolean
 }
 
 export interface DashboardFilters {
@@ -89,7 +93,8 @@ export interface DataHubConnection {
   hub: GitLabInstance
   /** True only when the request carries the session token. */
   includesPrivate: boolean
-  fetchProjects: (signal: AbortSignal) => Promise<Result<GitLabProject[]>>
+  /** `tokenRejected` means the saved token was refused (401) and the result is the anonymous public list. */
+  fetchProjects: (signal: AbortSignal) => Promise<Result<{ projects: GitLabProject[]; tokenRejected: boolean }>>
   fetchGroups: (signal: AbortSignal) => Promise<Result<GitLabGroup[]>>
   fetchMemberProjectIds: (signal: AbortSignal) => Promise<Result<number[]>>
   fetchContributors: (projectId: number, signal: AbortSignal) => Promise<Result<GitLabContributor[]>>

@@ -13,8 +13,8 @@ export interface StatsSidebarProps {
   privateNote?: string
 }
 
-function numberValue(value: number | null) {
-  return value === null ? '–' : String(value)
+function peopleValue(value: number | 'counting' | null) {
+  return value === 'counting' ? 'counting…' : value === null ? '–' : String(value)
 }
 
 function countCard(id: string, label: string, count: number, total: number | undefined, pressed: boolean, icon: typeof DatabaseIcon, onClick: () => void) {
@@ -53,8 +53,9 @@ export function StatsSidebar({ numbers, totals, filtersActive, activeAccess, onS
       </div>
       <div className={styles.stat} role="group" aria-labelledby="people-label">
         <span className={styles.icon}><PersonIcon size={16} /></span>
-        <span className={styles.value}>{numberValue(numbers.people)}</span>
+        <span className={styles.value}>{peopleValue(numbers.people)}</span>
         <span id="people-label" className={styles.label}>people</span>
+        {numbers.peopleIncomplete && <span className={styles.caption}>some ARCs could not be checked</span>}
       </div>
       <div className={`${styles.stat} ${styles.disabled}`} role="group" aria-labelledby="doi-label" aria-disabled="true">
         <span className={styles.icon}><FileBadgeIcon size={16} /></span>

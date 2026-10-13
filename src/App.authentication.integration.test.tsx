@@ -177,4 +177,21 @@ describe('DataHub logins', () => {
     expect(savedTokens()).toEqual({ [rptu.id]: 'rptu-token' })
     expect(await screen.findByRole('button', { name: 'Open datahub.rz.rptu.de private ARC' })).toBeVisible()
   })
+
+  it('falls back to public ARCs when a saved token is rejected by the project list', async () => {
+    const transport = fetchCall.getMockImplementation()!
+    fetchCall.mockImplementation(async (input, init) => {
+      const url = requestUrl(input)
+      const token = requestToken(init)
+      if (url.host === 'gitlab.plantmicrobe.de' && url.pathname === '/api/v4/projects' && token) {
+        return Response.json({ message: '401 Unauthorized' }, { status: 401 })
+      }
+      return transport(input, init)
+    })
+    localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify({ [microbe.id]: 'microbe-token' }))
+    render(<App />)
+    expect(await screen.findByText('Your login for gitlab.plantmicrobe.de has expired')).toBeVisible()
+    expect(screen.getByText('Showing public ARCs only. Log in again to see private ARCs.')).toBeVisible()
+    expect(await screen.findByRole('button', { name: 'Open gitlab.plantmicrobe.de public ARC' })).toBeVisible()
+  })
 })

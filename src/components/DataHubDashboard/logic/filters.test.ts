@@ -69,4 +69,11 @@ describe('matchesSearch', () => {
     expect(matchesSearch(wheat, 'rice')).toBe(true)
     expect(matchesSearch(rice, 'nothing')).toBe(false)
   })
+
+  it('matches a contributor name from the details', () => {
+    const details = new Map([[rice.key, { people: [{ id: 'maria', name: 'María López' }], lastChangeBy: null }]])
+    expect(matchesSearch(rice, 'maría', details)).toBe(true)
+    expect(matchesSearch(rice, 'lópez', details)).toBe(true)
+    expect(matchesSearch(rice, 'maría')).toBe(false)
+  })
 })

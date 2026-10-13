@@ -39,15 +39,19 @@ async function loadHub(connection: DataHubConnection, signal: AbortSignal, apply
     // Group names are cosmetic: without them labels fall back to paths.
     const names = groups.success === true ? groupNamesFrom(groups.value) : new Map<string, string>()
     const memberIds = memberships.success === true ? new Set(memberships.value) : null
-    const arcs = projects.value.map(project =>
-      toArcSummary(project, connection.hub, names, !connection.includesPrivate, memberIds ?? new Set()))
+    // A rejected token means the list is the anonymous, public one.
+    const tokenRejected = projects.value.tokenRejected
+    const arcs = projects.value.projects.map(project =>
+      toArcSummary(project, connection.hub, names, !connection.includesPrivate || tokenRejected, memberIds ?? new Set()))
     apply(id, hub => ({
       ...hub,
       status: 'loaded',
       arcs,
       error: undefined,
+      tokenRejected: tokenRejected ? true : undefined,
       // A membership failure never hides the ARCs; the working-group chart names the DataHUB.
-      membershipError: memberships.success === false ? memberships.error : undefined,
+      // With a rejected token it is expected, and the expired-login banner explains it.
+      membershipError: memberships.success === false && !tokenRejected ? memberships.error : undefined,
     }))
   } catch (error) {
     // Keep injected callbacks from causing an unhandled rejection.

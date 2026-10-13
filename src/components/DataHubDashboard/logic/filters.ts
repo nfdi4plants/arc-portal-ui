@@ -3,11 +3,15 @@ import type { ArcSummary, DashboardFilters, DetailsMap } from '../../../types/da
 const RECENT_WINDOW_DAYS = 30
 
 /** `details` (people) takes part in matching once contributors are loaded. */
-export function matchesSearch(arc: ArcSummary, query: string, _details?: DetailsMap): boolean {
+export function matchesSearch(arc: ArcSummary, query: string, details?: DetailsMap): boolean {
   const needle = query.trim().toLowerCase()
   if (!needle) return true
   const has = (text: string) => text.toLowerCase().includes(needle)
-  return has(arc.title) || has(arc.description) || has(arc.group.label) || arc.topics.some(has)
+  const entry = details?.get(arc.key)
+  const peopleMatch = entry !== undefined && entry !== 'unavailable'
+    ? entry.people.some(person => has(person.name))
+    : false
+  return has(arc.title) || has(arc.description) || has(arc.group.label) || arc.topics.some(has) || peopleMatch
 }
 
 /** `ignore` drops the hub or group filter, so its own bar chart still lists the alternatives. */

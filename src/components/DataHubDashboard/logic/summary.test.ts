@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { arcsPerMonth, countBy, headlineNumbers } from './summary.ts'
+import type { ArcDetails, DetailsMap } from '../../../types/dashboard.ts'
 import { arcSummary } from '../../../test/helpers.tsx'
 
 const group = (key: string, label: string) => ({ key, label, hubId: 'a', personal: false })
@@ -11,7 +12,30 @@ describe('headlineNumbers', () => {
       arcSummary({ hubId: 'a', access: 'private' }),
       arcSummary({ hubId: 'b' }),
     ]
-    expect(headlineNumbers(arcs)).toEqual({ total: 3, public: 2, private: 1, hubs: 2, people: null })
+    expect(headlineNumbers(arcs)).toEqual({ total: 3, public: 2, private: 1, hubs: 2, people: null, peopleIncomplete: false })
+  })
+
+  it('reports counting while any ARC lacks details', () => {
+    const arcs = [arcSummary({ key: 'k1' }), arcSummary({ key: 'k2' })]
+    const details = new Map<string, ArcDetails | 'unavailable'>([['k1', { people: [{ id: 'jane', name: 'Jane' }], lastChangeBy: null }]])
+    expect(headlineNumbers(arcs, details).people).toBe('counting')
+  })
+
+  it('counts distinct people once every ARC has details', () => {
+    const arcs = [arcSummary({ key: 'k1' }), arcSummary({ key: 'k2' })]
+    const details = new Map<string, ArcDetails | 'unavailable'>([
+      ['k1', { people: [{ id: 'jane', name: 'Jane' }, { id: 'joe', name: 'Joe' }], lastChangeBy: null }],
+      ['k2', { people: [{ id: 'jane', name: 'Jane' }], lastChangeBy: 'Jane' }],
+    ])
+    expect(headlineNumbers(arcs, details).people).toBe(2)
+  })
+
+  it('flags incomplete counts when some ARCs are unavailable', () => {
+    const arcs = [arcSummary({ key: 'k1' }), arcSummary({ key: 'k2' })]
+    const details: DetailsMap = new Map()
+    details.set('k1', { people: [{ id: 'jane', name: 'Jane' }], lastChangeBy: null })
+    details.set('k2', 'unavailable')
+    expect(headlineNumbers(arcs, details)).toMatchObject({ people: 1, peopleIncomplete: true })
   })
 })
 

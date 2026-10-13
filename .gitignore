@@ -32,3 +32,4 @@ CLAUDE.md
 /.kilocode
 /.claude
 specs
+.playwright-mcp

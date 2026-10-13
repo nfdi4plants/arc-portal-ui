@@ -1,8 +1,17 @@
-.container { background: var(--bgColor-default); border: 1px solid var(--borderColor-default); border-radius: 6px; }
-.scroll { overflow-x: auto; }
+.container { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); min-width: 0; background: var(--bgColor-default); border: 1px solid var(--borderColor-default); border-radius: 6px; }
 .title { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
 .titleLink { font-weight: 600; text-align: left; }
 .group { font-size: 12px; color: var(--fgColor-muted); }
 .hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .empty { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 32px 16px; }
 .message { margin: 0; color: var(--fgColor-muted); }
+.skeleton { display: inline-block; }
+.people { display: flex; align-items: center; gap: 2px; }
+.avatar { width: 20px; height: 20px; border-radius: 50%; margin-left: -4px; color: var(--fgColor-onEmphasis);
+  font: inherit; font-size: 10px; font-weight: 600; line-height: 18px; text-align: center; border: 1px solid var(--borderColor-default);
+  padding: 0; }
+.avatar:first-child { margin-left: 0; }
+.morePill { min-width: 22px; padding: 0 6px; border-radius: 10px; background: var(--bgColor-neutral-muted); font-size: 12px; font-weight: 600; color: var(--fgColor-muted); }
+.muted { color: var(--fgColor-muted); }
+.changed { display: flex; flex-direction: column; gap: 2px; }
+.by { font-size: 12px; color: var(--fgColor-muted); }

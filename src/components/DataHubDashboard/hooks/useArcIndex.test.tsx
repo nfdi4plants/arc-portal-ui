@@ -1,7 +1,7 @@
 import { renderHook, waitFor, act } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { useArcIndex } from './useArcIndex.ts'
-import { fakeConnection, gitLabProjectFull } from '../../../test/helpers.tsx'
+import { fakeConnection, gitLabProjectFull, projectsResult } from '../../../test/helpers.tsx'
 import { Failure, Success } from '../../../types/result.ts'
 import type { DataHubConnection } from '../../../types/dashboard.ts'
 
@@ -11,7 +11,7 @@ const hubB = { id: 'b', name: 'Beta', url: 'https://b.example' }
 function connection(hub: typeof hubA, fetchProjects?: DataHubConnection['fetchProjects']) {
   return fakeConnection({
     hub,
-    fetchProjects: fetchProjects ?? (async () => Success([gitLabProjectFull({ id: hub === hubA ? 1 : 2, name: `ARC of ${hub.name}` })])),
+    fetchProjects: fetchProjects ?? (async () => projectsResult([gitLabProjectFull({ id: hub === hubA ? 1 : 2, name: `ARC of ${hub.name}` })])),
   })
 }
 
@@ -38,7 +38,7 @@ describe('useArcIndex', () => {
   it('falls back to group paths when the group list fails', async () => {
     const connections = [fakeConnection({
       hub: hubA,
-      fetchProjects: async () => Success([gitLabProjectFull()]),
+      fetchProjects: async () => projectsResult([gitLabProjectFull()]),
       fetchGroups: async () => Failure('no groups'),
     })]
     const { result } = renderHook(() => useArcIndex(connections))
@@ -49,8 +49,8 @@ describe('useArcIndex', () => {
   it('retries only the DataHUB asked for', async () => {
     const failing = vi.fn<DataHubConnection['fetchProjects']>()
       .mockResolvedValueOnce(Failure('down'))
-      .mockResolvedValue(Success([gitLabProjectFull()]))
-    const other = vi.fn<DataHubConnection['fetchProjects']>(async () => Success([]))
+      .mockResolvedValue(projectsResult([gitLabProjectFull()]))
+    const other = vi.fn<DataHubConnection['fetchProjects']>(async () => projectsResult([]))
     const connections = [connection(hubA, failing), connection(hubB, other)]
     const { result } = renderHook(() => useArcIndex(connections))
     await waitFor(() => expect(result.current.hubs[0].status).toBe('failed'))
@@ -90,8 +90,8 @@ describe('useArcIndex', () => {
   })
 
   it('reloads only the DataHUB whose connection object changed', async () => {
-    const projectsA = vi.fn<DataHubConnection['fetchProjects']>(async () => Success([gitLabProjectFull({ id: 1, name: 'ARC of Alpha' })]))
-    const projectsB = vi.fn<DataHubConnection['fetchProjects']>(async () => Success([gitLabProjectFull({ id: 2, name: 'ARC of Beta' })]))
+    const projectsA = vi.fn<DataHubConnection['fetchProjects']>(async () => projectsResult([gitLabProjectFull({ id: 1, name: 'ARC of Alpha' })]))
+    const projectsB = vi.fn<DataHubConnection['fetchProjects']>(async () => projectsResult([gitLabProjectFull({ id: 2, name: 'ARC of Beta' })]))
     const signals: Record<string, AbortSignal[]> = { a: [], b: [] }
     const firstA = fakeConnection({ hub: hubA, fetchProjects: (signal) => { signals.a.push(signal); return projectsA(signal) } })
     const firstB = fakeConnection({ hub: hubB, fetchProjects: (signal) => { signals.b.push(signal); return projectsB(signal) } })
@@ -121,8 +121,8 @@ describe('useArcIndex', () => {
   })
 
   it('starts no request when the same connection objects arrive in a new array', async () => {
-    const projectsA = vi.fn<DataHubConnection['fetchProjects']>(async () => Success([]))
-    const projectsB = vi.fn<DataHubConnection['fetchProjects']>(async () => Success([]))
+    const projectsA = vi.fn<DataHubConnection['fetchProjects']>(async () => projectsResult([]))
+    const projectsB = vi.fn<DataHubConnection['fetchProjects']>(async () => projectsResult([]))
     const connections = [
       fakeConnection({ hub: hubA, fetchProjects: projectsA }),
       fakeConnection({ hub: hubB, fetchProjects: projectsB }),
@@ -137,7 +137,7 @@ describe('useArcIndex', () => {
 
   it('marks ARCs as members from the membership id list', async () => {
     const projects = [gitLabProjectFull({ id: 1 }), gitLabProjectFull({ id: 2 })]
-    const connections = [fakeConnection({ hub: hubA, fetchProjects: async () => Success(projects),
+    const connections = [fakeConnection({ hub: hubA, fetchProjects: async () => projectsResult(projects),
       fetchMemberProjectIds: async () => Success([2]) })]
     const { result } = renderHook(() => useArcIndex(connections))
     await waitFor(() => expect(result.current.hubs[0].status).toBe('loaded'))
@@ -147,7 +147,7 @@ describe('useArcIndex', () => {
   it('keeps the hub loaded with a membershipError when the membership list fails', async () => {
     const projects = [gitLabProjectFull({ id: 1 })]
     const connections = [fakeConnection({ hub: hubA, includesPrivate: true,
-      fetchProjects: async () => Success(projects), fetchMemberProjectIds: async () => Failure('membership down') })]
+      fetchProjects: async () => projectsResult(projects), fetchMemberProjectIds: async () => Failure('membership down') })]
     const { result } = renderHook(() => useArcIndex(connections))
     await waitFor(() => expect(result.current.hubs[0].status).toBe('loaded'))
     expect(result.current.hubs[0].membershipError).toBe('membership down')

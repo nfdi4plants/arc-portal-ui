@@ -1,15 +1,33 @@
-import type { ArcSummary, CountItem, HeadlineNumbers, MonthCount } from '../../../types/dashboard.ts'
+import type { ArcSummary, CountItem, DetailsMap, HeadlineNumbers, MonthCount } from '../../../types/dashboard.ts'
 
 export type { CountItem, HeadlineNumbers, MonthCount } from '../../../types/dashboard.ts'
 
-export function headlineNumbers(arcs: ArcSummary[]): HeadlineNumbers {
+export function headlineNumbers(arcs: ArcSummary[], details?: DetailsMap): HeadlineNumbers {
   const publicCount = arcs.filter(arc => arc.access === 'public').length
+  let people: number | 'counting' | null = null
+  let peopleIncomplete = false
+  if (details) {
+    const missing = arcs.filter(arc => !details.has(arc.key))
+    const unavailable = arcs.filter(arc => details.get(arc.key) === 'unavailable')
+    if (missing.length > 0) {
+      people = 'counting'
+    } else {
+      const ids = new Set<string>()
+      for (const arc of arcs) {
+        const entry = details.get(arc.key)
+        if (entry !== undefined && entry !== 'unavailable') for (const person of entry.people) ids.add(person.id)
+      }
+      people = ids.size
+    }
+    peopleIncomplete = unavailable.length > 0
+  }
   return {
     total: arcs.length,
     public: publicCount,
     private: arcs.length - publicCount,
     hubs: new Set(arcs.map(arc => arc.hubId)).size,
-    people: null,
+    people,
+    peopleIncomplete,
   }
 }
 
