@@ -131,7 +131,11 @@ export class RunDirector {
     this.stage = stage
     if (stage.kind === 'stretch') this.hooks.emit({ type: 'segmentEntered', segment: this.segment(stage.index) })
     else if (stage.kind === 'boss') this.hooks.emit({ type: 'bossEntered', boss: this.bossSpec(stage.index) })
-    else if (stage.kind === 'finalBoss') this.hooks.emit({ type: 'bossEntered', boss: this.finalBossSpec() })
+    else if (stage.kind === 'finalBoss') {
+      // A player who barely beat the last node boss would otherwise start the hardest fight nearly dead.
+      this.build = { ...this.build, hp: this.build.stats.maxHp }
+      this.hooks.emit({ type: 'bossEntered', boss: this.finalBossSpec() })
+    }
     this.hooks.enter(stage)
   }
 }

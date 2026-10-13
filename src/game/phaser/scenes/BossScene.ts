@@ -2,6 +2,7 @@ import { SCENE } from '../../contracts/constants'
 import type { Combatant } from '../../contracts/combat'
 import type { BossSpec } from '../../contracts/content'
 import type { Segment } from '../../contracts/run'
+import { prewarmTelegraphs, releaseTelegraphs } from '../art'
 import { spawnBoss, type Arena, type Boss } from '../bosses'
 import type { View } from '../view'
 import { buildArena } from './arena'
@@ -40,10 +41,13 @@ export class BossScene extends GameplayScene {
 
   protected setup() {
     const { spec, segment } = this
+    prewarmTelegraphs(this)
     const deps = { combat: this.combat, art: this.ctx.art, player: this.player, rng: this.director.rng.fork(`bossFight/${segment.index}`) }
     const boss = spawnBoss(this, spec, segment, deps, this.arena)
     this.boss = boss
-    this.enemies.push(boss)
+    this.combat.on('kill', (event) => {
+      if (event.target === boss) this.spareAfterBoss(boss)
+    })
     if (this.ctx.active) {
       this.ctx.active.boss = boss
       this.ctx.active.bossName = spec.label
@@ -73,6 +77,7 @@ export class BossScene extends GameplayScene {
     if (this.outroMs < 0) {
       boss.update(dtMs)
       if (boss.isDefeated()) {
+        this.spareAfterBoss(boss)
         this.outroMs = OUTRO_MS
         this.gainXp(this.spec.xp)
       }
@@ -85,5 +90,6 @@ export class BossScene extends GameplayScene {
   protected onShutdown() {
     this.boss?.destroy()
     this.boss = null
+    releaseTelegraphs(this)
   }
 }

@@ -3,7 +3,7 @@ import { DEPTH, PALETTE, SCENE, TILE } from '../../contracts/constants'
 import type { MonsterSpec } from '../../contracts/content'
 import type { Segment } from '../../contracts/run'
 import { monsterFromAnnotation } from '../../model/content'
-import { applySpriteRef, doorArt, prewarm, releaseMonsters } from '../art'
+import { applySpriteRef, doorArt, minionArtSpec, prewarm, prewarmEffects, releaseMonsters } from '../art'
 import { spawnMob, updatePickups, type Mob, type MobDeps } from '../mobs'
 import { markOneWay } from '../player/Player'
 import type { View } from '../view'
@@ -126,11 +126,15 @@ export class StretchScene extends GameplayScene {
     this.parallax?.layout(view)
   }
 
-  // Monster art is drawn behind the banner, a few per frame, so no frame stalls.
+  // Monster art is drawn behind the banner, a few per frame, so no frame stalls. A summoner's
+  // minion art goes with its summoner, and the effects and projectiles come on the first frame.
   protected onBannerFrame() {
+    if (this.prewarmed === 0) prewarmEffects(this)
     if (this.prewarmed >= this.specs.length) return
     const next = Math.min(this.specs.length, this.prewarmed + PREWARM_PER_FRAME)
-    prewarm(this, this.specs.slice(this.prewarmed, next))
+    const batch = this.specs.slice(this.prewarmed, next)
+    prewarm(this, batch)
+    prewarm(this, batch.filter((spec) => spec.passive.kind === 'summoner').map(minionArtSpec))
     this.prewarmed = next
   }
 
@@ -144,7 +148,6 @@ export class StretchScene extends GameplayScene {
     if (this.prewarmed < this.specs.length) return
     const centre = this.cameras.main.midPoint.x
     const reach = AWAKE_VIEWS * this.view.width
-    let changed = false
     for (const slot of this.slots) {
       if (slot.gone) continue
       const x = slot.mob ? slot.mob.position().x : slot.x
@@ -152,23 +155,14 @@ export class StretchScene extends GameplayScene {
       if (!slot.mob) {
         if (!near) continue
         slot.mob = spawnMob(this, slot.spec, this.mobDeps, slot.x, slot.y)
-        changed = true
       } else if (slot.asleep === near) {
         slot.asleep = !near
         slot.mob.setAsleep(slot.asleep)
-        changed = true
       }
     }
-    if (changed) this.refreshEnemies()
-  }
-
-  private refreshEnemies() {
-    this.enemies.length = 0
-    for (const slot of this.slots) if (slot.mob && !slot.asleep && !slot.gone) this.enemies.push(slot.mob)
   }
 
   protected stepWorld(dtMs: number) {
-    let removed = false
     for (const slot of this.slots) {
       const mob = slot.mob
       if (!mob || slot.asleep || slot.gone) continue
@@ -176,10 +170,8 @@ export class StretchScene extends GameplayScene {
       if (mob.isGone()) {
         mob.destroy()
         slot.gone = true
-        removed = true
       }
     }
-    if (removed) this.refreshEnemies()
     updatePickups(this, this.player)
 
     const feet = this.player.position()

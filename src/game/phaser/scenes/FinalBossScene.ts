@@ -1,5 +1,6 @@
 import { SCENE } from '../../contracts/constants'
 import type { Combatant } from '../../contracts/combat'
+import { prewarmTelegraphs, releaseTelegraphs } from '../art'
 import { spawnFinalBoss, type Arena, type FinalBoss } from '../bosses'
 import type { View } from '../view'
 import { buildArena } from './arena'
@@ -36,10 +37,13 @@ export class FinalBossScene extends GameplayScene {
   protected setup() {
     const { plan } = this.director
     const spec = this.director.finalBossSpec()
+    prewarmTelegraphs(this)
     const deps = { combat: this.combat, art: this.ctx.art, player: this.player, rng: this.director.rng.fork('finalBossFight') }
     const boss = spawnFinalBoss(this, spec, plan, deps, this.arena)
     this.boss = boss
-    this.enemies.push(boss)
+    this.combat.on('kill', (event) => {
+      if (event.target === boss) this.spareAfterBoss(boss)
+    })
     if (this.ctx.active) {
       this.ctx.active.boss = boss
       this.ctx.active.bossName = spec.title
@@ -71,7 +75,10 @@ export class FinalBossScene extends GameplayScene {
     if (!boss) return
     if (this.outroMs < 0) {
       boss.update(dtMs)
-      if (boss.isDefeated()) this.outroMs = OUTRO_MS
+      if (boss.isDefeated()) {
+        this.spareAfterBoss(boss)
+        this.outroMs = OUTRO_MS
+      }
       return
     }
     this.outroMs -= dtMs
@@ -81,5 +88,6 @@ export class FinalBossScene extends GameplayScene {
   protected onShutdown() {
     this.boss?.destroy()
     this.boss = null
+    releaseTelegraphs(this)
   }
 }

@@ -30,8 +30,6 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
   protected player!: Player
   protected loadout!: LoadoutWithStatus
   protected view: View = viewForBox(1, 1)
-  // Awake enemies, handed to the loadout for auto-aim and area effects.
-  protected readonly enemies: Combatant[] = []
   private controls!: InputLayer
   private frame!: InputFrame
   private readonly holds = new Set<Hold>()
@@ -72,7 +70,6 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
     this.frozen = false
     this.bannerMs = 0
     this.lookAhead = 0
-    this.enemies.length = 0
     // A restarted scene keeps its clock and tween manager, so clear what an earlier hold left.
     this.time.paused = false
     this.tweens.resumeAll()
@@ -108,7 +105,8 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
       art,
       player: this.player,
       rng: director.rng.fork(`loadout/${this.scene.key}/${data.index ?? 0}`),
-      enemies: () => this.enemies,
+      // Sleeping mobs leave the combat world, so the living enemy team is the awake mobs plus whatever they or a boss summon.
+      enemies: () => this.combat.livingCombatants('enemy'),
     })
     this.loadout.sync(director.build)
     this.combat.on('kill', (event) => this.onKill(event))
@@ -232,6 +230,13 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
       return
     }
     if (event.attacker.team === 'player') this.gainXp(this.xpFor(event.target))
+  }
+
+  // Shots a beaten boss fired earlier must not kill the player during the outro. An unregistered
+  // player cannot be hit at all, and the scene ends before the player would need the combat world again.
+  protected spareAfterBoss(boss: Combatant) {
+    this.combat.cancelOwnedBy(boss)
+    this.combat.unregister(this.player)
   }
 
   // Pit damage. True when it was lethal.
