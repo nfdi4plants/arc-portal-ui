@@ -36,7 +36,7 @@ export function createOntology(core: Core): Feature {
       hitOn(other, (event.damage + bonus) * CHAIN_SHARE, ['extra', 'chain'])
       const from = centerOf(event.target)
       const to = centerOf(other)
-      core.fx.line(from.x, from.y, to.x, to.y, PALETTE.teal, 220)
+      core.fx.line(from.x, from.y, to.x, to.y, 220)
     }),
   )
   return { sync() {}, update() {} }
@@ -72,9 +72,9 @@ export function createGitRevert(core: Core): GitRevertFeature {
     if (hp > player.hp()) player.heal(hp - player.hp())
     history.clear()
     record()
-    core.fx.line(from.x, from.y - 24, x, y - 24, PALETTE.teal, 420)
-    core.fx.burst(from.x, from.y - 24, 30, PALETTE.cream, 300)
-    core.fx.burst(x, y - 24, 36, PALETTE.blue, 420)
+    core.fx.line(from.x, from.y - 24, x, y - 24, 420)
+    core.fx.burst(from.x, from.y - 24, 'hit')
+    core.fx.burst(x, y - 24, 'levelUp')
     return true
   }
 
@@ -260,7 +260,7 @@ export function createPeerReview(core: Core): Feature {
       const box = item.box
       combat.spawnHitbox({ ...box, owner, follow: false, damage: box.damage * multiplier, tags: [...(box.tags ?? []), 'extra', 'review'] })
     }
-    core.fx.burst(x, y - 24, 20, PALETTE.blue, 200)
+    core.fx.burst(x, y - 24, 'hit')
   }
 
   const summon = () => {
@@ -290,7 +290,7 @@ export function createPeerReview(core: Core): Feature {
       const item = { ...recorded[(next - count + k + recorded.length) % recorded.length] }
       core.scheduler.at(REVIEW_REPLAY_MS + k * REVIEW_GAP_MS, () => replay(item, x, y))
     }
-    core.fx.burst(x, y - 24, 24, PALETTE.blue, 240)
+    core.fx.burst(x, y - 24, 'levelUp')
   }
 
   core.own(

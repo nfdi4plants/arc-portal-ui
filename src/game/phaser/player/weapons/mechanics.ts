@@ -1,5 +1,5 @@
 import type Phaser from 'phaser'
-import { DEPTH, PALETTE } from '../../../contracts/constants'
+import { DEPTH } from '../../../contracts/constants'
 import type { AbilityHandler } from '../../../contracts/player'
 import type { Core, Feature } from './core'
 import { centerOf, nearestLiving } from './helpers'
@@ -87,7 +87,7 @@ export function createParry(core: Core): AbilityFeature {
       maxTargets: Infinity,
       tags: ['heavy', 'counter'],
     })
-    core.fx.burst(feet.x, feet.y - 24, 44, PALETTE.blue, 260)
+    core.fx.burst(feet.x, feet.y - 24, 'crit', 1.5)
   }
 
   core.own(
@@ -110,7 +110,7 @@ export function createParry(core: Core): AbilityFeature {
       activate() {
         windowMs = PARRY_WINDOW_MS
         const feet = player.position()
-        core.fx.burst(feet.x, feet.y - 24, 26, PALETTE.cream, PARRY_WINDOW_MS)
+        core.fx.burst(feet.x, feet.y - 24, 'hit')
       },
     },
     sync() {

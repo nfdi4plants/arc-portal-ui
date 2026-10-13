@@ -1,7 +1,9 @@
+import type Phaser from 'phaser'
 import type { ProjectileArt } from '../../../contracts/art'
 import type { AttackContext, AttackMove, WeaponMoveset } from '../../../contracts/player'
 import type { WeaponSlot } from '../../../contracts/progression'
 import type { Point } from './helpers'
+import type { Scheduler } from './scheduler'
 
 // Building blocks shared by the weapon movesets.
 
@@ -15,8 +17,29 @@ export function muzzle(ctx: AttackContext): Point {
   return { x: feet.x + ctx.player.facing() * MUZZLE.x, y: feet.y + MUZZLE.y }
 }
 
-export function move(name: string, timing: Timing, onActive: (ctx: AttackContext, self: AttackMove) => void): AttackMove {
+// What the effects that follow a heavy move (DOI Excalibur, Heavy Shockwave) read from it.
+export interface HeavyDeclaration {
+  // The damage one target takes from the main hit of the move, before the damage multiplier. The
+  // pulses of a flame cone and the two cuts of Dual Scalpels add up.
+  damage: number
+  // Time from the start of the active phase until that damage, before the attack speed divides it.
+  delayMs?: number
+}
+
+const declared = new WeakMap<AttackMove, HeavyDeclaration>()
+
+export function heavyOf(move: AttackMove): HeavyDeclaration | undefined {
+  return declared.get(move)
+}
+
+export function move(
+  name: string,
+  timing: Timing,
+  onActive: (ctx: AttackContext, self: AttackMove) => void,
+  heavy?: HeavyDeclaration,
+): AttackMove {
   const result: AttackMove = { name, ...timing, onActive: (ctx) => onActive(ctx, result) }
+  if (heavy) declared.set(result, heavy)
   return result
 }
 
@@ -26,10 +49,25 @@ export function activeMs(ctx: AttackContext, self: AttackMove): number {
   return self.activeMs / ctx.player.getBuild().stats.attackSpeed
 }
 
-// Delays inside a move use the scene clock. They drift from the move's own timing by the length
-// of a hit-stop at most.
-export function later(ctx: AttackContext, delayMs: number, run: () => void): void {
-  ctx.scene.time.delayedCall(delayMs, run)
+// The movesets are module constants that know nothing of the loadout, so the move layer binds the
+// loadout's scheduler to its scene and `later` looks it up there.
+const schedulers = new WeakMap<Phaser.Scene, Scheduler>()
+
+export function bindScheduler(scene: Phaser.Scene, scheduler: Scheduler): () => void {
+  schedulers.set(scene, scheduler)
+  return () => {
+    if (schedulers.get(scene) === scheduler) schedulers.delete(scene)
+  }
+}
+
+// Group of the sub-hits that belong to one attack. The move layer drops the group when the mage is
+// hit or dashes out of the attack.
+export const SUB_HITS = 1
+
+// Delays inside a move run on the loadout's fixed-step scheduler, so they stand still during
+// hit-stop like the hitboxes and projectiles they spawn.
+export function later(ctx: AttackContext, delayMs: number, run: () => void, group = SUB_HITS): void {
+  schedulers.get(ctx.scene)?.at(delayMs, run, group)
 }
 
 export interface MeleeHit {
@@ -108,12 +146,16 @@ export interface WaveOptions {
   distance: number
 }
 
+// Distance from the mage's centre to the inner edge of each wave. The gap keeps an enemy next to
+// the mage out of both waves in the same step.
+const WAVE_GAP = 12
+
 // Two flat waves along the ground, one each way. The knockback follows each wave's own direction.
 export function spawnShockwaves(ctx: AttackContext, wave: WaveOptions): void {
   const feet = ctx.player.position()
   const lifetimeMs = (wave.distance / wave.speed) * 1000
   for (const dir of [1, -1]) {
-    fireShot(ctx, { x: feet.x + dir * 14, y: feet.y - wave.height / 2 }, {
+    fireShot(ctx, { x: feet.x + dir * (WAVE_GAP + wave.width / 2), y: feet.y - wave.height / 2 }, {
       art: 'orb',
       velocity: { x: dir * wave.speed, y: 0 },
       damage: wave.damage,

@@ -83,6 +83,8 @@ export function attachLoadout(deps: LoadoutDeps): LoadoutWithStatus {
   const applied: (string | null | undefined)[] = [undefined, undefined, undefined, undefined]
   let destroyed = false
 
+  // event.damage is what the target took, after armour and weak points. Secondary hits belong to
+  // the stand-in attacker, so they never heal.
   core.own(
     combat.on('hit', (event) => {
       if (event.attacker !== player || core.build.stats.lifesteal <= 0) return

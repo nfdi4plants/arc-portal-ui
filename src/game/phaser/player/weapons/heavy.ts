@@ -3,6 +3,7 @@ import { flameVisual } from './flame'
 import { aimedVelocity } from './helpers'
 import type { MeleeHit, Shot, Timing } from './kit'
 import { activeMs, fireShot, later, memoMoves, move, spawnMelee, spawnShockwaves } from './kit'
+import { UNGROUPED } from './scheduler'
 
 // The four heavy weapons. Each has one heavy move, plus a quick light move for the case that the
 // weapon sits in the light slot. The catalog never puts it there, so the fallback stays simple.
@@ -29,9 +30,11 @@ const lightTiming = (startupMs: number, activeMs: number, recoveryMs: number, ca
 })
 
 // Centrifuge disc: flies out 160 units and comes back to the thrower. The return is a second
-// projectile that starts where the first one expires and aims at the player's hand.
+// projectile that starts where the first one expires and aims at the player's hand. The return is
+// ungrouped, so a hit on the mage does not make the disc vanish in flight.
 const DISC_SPEED = 320
 const DISC_REACH = 160
+const DISC_DAMAGE = 20
 
 const disc = (damage: number, lifetimeMs: number, velocity: { x: number; y: number }, tags: string[]): Shot => ({
   art: 'disc',
@@ -52,14 +55,19 @@ function throwDisc(ctx: AttackContext, height: number, damage: number, returns: 
   const outMs = (reach / DISC_SPEED) * 1000
   fireShot(ctx, origin, disc(damage, outMs, { x: dir * DISC_SPEED, y: 0 }, returns ? ['heavy', 'projectile'] : LIGHT_TAGS))
   if (!returns) return
-  later(ctx, outMs, () => {
-    const turn = { x: origin.x + dir * reach, y: origin.y }
-    const hand = ctx.player.position()
-    const target = { x: hand.x, y: hand.y + height }
-    const back = aimedVelocity(turn, target, DISC_SPEED * 1.1, dir === 1 ? -1 : 1)
-    const flightMs = (Math.hypot(target.x - turn.x, target.y - turn.y) / (DISC_SPEED * 1.1)) * 1000 + 60
-    fireShot(ctx, turn, disc(damage * 0.6, flightMs, back, ['heavy', 'projectile']))
-  })
+  later(
+    ctx,
+    outMs,
+    () => {
+      const turn = { x: origin.x + dir * reach, y: origin.y }
+      const hand = ctx.player.position()
+      const target = { x: hand.x, y: hand.y + height }
+      const back = aimedVelocity(turn, target, DISC_SPEED * 1.1, dir === 1 ? -1 : 1)
+      const flightMs = (Math.hypot(target.x - turn.x, target.y - turn.y) / (DISC_SPEED * 1.1)) * 1000 + 60
+      fireShot(ctx, turn, disc(damage * 0.6, flightMs, back, ['heavy', 'projectile']))
+    },
+    UNGROUPED,
+  )
 }
 
 export const discMoveset: WeaponMoveset = {
@@ -72,9 +80,14 @@ export const discMoveset: WeaponMoveset = {
     // Tier 2 throws a high and a low disc at once.
     const heights = tier === 2 ? [-40, -12] : [-26]
     return [
-      move('Disc throw', heavyTiming(200, 80, 300, 180), (ctx) => {
-        for (const height of heights) throwDisc(ctx, height, 20, true)
-      }),
+      move(
+        'Disc throw',
+        heavyTiming(200, 80, 300, 180),
+        (ctx) => {
+          for (const height of heights) throwDisc(ctx, height, DISC_DAMAGE, true)
+        },
+        { damage: DISC_DAMAGE },
+      ),
     ]
   }),
 }
@@ -110,16 +123,21 @@ export const beakerMoveset: WeaponMoveset = {
       ? { damage: 13, width: 20, height: 24, speed: 240, distance: 190 }
       : { damage: 9, width: 12, height: 14, speed: 220, distance: 130 }
     return [
-      move('Beaker smash', heavyTiming(340, 120, 360, 240, 60), (ctx, self) => {
-        spawnMelee(ctx, activeMs(ctx, self), smash)
-        spawnShockwaves(ctx, wave)
-      }),
+      move(
+        'Beaker smash',
+        heavyTiming(340, 120, 360, 240, 60),
+        (ctx, self) => {
+          spawnMelee(ctx, activeMs(ctx, self), smash)
+          spawnShockwaves(ctx, wave)
+        },
+        { damage: smash.damage },
+      ),
     ]
   }),
 }
 
 // Bunsen staff: a flame cone in front of the player, built from short hitboxes that widen and
-// reach further. The sprites come from flameVisual and the pulses are timed on the scene clock.
+// reach further. The sprites come from flameVisual and the pulses run on the loadout scheduler.
 interface Cone {
   length: number
   pulses: number
@@ -160,7 +178,9 @@ export const bunsenMoveset: WeaponMoveset = {
       return [move('Flame puff', lightTiming(90, 70, 180, 100), (ctx) => flameCone(ctx, puff))]
     }
     const cone = { length: tier === 2 ? 105 : 70, pulses: 4, damage: tier === 2 ? 8 : 7, tags: HEAVY_TAGS }
-    return [move('Flame cone', heavyTiming(180, 400, 240, 140), (ctx) => flameCone(ctx, cone))]
+    // The extras of the heavy move read the total of the pulses, once per move.
+    const declared = { damage: cone.pulses * cone.damage }
+    return [move('Flame cone', heavyTiming(180, 400, 240, 140), (ctx) => flameCone(ctx, cone), declared)]
   }),
 }
 
@@ -210,13 +230,19 @@ export const petriMoveset: WeaponMoveset = {
       tags: ['heavy', 'bash'],
     }
     const timing = heavyTiming(70, stanceMs + 80, 260, 200)
-    const stance: AttackMove = move('Shield stance', timing, (ctx) => {
-      const speed = ctx.player.getBuild().stats.attackSpeed
-      reflectStance(ctx, stanceMs / speed)
-      later(ctx, stanceMs / speed, () => {
-        if (!ctx.player.isDead()) spawnMelee(ctx, 80 / speed, bash)
-      })
-    })
+    // The bash is the main damage, so the extras of the heavy move wait for it as well.
+    const stance: AttackMove = move(
+      'Shield stance',
+      timing,
+      (ctx) => {
+        const speed = ctx.player.getBuild().stats.attackSpeed
+        reflectStance(ctx, stanceMs / speed)
+        later(ctx, stanceMs / speed, () => {
+          if (!ctx.player.isDead()) spawnMelee(ctx, 80 / speed, bash)
+        })
+      },
+      { damage: bash.damage, delayMs: stanceMs },
+    )
     return [stance]
   }),
 }

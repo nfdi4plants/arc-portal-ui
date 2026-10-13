@@ -46,6 +46,9 @@ function fireVolley(ctx: AttackContext, volley: Volley): void {
   }
 }
 
+// Each of the two hits of tier 2 deals this share of the damage.
+const DUAL_SHARE = 0.75
+
 // Two hits for tier 2, 40 ms apart, each at 75% damage. One hit at full damage for tier 1.
 function swing(ctx: AttackContext, self: AttackMove, hit: MeleeHit, dual: boolean): void {
   const duration = activeMs(ctx, self)
@@ -53,7 +56,7 @@ function swing(ctx: AttackContext, self: AttackMove, hit: MeleeHit, dual: boolea
     spawnMelee(ctx, duration, hit)
     return
   }
-  const part = { ...hit, damage: hit.damage * 0.75 }
+  const part = { ...hit, damage: hit.damage * DUAL_SHARE }
   spawnMelee(ctx, duration, part)
   later(ctx, 40, () => spawnMelee(ctx, duration, part))
 }
@@ -80,7 +83,9 @@ export const wandMoveset: WeaponMoveset = {
   moves: memoMoves((slot, tier) => {
     if (slot === 'heavy') {
       const big = { ...WAND_BOLT(30 * (tier === 2 ? TIER2_HEAVY : 1)), radius: 9, pierce: 2, hitStopMs: 60, tags: ['heavy', 'projectile'] }
-      return [move('Charged bolt', heavyTiming(260, 60, 300, 180), (ctx) => fireVolley(ctx, { shot: big, speed: 300, count: 1, fan: 0 }))]
+      return [
+        move('Charged bolt', heavyTiming(260, 60, 300, 180), (ctx) => fireVolley(ctx, { shot: big, speed: 300, count: 1, fan: 0 }), { damage: big.damage }),
+      ]
     }
     return [
       wandShot('Bolt', lightTiming(70, 40, 150, 70), 9, tier),
@@ -110,7 +115,9 @@ export const pipetteMoveset: WeaponMoveset = {
   moves: memoMoves((slot, tier) => {
     if (slot === 'heavy') {
       const spray = { ...DROPLET(7, tier), tags: ['heavy', 'projectile'] }
-      return [move('Droplet spray', heavyTiming(200, 100, 300, 180), (ctx) => fireVolley(ctx, { shot: spray, speed: 420, count: 5, fan: 0.2 }))]
+      return [
+        move('Droplet spray', heavyTiming(200, 100, 300, 180), (ctx) => fireVolley(ctx, { shot: spray, speed: 420, count: 5, fan: 0.2 }), { damage: spray.damage }),
+      ]
     }
     return [
       dropletShot(lightTiming(40, 40, 100, 50), 8, tier),
@@ -133,8 +140,9 @@ const stab = (damage: number, knockback: { x: number; y: number }, hitStopMs: nu
   tags: LIGHT_TAGS,
 })
 
-function scalpelMove(name: string, timing: Timing, hit: MeleeHit, tier: 1 | 2): AttackMove {
-  return move(name, timing, (ctx, self) => swing(ctx, self, hit, tier === 2))
+function scalpelMove(name: string, timing: Timing, hit: MeleeHit, tier: 1 | 2, heavy = false): AttackMove {
+  const total = tier === 2 ? hit.damage * 2 * DUAL_SHARE : hit.damage
+  return move(name, timing, (ctx, self) => swing(ctx, self, hit, tier === 2), heavy ? { damage: total } : undefined)
 }
 
 export const scalpelMoveset: WeaponMoveset = {
@@ -151,7 +159,7 @@ export const scalpelMoveset: WeaponMoveset = {
         hitStopMs: 70,
         tags: HEAVY_TAGS,
       }
-      return [scalpelMove('Deep cut', heavyTiming(240, 90, 320, 200, 100), cut, tier)]
+      return [scalpelMove('Deep cut', heavyTiming(240, 90, 320, 200, 100), cut, tier, true)]
     }
     const quick = { x: 70, y: -20 }
     return [
@@ -181,7 +189,9 @@ export const whipMoveset: WeaponMoveset = {
   moves: memoMoves((slot, tier) => {
     if (slot === 'heavy') {
       const heavyLash: MeleeHit = { ...lash(28, 260, 70, tier), y: -32, w: 92, h: 16, tags: HEAVY_TAGS }
-      return [move('Heavy lash', heavyTiming(280, 110, 330, 200), (ctx, self) => spawnMelee(ctx, activeMs(ctx, self), heavyLash))]
+      return [
+        move('Heavy lash', heavyTiming(280, 110, 330, 200), (ctx, self) => spawnMelee(ctx, activeMs(ctx, self), heavyLash), { damage: heavyLash.damage }),
+      ]
     }
     return [
       move('Whip lash', lightTiming(90, 70, 170, 90, 60), (ctx, self) => spawnMelee(ctx, activeMs(ctx, self), lash(11, 130, 30, tier))),

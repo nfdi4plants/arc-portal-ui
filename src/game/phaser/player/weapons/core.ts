@@ -134,7 +134,7 @@ export function createCore(deps: LoadoutDeps, build: PlayerBuild): Core {
   for (const id of PASSIVE_IDS) flags[id] = false
   const disposers: (() => void)[] = []
   const scheduler = createScheduler()
-  const fx = createFxPool(deps.scene)
+  const fx = createFxPool(deps.scene, deps.art)
 
   return {
     deps,
