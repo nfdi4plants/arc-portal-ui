@@ -74,7 +74,12 @@
   font-size: 0.875rem;
 }
 
+.investigation-owner-unavailable {
+  color: var(--fgColor-muted);
+}
+
 .investigation-archive-size {
+  white-space: nowrap;
   display: block;
   color: var(--fgColor-muted);
 }

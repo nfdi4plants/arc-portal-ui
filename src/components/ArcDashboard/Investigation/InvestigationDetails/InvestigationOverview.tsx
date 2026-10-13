@@ -2,7 +2,10 @@ import { Link, Text } from '@primer/react'
 import { ExpandableText } from '../Primitive Components'
 import type { InvestigationMetadata } from '../types'
 
-export function InvestigationOverview({ metadata }: { metadata: Pick<InvestigationMetadata, 'identifier' | 'description' | 'githubLinks'> }) {
+export function InvestigationOverview({ metadata, showFullDescription = false }: {
+  metadata: Pick<InvestigationMetadata, 'identifier' | 'description' | 'githubLinks'>
+  showFullDescription?: boolean
+}) {
   return (
     <section className="investigation-overview" aria-label="ARC overview">
       <Text as="p" className="investigation-identifier">{metadata.identifier}</Text>
@@ -19,7 +22,11 @@ export function InvestigationOverview({ metadata }: { metadata: Pick<Investigati
         </nav>
       )}
       {metadata.description && (
-        <ExpandableText className="investigation-description">{metadata.description}</ExpandableText>
+        showFullDescription ? (
+          <div className="investigation-description"><Text as="p">{metadata.description}</Text></div>
+        ) : (
+          <ExpandableText className="investigation-description">{metadata.description}</ExpandableText>
+        )
       )}
     </section>
   )

@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { act, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { crateJson, sampleCrateSource } from '../../../../tests/helpers/sampleCrate'
@@ -11,6 +11,7 @@ import { InvestigationOverview } from '../Investigation/InvestigationDetails/Inv
 import { Dashboard, type DashboardProps } from './Dashboard'
 
 vi.mock('@nfdi4plants/arc-web-view', () => ({ WebViewer: () => <p>ARC contents preview</p> }))
+vi.mock('../ArcViewer/fileSizes', () => ({ loadFileSizes: vi.fn(async () => new Map()) }))
 
 const repository = { source: 'https://gitlab.example', projectPath: 'research/talinum' }
 const release: ArcRepositoryVersion = {
@@ -39,6 +40,48 @@ async function renderDetails(props: Omit<DashboardProps, 'arcJson'> = { reposito
 }
 
 describe('ARC-Dashboard', () => {
+  it('opens the ARC viewer from its expand button', async () => {
+    const user = await renderDetails()
+    const frame = document.createElement('iframe')
+    document.body.appendChild(frame)
+    const popup = frame.contentWindow!
+    popup.matchMedia = window.matchMedia
+    vi.spyOn(window, 'open').mockReturnValue(popup)
+    vi.spyOn(popup, 'focus').mockImplementation(() => {})
+    try {
+      await user.click(screen.getByRole('button', { name: 'Open ARC viewer in popup' }))
+      expect(window.open).toHaveBeenCalledWith('', 'arc-viewer-popup', expect.any(String))
+      const viewer = within(popup.document.body)
+      expect(viewer.getByRole('heading', { name: 'Facultative CAM in Talinum triangulare' })).toBeVisible()
+      expect(within(viewer.getByRole('region', { name: 'ARC contents' })).getByText('ARC contents preview')).toBeVisible()
+    } finally {
+      act(() => { popup.dispatchEvent(new Event('pagehide')) })
+      frame.remove()
+    }
+  })
+
+  it('opens interactive investigation details when the expand button is clicked', async () => {
+    const user = await renderDetails()
+    const frame = document.createElement('iframe')
+    document.body.appendChild(frame)
+    const popup = frame.contentWindow!
+    vi.spyOn(window, 'open').mockReturnValue(popup)
+    vi.spyOn(popup, 'focus').mockImplementation(() => {})
+    try {
+      await user.click(screen.getByRole('button', { name: 'Open investigation details in popup' }))
+      const details = within(popup.document.body)
+      expect(details.getByRole('heading', { name: 'Facultative CAM in Talinum triangulare' })).toBeVisible()
+      expect(details.getAllByRole('tab')).toHaveLength(4)
+      await user.click(details.getByRole('tab', { name: /^Contacts/ }))
+      expect(within(details.getByRole('region', { name: /^Contacts/ })).getAllByRole('listitem')).toHaveLength(12)
+      await user.click(details.getByRole('tab', { name: /^Publications/ }))
+      expect(within(details.getByRole('region', { name: /^Publications/ })).getAllByRole('listitem')).toHaveLength(2)
+    } finally {
+      act(() => { popup.dispatchEvent(new Event('pagehide')) })
+      frame.remove()
+    }
+  })
+
   it('shows the ARC header above investigation and viewer dashlets, with Overview selected', async () => {
     await renderDetails()
     const dashboard = screen.getByRole('region', { name: 'ARC-Dashboard' })
@@ -137,7 +180,7 @@ describe('ARC-Dashboard', () => {
     const unknown = screen.getByRole('img', { name: 'ARC visibility unknown' })
     expect(unknown).toHaveTextContent('?')
     expect(unknown).toHaveAttribute('title', 'ARC visibility unknown')
-    expect(screen.queryByText('Owner')).not.toBeInTheDocument()
+    expect(screen.getByText('Owner: unavailable')).toBeVisible()
     expect(screen.getByRole('region', { name: 'ARC overview' })).toBeVisible()
     expect(screen.queryByRole('tab', { name: /^Versions/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument()
@@ -195,9 +238,9 @@ describe('ARC-Dashboard', () => {
     const headerRelease = screen.getByRole('navigation', { name: 'ARC release' })
     const versionLink = within(headerRelease).getByRole('link', { name: 'v1.0' })
     expect(versionLink).toHaveAttribute('href', release.url)
-    expect(within(headerRelease).queryByText('Archive size: 3 KiB')).not.toBeInTheDocument()
+    expect(within(headerRelease).queryByText('ARC size: 3 KiB')).not.toBeInTheDocument()
     const headerMetadata = screen.getByRole('complementary', { name: 'ARC ownership and visibility' })
-    const size = within(headerMetadata).getByText('Archive size: 3 KiB')
+    const size = within(headerMetadata).getByText('ARC size: 3 KiB')
     const owner = within(headerMetadata).getByRole('link', { name: 'Dominik Brilhaus' })
     expect(owner.compareDocumentPosition(size) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(screen.queryByRole('tab', { name: /^Versions/ })).not.toBeInTheDocument()
@@ -205,7 +248,7 @@ describe('ARC-Dashboard', () => {
 
   it('shows unavailable sizes when the caller supplies no archive sizes', async () => {
     await renderDetails({ dataHubData: { versions: [release] } })
-    expect(within(screen.getByRole('complementary', { name: 'ARC ownership and visibility' })).getByText('Archive size unavailable')).toBeVisible()
+    expect(within(screen.getByRole('complementary', { name: 'ARC ownership and visibility' })).getByText('ARC size: unavailable')).toBeVisible()
   })
 
   it('returns to Overview after browsing Contacts and keeps the description there', async () => {

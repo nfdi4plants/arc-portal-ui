@@ -63,15 +63,17 @@ export function InvestigationHeader(props: {
             </svg>
           ) : '?'}
         </span>
-        {props.owner && (
+        {props.owner ? (
           <div className="investigation-owner">
             <Text as="span" className="investigation-meta-label">Owner</Text>
             {props.owner.url ? <Link href={props.owner.url} target="_blank" rel="noreferrer">{props.owner.name}</Link> : <Text as="span">{props.owner.name}</Text>}
           </div>
+        ) : (
+          <Text as="small" className="investigation-owner investigation-owner-unavailable">Owner: unavailable</Text>
         )}
         {(props.releaseLink || props.archiveSizeBytes !== undefined) && (
           <Text as="small" className="investigation-archive-size">
-            {props.archiveSizeBytes === undefined ? 'Archive size unavailable' : `Archive size: ${formatBytes(props.archiveSizeBytes)}`}
+            {props.archiveSizeBytes === undefined ? 'ARC size: unavailable' : `ARC size: ${formatBytes(props.archiveSizeBytes)}`}
           </Text>
         )}
       </aside>

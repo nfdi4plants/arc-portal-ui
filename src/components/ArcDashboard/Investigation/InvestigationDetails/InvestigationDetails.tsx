@@ -10,9 +10,10 @@ import './investigationDetails.css'
 
 export interface InvestigationDetailsProps {
   metadata: InvestigationMetadata
+  showFullDescription?: boolean
 }
 
-export function InvestigationDetails({ metadata }: InvestigationDetailsProps) {
+export function InvestigationDetails({ metadata, showFullDescription = false }: InvestigationDetailsProps) {
   const [activeTab, setActiveTab] = useState('overview')
 
   return (
@@ -30,7 +31,7 @@ export function InvestigationDetails({ metadata }: InvestigationDetailsProps) {
           <UnderlinePanels.Tab value="organizations" counter={metadata.organizations.length}>Organizations</UnderlinePanels.Tab>
           <UnderlinePanels.Tab value="publications" counter={metadata.publications.length}>Publications</UnderlinePanels.Tab>
           <UnderlinePanels.Panel value="overview" className="investigation-details-panel" aria-hidden={activeTab !== 'overview'} inert={activeTab !== 'overview'}>
-            <InvestigationOverview metadata={metadata} />
+            <InvestigationOverview metadata={metadata} showFullDescription={showFullDescription} />
           </UnderlinePanels.Panel>
           <UnderlinePanels.Panel value="contacts" className="investigation-details-panel" aria-hidden={activeTab !== 'contacts'} inert={activeTab !== 'contacts'}>
             <ContactList contacts={metadata.contacts} showHeading={false} description="All people associated with this ARC." />

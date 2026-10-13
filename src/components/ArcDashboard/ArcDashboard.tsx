@@ -14,7 +14,7 @@ type ArcDashboardProps = {
     onBack: () => void;
 };
 
-function LoadedArc({ arc, name, url, onBack }: { arc: ARC; name: string; url: string; onBack: () => void }) {
+function LoadedArc({ arc, name, url, token, onBack }: { arc: ARC; name: string; url: string; token?: string; onBack: () => void }) {
     console.log(arc)
 
     return <>
@@ -22,7 +22,7 @@ function LoadedArc({ arc, name, url, onBack }: { arc: ARC; name: string; url: st
         <a href={url}>Link</a>
         <Button onClick={onBack}>Back</Button>
         <Suspense fallback={<p role="status">Loading ARC viewer…</p>}>
-            <ArcViewer />
+            <ArcViewer repositoryUrl={url} token={token} jsonString={arc.ToROCrateJsonString()} />
         </Suspense>
     </>
 }
@@ -34,7 +34,7 @@ function ArcDashboard({ name, url, source, projectId, token, onBack }: ArcDashbo
     if (state.status === 'Error') return <p role="alert">Could not load ARC.</p>
     if (state.status !== 'Result') return <p>Loading…</p>
 
-    return <LoadedArc arc={state.arc} name={name} url={url} onBack={onBack} />
+    return <LoadedArc arc={state.arc} name={name} url={url} token={token} onBack={onBack} />
 }
 
 export default ArcDashboard;

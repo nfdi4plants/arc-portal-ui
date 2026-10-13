@@ -43,19 +43,6 @@
   background: var(--bgColor-inset);
 }
 
-.dashboard-window-controls {
-  position: absolute;
-  left: 16px;
-}
-
-.dashboard-window-controls span {
-  width: 10px;
-  height: 10px;
-  border: 1px solid var(--borderColor-default);
-  border-radius: 50%;
-  background: var(--bgColor-neutral-muted);
-}
-
 .dashboard-window-title {
   overflow: hidden;
   color: var(--fgColor-muted);
@@ -63,6 +50,14 @@
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.dashboard-window-actions {
+  position: absolute;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .dashboard-component {
