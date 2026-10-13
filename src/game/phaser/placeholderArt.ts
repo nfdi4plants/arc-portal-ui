@@ -70,7 +70,8 @@ export const placeholderArt: ScribbleArt = {
     return { ...ref, parts: {} }
   },
   playerWeapon(scene, id, tier) {
-    return box(scene, `weapon:${id}:${tier}`, 28, 8, PALETTE.yellow)
+    // Upright with the grip at the bottom centre, like the scribble weapons.
+    return box(scene, `weapon:${id}:${tier}`, 8, 28, PALETTE.yellow)
   },
   projectile(scene, kind) {
     return box(scene, `projectile:${kind}`, 8, 8, PALETTE.yellow)

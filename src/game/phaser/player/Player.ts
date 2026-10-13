@@ -8,6 +8,7 @@ import type { PlayerBuild, PlayerWeaponId, WeaponSlot } from '../../contracts/pr
 import { EMPTY_MOTOR_INPUT, MOTOR, availableJump, canDash, createMotorState, runSpeed, stepMotor } from '../../model/input/motor'
 import type { MotorEnv, MotorInput, MotorState } from '../../model/input/motor'
 import type { InputLayer } from '../input/InputLayer'
+import { applySpriteRef } from '../art'
 import { createAttackMachine } from './attacks'
 import type { AttackPhase } from './attacks'
 import { staffMoveset } from './staffMoveset'
@@ -141,9 +142,18 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
   const mageFrame = scene.textures.get(MAGE_TEXTURE).has(MAGE_FRAME) ? MAGE_FRAME : undefined
   const mage = scene.add.image(0, 0, MAGE_TEXTURE, mageFrame).setOrigin(0.5, 1)
   const baseScale = PLAYER_HEIGHT / Math.max(1, mage.height)
-  const weaponArt = deps.art.playerWeapon(scene, build.weapons.light.id, build.weapons.light.tier)
-  const weapon = scene.add.image(0, -20, weaponArt.textureKey).setOrigin(0.15, 0.5).setDisplaySize(26, 5)
-  const weaponScaleX = Math.abs(weapon.scaleX)
+  // The weapon art stands upright with the grip at its origin, so the sprite rotates around the hand.
+  const weapon = scene.add.sprite(0, 0, MAGE_TEXTURE)
+  let weaponShown = ''
+  let weaponScaleX = 1
+  const showWeapon = () => {
+    const { id, tier } = build.weapons.light
+    if (weaponShown === `${id}:${tier}`) return
+    weaponShown = `${id}:${tier}`
+    applySpriteRef(weapon, deps.art.playerWeapon(scene, id, tier))
+    weaponScaleX = Math.abs(weapon.scaleX)
+  }
+  showWeapon()
   const container = scene.add.container(x, y, [weapon, mage]).setDepth(DEPTH.player)
 
   // A fixed pool for the dash smear, reused in turn.
@@ -335,10 +345,11 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
     mage.setScale(baseScale * squashX * motor.facing, baseScale * squashY * breathe)
     mage.setRotation(lean + (poke > 0 ? poke * 0.08 * motor.facing : 0))
 
-    weapon.setPosition(motor.facing * (6 + poke * 10), -20 + bob)
+    weapon.setPosition(motor.facing * (8 + poke * 8), -12 + bob)
     weapon.scaleX = weaponScaleX * motor.facing
-    const heavyAngle = phase === 'startup' ? -1.4 : phase === 'active' ? 0.5 : 0.2
-    weapon.setRotation((heavy ? heavyAngle : 0.15) * motor.facing)
+    // Angles from upright, positive tips the weapon forward.
+    const heavyAngle = phase === 'startup' ? -0.6 : phase === 'active' ? 2 : 1.2
+    weapon.setRotation((heavy ? heavyAngle : 0.35 + Math.max(0, poke) * 1.1) * motor.facing)
 
     if (motor.dashMs > 0) {
       ghostMs -= delta
@@ -402,6 +413,7 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
       build = next
       hp = Math.min(next.hp, next.stats.maxHp)
       readBuild()
+      showWeapon()
     },
     hp: () => hp,
     grantShield() {

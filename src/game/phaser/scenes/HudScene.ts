@@ -140,11 +140,17 @@ export class HudScene extends Phaser.Scene implements HudControl {
     this.drawBannerBox()
   }
 
+  // Title and subtitle wrap at the widest box the view allows, measured anew for every banner.
+  // The box grows with their height.
   private drawBannerBox() {
-    const width = Math.min(this.view.width - 2 * M, Math.max(this.bannerTitle.width, this.bannerSubtitle.width) + 24)
+    const maxWidth = this.view.width - 2 * M
+    this.bannerTitle.setWordWrapWidth(maxWidth - 24, true)
+    this.bannerSubtitle.setWordWrapWidth(maxWidth - 24, true)
+    const width = Math.min(maxWidth, Math.max(this.bannerTitle.width, this.bannerSubtitle.width) + 24)
     const top = this.bannerTitle.y - 6
-    this.bannerBox.clear().fillStyle(PALETTE.navy, 0.88).fillRoundedRect(this.view.width / 2 - width / 2, top, width, 40, 4)
-    this.bannerTitle.setWordWrapWidth(width - 12)
+    this.bannerSubtitle.setY(this.bannerTitle.y + this.bannerTitle.height + 2)
+    const height = this.bannerSubtitle.y + this.bannerSubtitle.height + 6 - top
+    this.bannerBox.clear().fillStyle(PALETTE.navy, 0.88).fillRoundedRect(this.view.width / 2 - width / 2, top, width, height, 4)
   }
 
   private setBannerAlpha(alpha: number) {
@@ -160,7 +166,8 @@ export class HudScene extends Phaser.Scene implements HudControl {
   }
 
   update(_time: number, delta: number) {
-    if (this.bannerMs > 0) {
+    // The gameplay scene holds its banner time during the pause, so the banner waits with it.
+    if (this.bannerMs > 0 && !this.pauseDim.visible) {
       this.bannerMs -= delta
       this.setBannerAlpha(Math.max(0, Math.min(1, this.bannerMs / BANNER_FADE_MS)))
     }
