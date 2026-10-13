@@ -1,0 +1,36 @@
+.viewer-dashboard {
+  display: flex;
+  flex-direction: column;
+  height: var(--dashboard-window-height);
+  min-height: 600px;
+  gap: 12px;
+  color: var(--fgColor-default);
+}
+
+.viewer-dashboard-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.viewer-dashboard > .arc-details { flex-shrink: 0; }
+.viewer-dashboard .arc-details .investigation-title { font-size: 1.125rem; margin-bottom: 4px; }
+.viewer-dashboard .arc-details .investigation-header-links { margin-top: 4px; font-size: 0.75rem; }
+.viewer-dashboard .arc-details .investigation-header-layout { grid-template-columns: minmax(0, 1fr) auto; gap: 12px; }
+.viewer-dashboard .arc-details .investigation-header-meta {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  max-width: 360px;
+  padding-top: 0;
+  font-size: 0.75rem;
+  text-align: left;
+}
+.viewer-dashboard .arc-details .investigation-owner { display: flex; gap: 4px; }
+.viewer-dashboard .arc-details .investigation-meta-label { margin-bottom: 0; }
+
+@media (max-width: 700px) {
+  .viewer-dashboard .arc-details .investigation-header-layout { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+}

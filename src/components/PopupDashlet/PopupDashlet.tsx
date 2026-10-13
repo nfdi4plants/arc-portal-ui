@@ -1,5 +1,5 @@
 import { PortalContext, registerPortalRoot } from '@primer/react'
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react'
 import { PopupDashletModeContext, type PopupDashletMode } from './PopupDashletContext'
 import surfaces from '../DashboardWindow/dashboardSurface.module.css'
 import '../DashboardWindow/dashboardWindow.css'
@@ -15,13 +15,18 @@ export interface PopupDashletProps {
   expandOnClick?: boolean
   collapsed?: boolean
   onToggleCollapsed?: () => void
+  /** Control a full popup from an external trigger. */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  returnFocusRef?: RefObject<HTMLElement | null>
   /** Replace compact content with a symbol; preserve the content's state while hidden. */
   symbol?: ReactNode
   children: ReactNode
 }
 
-export function PopupDashlet({ title, description, label, className, showHeader = true, expandOnClick = true, collapsed = false, onToggleCollapsed, symbol, children }: PopupDashletProps) {
-  const [mode, setMode] = useState<PopupDashletMode>('compact')
+export function PopupDashlet({ title, description, label, className, showHeader = true, expandOnClick = true, collapsed = false, onToggleCollapsed, open, onOpenChange, returnFocusRef, symbol, children }: PopupDashletProps) {
+  const [localMode, setMode] = useState<PopupDashletMode>('compact')
+  const mode = open === undefined ? localMode : open ? 'expanded' : 'compact'
   const expanded = mode === 'expanded'
   const focused = mode !== 'compact'
   const [collapsing, setCollapsing] = useState(false)
@@ -84,7 +89,8 @@ export function PopupDashlet({ title, description, label, className, showHeader 
   const expand = () => {
     clearTimeout(hoverTimer.current)
     setBounds(dashboardBounds())
-    setMode('expanded')
+    if (open === undefined) setMode('expanded')
+    onOpenChange?.(true)
   }
 
   const shrink = () => {
@@ -96,6 +102,7 @@ export function PopupDashlet({ title, description, label, className, showHeader 
       closing.current = false
       setCollapsing(false)
       setMode('compact')
+      onOpenChange?.(false)
     }
     const animation = animatePopup(true)
     if (animation) void animation.finished.then(finish, finish)
@@ -107,6 +114,7 @@ export function PopupDashlet({ title, description, label, className, showHeader 
     if (!dialog) return
     if (previousMode.current === 'preview') dialog.hidePopover()
     if (expanded) {
+      if (open !== undefined) fitDashboard()
       // The same dialog and content move into the browser's modal layer.
       dialog.close()
       dialog.showModal()
@@ -121,10 +129,11 @@ export function PopupDashlet({ title, description, label, className, showHeader 
     } else if (previousMode.current === 'expanded') {
       dialog.close()
       dialog.show()
-      toggle.current?.focus({ preventScroll: true })
+      const focusTarget = returnFocusRef?.current ?? toggle.current
+      focusTarget?.focus({ preventScroll: true })
     }
     previousMode.current = mode
-  }, [mode, expanded, animatePopup, fitDashboard])
+  }, [mode, expanded, animatePopup, fitDashboard, open, returnFocusRef])
 
   useEffect(() => {
     if (!focused) return

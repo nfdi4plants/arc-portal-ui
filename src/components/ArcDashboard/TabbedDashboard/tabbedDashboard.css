@@ -1,0 +1,23 @@
+.tabbed-dashboard { position: relative; }
+.tabbed-dashboard-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; flex-shrink: 0; }
+.tabbed-dashboard-tabs { display: flex; gap: 4px; }
+.tabbed-dashboard-tabs > button {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 8px 10px;
+  background: transparent;
+  color: var(--fgColor-muted);
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+.tabbed-dashboard-tabs > button[aria-selected='true'] { border-bottom-color: var(--borderColor-accent-emphasis); color: var(--fgColor-default); font-weight: 600; }
+.tabbed-dashboard-tabs > button:hover { background: var(--bgColor-neutral-muted); }
+.tabbed-dashboard-tabs > button:focus-visible { outline: 2px solid var(--borderColor-accent-emphasis); outline-offset: -2px; }
+.tabbed-dashboard-viewer-panel { display: flex; flex: 1; min-height: 300px; }
+.tabbed-dashboard-investigation-popups { position: absolute; top: 0; left: 0; width: 100%; }
+.tabbed-dashboard-investigation-popups > .popup-dashlet { height: 0; }
+.tabbed-dashboard-investigation-popups .popup-dashlet-panel:not([data-expanded]) { display: none; }
+@media (max-width: 700px) {
+  .tabbed-dashboard-tabs > button { padding: 8px 6px; font-size: 0.8125rem; }
+}
