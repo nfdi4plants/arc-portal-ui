@@ -3,13 +3,6 @@
   border-bottom: 1px solid var(--borderColor-default);
 }
 
-.investigation-title {
-  margin: 12px 0 4px;
-  font-size: clamp(2rem, 5vw, 3rem);
-  line-height: 1.12;
-  letter-spacing: -0.03em;
-}
-
 .investigation-header-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 240px;
@@ -100,13 +93,7 @@
 .investigation-description {
   max-width: 80ch;
   margin-top: 24px;
-  color: var(--fgColor-muted);
   line-height: 1.65;
-}
-
-.investigation-description-toggle {
-  margin-top: 8px;
-  margin-left: -8px;
 }
 
 .metadata-card {
@@ -200,16 +187,7 @@
     gap: 0;
   }
 
-  .investigation-header-main {
-    display: contents;
-  }
-
-  .investigation-header-main > :first-child {
-    justify-self: start;
-  }
-
   .investigation-header-meta {
-    grid-row: 3;
     padding-top: 16px;
   }
 

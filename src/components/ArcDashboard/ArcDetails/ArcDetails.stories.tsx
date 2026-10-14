@@ -7,8 +7,8 @@ import { ArcDetails, type ArcDetailsProps } from './ArcDetails'
 function SampleArcDetails(props: Omit<ArcDetailsProps, 'metadata'>) {
   return (
     <TalinumStory>{(metadata) => (
-      <DashboardWindow title="ARC-Dashboard" maxWidth={620}>
-        <div style={{ padding: 16 }}><ArcDetails {...props} metadata={metadata} /></div>
+      <DashboardWindow label="ARC-Dashboard" maxWidth={620}>
+        <ArcDetails {...props} metadata={metadata} />
       </DashboardWindow>
     )}</TalinumStory>
   )

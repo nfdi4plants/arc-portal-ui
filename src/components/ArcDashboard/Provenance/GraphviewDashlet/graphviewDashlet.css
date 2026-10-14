@@ -1,0 +1,14 @@
+.dashlet.graphview-dashlet {
+  max-height: none;
+}
+
+.graphview-dashlet > .dashboard-component {
+  height: 100%;
+}
+
+.graphview-dashlet > .dashboard-component > .dashboard-component-content {
+  flex: 1;
+  padding: 0;
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}

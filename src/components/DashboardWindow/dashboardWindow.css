@@ -1,18 +1,18 @@
 .dashboard-window-container {
-  --dashboard-window-height: calc(100dvh - 64px);
-  min-height: 100vh;
-  padding: 32px;
-  background: var(--bgColor-muted);
+  --dashboard-window-height: calc(100dvh - 32px);
+  min-height: 100dvh;
+}
+
+.dashboard-window {
+  width: 100%;
+  min-width: 0;
+  margin: 0 auto;
 }
 
 .dashboard-window[data-fill-height='true'] {
   display: flex;
   flex-direction: column;
   height: var(--dashboard-window-height);
-}
-
-.dashboard-window[data-fill-height='true'] > .dashboard-window-bar {
-  flex-shrink: 0;
 }
 
 .dashboard-window[data-fill-height='true'] > .dashboard-window-content {
@@ -22,86 +22,22 @@
   scrollbar-gutter: stable;
 }
 
-.dashboard-window {
-  width: min(100%, 1120px);
-  margin: 0 auto;
-  overflow: hidden;
-  border: 1px solid var(--borderColor-default);
-  border-radius: 12px;
-  background: var(--bgColor-default);
-  box-shadow: var(--shadow-floating-large);
-}
-
 .dashboard-window-bar {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 44px;
-  padding: 0 56px;
+  flex-shrink: 0;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--borderColor-default);
-  background: var(--bgColor-inset);
-}
-
-.dashboard-window-controls {
-  position: absolute;
-  left: 16px;
-}
-
-.dashboard-window-controls span {
-  width: 10px;
-  height: 10px;
-  border: 1px solid var(--borderColor-default);
-  border-radius: 50%;
-  background: var(--bgColor-neutral-muted);
 }
 
 .dashboard-window-title {
-  overflow: hidden;
-  color: var(--fgColor-muted);
-  font-size: 0.75rem;
+  font-size: 14px;
   font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .dashboard-component {
-  min-width: 0;
+  padding: 0;
   overflow: hidden;
-  border: 1px solid var(--borderColor-default);
-  border-radius: 10px;
-  background: var(--bgColor-default);
-  box-shadow: var(--shadow-resting-small);
 }
 
 .dashboard-component-content {
   padding: 16px;
-}
-
-.dashboard-component .dashboard-window-bar {
-  min-height: 36px;
-}
-
-@media (max-width: 700px) {
-  .dashboard-window-container {
-    --dashboard-window-height: 100dvh;
-    padding: 0;
-  }
-
-  .dashboard-window {
-    border-inline: 0;
-    border-radius: 0;
-    box-shadow: none;
-  }
-
-  .dashboard-component-content {
-    padding: 16px;
-  }
-}
-
-@media (max-height: 480px) {
-  .dashboard-window-container {
-    --dashboard-window-height: 100dvh;
-    padding: 0;
-  }
 }

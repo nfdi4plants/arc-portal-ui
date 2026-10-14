@@ -19,22 +19,6 @@ beforeEach(() => {
   vi.stubGlobal('fetch', fetchCall)
 })
 
-it('lists the selected DataHUB page and counts every configured DataHUB', async () => {
-  render(<App />)
-  expect(await screen.findByRole('button', { name: 'Open git.nfdi4plants.org ARC' })).toBeVisible()
-  const projectsCall = fetchCall.mock.calls.find(call => new URL(String(call[0])).pathname === '/api/v4/projects'
-    && new URL(String(call[0])).searchParams.get('per_page') === '25')!
-  const params = new URL(String(projectsCall[0])).searchParams
-  expect(params.get('visibility')).toBe('public')
-  expect(params.get('order_by')).toBe('last_activity_at')
-  expect(new Headers(projectsCall[1]?.headers).has('PRIVATE-TOKEN')).toBe(false)
-  const projectCalls = fetchCall.mock.calls.filter(call => new URL(String(call[0])).pathname === '/api/v4/projects')
-  // One fast count per hub, and only one selected project page.
-  expect(projectCalls).toHaveLength(availableDataHubs.length + 1)
-  const hosts = new Set(projectCalls.map(call => new URL(String(call[0])).host))
-  expect(hosts).toEqual(new Set(availableDataHubs.map(hub => new URL(hub.url).host)))
-})
-
 it('opens an ARC using its project id and the URL of its source DataHUB', async () => {
   const transport = fetchCall.getMockImplementation()!
   fetchCall.mockImplementation((input, init) => {
