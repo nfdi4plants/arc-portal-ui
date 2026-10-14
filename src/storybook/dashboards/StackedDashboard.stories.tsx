@@ -7,6 +7,7 @@ import { ArcDetails } from '../../components/ArcDashboard/ArcDetails'
 import type { DashboardContentProps } from '../../components/ArcDashboard/dashboardTypes'
 import { InvestigationDashlets } from '../../components/ArcDashboard/InvestigationDashlets/InvestigationDashlets'
 import { PopupGraphview } from '../../components/ArcDashboard/Provenance/PopupGraphview'
+import { PopupArcGame } from './PopupArcGame'
 import './stackedDashboard.css'
 
 function StackedDashboardLayout({ metadata, provenance, actions, ...props }: DashboardContentProps) {
@@ -17,6 +18,7 @@ function StackedDashboardLayout({ metadata, provenance, actions, ...props }: Das
       <div className="stacked-dashboard-body">
         <aside className="stacked-dashboard-cards" aria-label="Investigation dashlets">
           <InvestigationDashlets metadata={metadata} arcJson={props.arcJson} classNamePrefix="stacked-dashboard" />
+          <PopupArcGame index={provenance} arcTitle={metadata.title} className="stacked-dashboard-tile" />
         </aside>
         {provenance ? (
           <PopupGraphview
@@ -42,7 +44,7 @@ const meta = {
   parameters: {
     docs: {
       description: {
-        component: 'Flat ARC header above an index-card stack occupying one quarter of the dashboard width. The shared investigation popup dashlets keep all seven titles visible; click a card to expand it. Graphview fills the remaining three quarters. On narrow screens Graphview sits above the stack. Uses the bundled Talinum ARC without DataHub requests.',
+        component: 'Flat ARC header above an index-card stack occupying one quarter of the dashboard width. The shared investigation popup dashlets keep all eight titles visible, ARCade last; click a card to expand it. Graphview fills the remaining three quarters. On narrow screens Graphview sits above the stack. Uses the bundled Talinum ARC without DataHub requests.',
       },
     },
   },

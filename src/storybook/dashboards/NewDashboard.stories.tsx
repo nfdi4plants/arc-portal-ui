@@ -7,6 +7,7 @@ import { ArcDetails } from '../../components/ArcDashboard/ArcDetails'
 import type { DashboardContentProps } from '../../components/ArcDashboard/dashboardTypes'
 import { InvestigationDashlets } from '../../components/ArcDashboard/InvestigationDashlets/InvestigationDashlets'
 import { PopupGraphview } from '../../components/ArcDashboard/Provenance/PopupGraphview'
+import { PopupArcGame } from './PopupArcGame'
 import '../../components/ArcDashboard/Investigation/InvestigationDetails/investigationDetails.css'
 import './newDashboard.css'
 
@@ -20,6 +21,7 @@ function NewDashboardLayout({ metadata, provenance, actions, ...props }: Dashboa
         </div>
         <InvestigationDashlets metadata={metadata} arcJson={props.arcJson} classNamePrefix="new-dashboard" />
         <PopupGraphview index={provenance} symbol={<GraphIcon size={48} />} label="Graphview dashlet" className="new-dashboard-tile new-dashboard-graphview" />
+        <PopupArcGame index={provenance} arcTitle={metadata.title} label="ARCade dashlet" className="new-dashboard-tile new-dashboard-game" />
       </div>
     </main>
   )
@@ -34,7 +36,7 @@ const meta = {
   parameters: {
     docs: {
       description: {
-        component: 'Alternate investigation dashboard with a circular ARC header and eight equally sized, compact dashlets: Description, Contacts, Organizations, Publications, Assays, Studies, Webview, and Graphview. Hover for 1.5 seconds to preview; click to expand over the dashboard. Click outside, press Escape, or use the shrink icon to restore the dashlet. Overview is omitted. The layout stacks on smaller screens. Uses the bundled Talinum ARC without DataHub requests.',
+        component: 'Alternate investigation dashboard with a circular ARC header and nine equally sized, compact dashlets: Description, Contacts, Organizations, Publications, Assays, Studies, Webview, Graphview, and the ARCade game. Hover for 1.5 seconds to preview; click to expand over the dashboard. Click outside, press Escape, or use the shrink icon to restore the dashlet. Overview is omitted. The layout stacks on smaller screens. Uses the bundled Talinum ARC without DataHub requests.',
       },
     },
   },

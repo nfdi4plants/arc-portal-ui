@@ -39,6 +39,18 @@ describe('TabbedDashboard', () => {
     expect(screen.getByRole('separator')).toHaveAttribute('aria-valuenow', '65')
   }, 15000)
 
+  it('shows the ARCade game in its own tab and keeps the viewers mounted', async () => {
+    await openDashboard()
+    const user = userEvent.setup()
+    expect(screen.getByRole('region', { name: 'ARCade', hidden: true })).not.toBeVisible()
+    await user.type(screen.getByRole('textbox'), 'assays')
+    await user.click(screen.getByRole('tab', { name: 'ARCade' }))
+    expect(screen.getByRole('region', { name: 'ARCade' })).toBeVisible()
+    expect(screen.getByLabelText('Search ARC files')).not.toBeVisible()
+    await user.click(screen.getByRole('tab', { name: 'Webview' }))
+    expect(screen.getByRole('textbox')).toHaveValue('assays')
+  }, 15000)
+
   it('supports keyboard tab navigation', async () => {
     await openDashboard()
     const user = userEvent.setup()
@@ -47,7 +59,7 @@ describe('TabbedDashboard', () => {
     expect(screen.getByRole('tab', { name: 'Graphview' })).toHaveFocus()
     expect(screen.getByRole('tab', { name: 'Graphview' })).toHaveAttribute('aria-selected', 'true')
     await user.keyboard('{End}')
-    expect(screen.getByRole('tab', { name: 'Compare' })).toHaveFocus()
+    expect(screen.getByRole('tab', { name: 'ARCade' })).toHaveFocus()
     await user.keyboard('{Home}')
     expect(screen.getByRole('tab', { name: 'Webview' })).toHaveFocus()
   }, 15000)

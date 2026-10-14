@@ -128,3 +128,15 @@
   min-height: 0;
 }
 
+
+.combined-dashboard-bottom {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 1fr);
+  min-height: 0;
+  gap: 16px;
+}
+
+.combined-dashboard-game {
+  min-width: 0;
+  min-height: 0;
+}

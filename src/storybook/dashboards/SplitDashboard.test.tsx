@@ -24,6 +24,8 @@ describe('SplitDashboard', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Facultative CAM in Talinum triangulare' })).toBeVisible()
     expect(screen.getByRole('region', { name: 'Provenance explorer' })).toBeVisible()
     expect(screen.getByRole('separator')).toHaveAttribute('aria-valuenow', '60')
+    expect(screen.getByRole('region', { name: 'ARCade' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Expand ARCade' })).toBeVisible()
     const toolbar = screen.getByRole('navigation', { name: 'Investigation dashlets' })
     expect(within(toolbar).getAllByRole('heading', { level: 2 }).map(heading => heading.textContent))
       .toEqual(['Description', 'Contacts', 'Organizations', 'Publications', 'Assays', 'Studies'])

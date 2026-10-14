@@ -18,3 +18,8 @@
 @media (max-width: 700px) {
   .tabbed-dashboard-tabs > button { padding: 8px 6px; font-size: 0.8125rem; }
 }
+
+.tabbed-dashboard-viewers, .tabbed-dashboard-game { display: flex; flex: 1; min-width: 0; }
+.tabbed-dashboard-viewers > .split-dashboard-workspace { flex: 1; min-width: 0; }
+.tabbed-dashboard-game > .popup-dashlet { flex: 1; }
+.tabbed-dashboard-viewers[hidden], .tabbed-dashboard-game[hidden] { display: none; }

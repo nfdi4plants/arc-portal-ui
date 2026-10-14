@@ -7,6 +7,7 @@ import type { DashboardContentProps } from '../../components/ArcDashboard/dashbo
 import { InvestigationDashlets } from '../../components/ArcDashboard/InvestigationDashlets/InvestigationDashlets'
 import { investigationDetailIds } from '../../components/ArcDashboard/InvestigationDashlets/investigationDashletOptions'
 import { ViewerWorkspace } from '../../components/ArcDashboard/ViewerWorkspace/ViewerWorkspace'
+import { PopupArcGame } from './PopupArcGame'
 import './viewerDashboard.css'
 import './splitDashboard.css'
 
@@ -15,9 +16,12 @@ function SplitDashboardLayout({ metadata, provenance, actions, ...props }: Dashb
     <main className="viewer-dashboard split-dashboard">
       {actions && <div className="viewer-dashboard-actions split-dashboard-actions">{actions}</div>}
       <ArcDetails {...props} metadata={metadata} />
-      <nav className="split-dashboard-metadata" aria-label="Investigation dashlets">
-        <InvestigationDashlets metadata={metadata} arcJson={props.arcJson} classNamePrefix="split-dashboard" ids={investigationDetailIds} />
-      </nav>
+      <div className="split-dashboard-toolbar">
+        <nav className="split-dashboard-metadata" aria-label="Investigation dashlets">
+          <InvestigationDashlets metadata={metadata} arcJson={props.arcJson} classNamePrefix="split-dashboard" ids={investigationDetailIds} />
+        </nav>
+        <PopupArcGame index={provenance} arcTitle={metadata.title} className="split-dashboard-game" />
+      </div>
       <ViewerWorkspace metadata={metadata} provenance={provenance} arcJson={props.arcJson} />
     </main>
   )
@@ -32,7 +36,7 @@ const meta = {
   parameters: {
     docs: {
       description: {
-        component: 'Full-width Webview above Graphview with a draggable 60/40 height split. Use Up/Down on the divider to resize with the keyboard. Either viewer can collapse to its title bar or open as a popup. A compact ARC header and investigation popup buttons keep most of the space available to the viewers. Uses the bundled Talinum ARC without DataHub requests.',
+        component: 'Full-width Webview above Graphview with a draggable 60/40 height split. Use Up/Down on the divider to resize with the keyboard. Either viewer can collapse to its title bar or open as a popup. A compact ARC header and investigation popup buttons and an ARCade button that opens the game keep most of the space available to the viewers. Uses the bundled Talinum ARC without DataHub requests.',
       },
     },
   },

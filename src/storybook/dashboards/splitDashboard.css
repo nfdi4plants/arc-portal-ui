@@ -1,6 +1,12 @@
+.split-dashboard-toolbar { display: flex; flex-shrink: 0; gap: 8px; }
+.split-dashboard-toolbar > .split-dashboard-metadata { flex: 1; min-width: 0; }
+.split-dashboard-game { flex: 0 0 144px; height: 42px; }
+.split-dashboard-game .popup-dashlet-panel:not([data-expanded]):not([data-preview]) > .popup-dashlet-bar { padding: 6px; gap: 4px; }
+.split-dashboard-game .popup-dashlet-panel:not([data-expanded]):not([data-preview]) .dashboard-window-title { font-size: 0.75rem; }
+.split-dashboard-game .popup-dashlet-panel:not([data-expanded]):not([data-preview]) > .popup-dashlet-symbol { display: none; }
+
 .split-dashboard-metadata {
   display: grid;
-  flex-shrink: 0;
   grid-template-columns: repeat(6, minmax(144px, 1fr));
   gap: 8px;
   overflow-x: auto;

@@ -33,6 +33,8 @@ describe('HubDashboard', () => {
     expect(within(right).getAllByRole('heading', { level: 2 }).map(heading => heading.textContent)).toEqual(['Publications', 'Assays', 'Studies'])
     expect(screen.getByRole('region', { name: 'Provenance explorer' })).toBeVisible()
     expect(screen.getByRole('separator')).toHaveAttribute('aria-valuenow', '60')
+    expect(screen.getByRole('region', { name: 'ARCade' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Expand ARCade' })).toBeVisible()
   })
 
   it('opens metadata and viewer popups without losing viewer input or the selected split', async () => {

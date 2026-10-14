@@ -37,6 +37,8 @@ describe('ScrollingDashboard', () => {
     expect(webview).toHaveFocus()
     expect(screen.getByRole('textbox')).toHaveValue('assays')
     expect(screen.getByRole('button', { name: 'Investigation' })).toBeVisible()
+    expect(within(screen.getByRole('region', { name: 'ARCade section' })).getByRole('region', { name: 'ARCade' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Jump to ARCade' })).toBeVisible()
   }, 15000)
 
   it('expands each viewer and restores it with its contents intact', async () => {
