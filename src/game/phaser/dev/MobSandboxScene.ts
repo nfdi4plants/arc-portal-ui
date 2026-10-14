@@ -149,7 +149,7 @@ export class MobSandboxScene extends Phaser.Scene {
       const frozen = combat.hitStopRemainingMs() > 0
       player.setFrozen(frozen)
       if (!frozen) for (const entry of entries) if (!entry.asleep) entry.mob.update(dt)
-      updatePickups(this, player)
+      updatePickups(this, player, frozen ? 0 : dt)
       if (player.hurtbox().bottom > FLOOR + 400) player.teleport(SPAWN.x, SPAWN.y)
     })
 

@@ -3,9 +3,11 @@ import { DEPTH, PALETTE, SCENE, TILE } from '../../contracts/constants'
 import type { Combatant } from '../../contracts/combat'
 import type { BossSpec } from '../../contracts/content'
 import type { Segment } from '../../contracts/run'
+import { bossCoinDrop } from '../../model/progression'
 import { applySpriteRef, doorArt, prewarmTelegraphs, releaseTelegraphs } from '../art'
 import { freeFloorX } from '../bosses/zones'
 import { spawnBoss, type Arena, type Boss } from '../bosses'
+import { dropCoins, updatePickups } from '../mobs/pickups'
 import type { View } from '../view'
 import { buildArena } from './arena'
 import type { RunContext } from './context'
@@ -89,14 +91,26 @@ export class BossScene extends GameplayScene {
       boss.update(dtMs)
       if (boss.isDefeated()) {
         this.spareAfterBoss(boss)
-        this.openPortal(boss.position().x)
+        const x = boss.position().x
+        this.openPortal(x)
+        this.dropBossCoins(x)
         this.gainXp(this.spec.xp)
       }
       return
     }
     this.portalMs += dtMs
+    const coins = updatePickups(this, this.player, dtMs)
+    if (coins > 0) this.gainCoins(coins)
     if (this.portalMs < PORTAL_APPEAR_MS) return
     if (Phaser.Geom.Intersects.RectangleToRectangle(this.player.hurtbox(), this.portal)) this.leave((director) => director.defeatBoss())
+  }
+
+  // A guaranteed handful, spread over the floor where the boss fell.
+  private dropBossCoins(bossX: number) {
+    const index = this.segment.index
+    const count = bossCoinDrop(index, this.director.rng.fork(`bossCoins/${index}`))
+    const x = Phaser.Math.Clamp(bossX, this.arena.left + 2 * T, this.arena.right - 2 * T)
+    dropCoins(this, x, this.arena.floorY - 10, count)
   }
 
   // The same door as at the end of a stretch, on free floor near where the boss fell, with the

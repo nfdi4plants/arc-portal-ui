@@ -95,6 +95,25 @@ export function shieldFragmentArt(scene: Phaser.Scene): SpriteRef {
   })
 }
 
+export const COIN_SIZE = 10
+
+// A gold coin with a small letter A of ARC stamped in. Mobs and bosses drop it for the FAIR trade store.
+export function coinArt(scene: Phaser.Scene): SpriteRef {
+  const r = COIN_SIZE / 2
+  return spriteFrom(scene, {
+    key: 'scribble:pickup:coin',
+    width: COIN_SIZE,
+    height: COIN_SIZE,
+    anchors: { weapon: { x: 0, y: -r }, head: { x: 0, y: -COIN_SIZE } },
+    draw(pen) {
+      pen.glow(r, r, r + 1, 'rgba(245, 190, 0, 0.35)')
+      pen.ellipse(r, r, COIN_SIZE - 1.4, COIN_SIZE - 1.4, { ...gold, gap: 1.6, weight: 0.8, rough: 0.3 })
+      pen.trace([[r - 1.8, r + 2], [r, r - 2.2], [r + 1.8, r + 2]], { line: '#a8820e', weight: 0.7, rough: 0.1 })
+      pen.line(r - 1, r + 0.8, r + 1, r + 0.8, { line: '#a8820e', weight: 0.6, rough: 0.1 })
+    },
+  })
+}
+
 export const CARD_WIDTH = 100
 export const CARD_HEIGHT = 136
 

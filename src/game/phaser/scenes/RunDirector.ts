@@ -57,6 +57,8 @@ export class RunDirector {
   // Second Wind heals once, then waits for the next boss to fall. It lives here, so leaving a
   // stretch or a boss arena keeps it spent.
   readonly secondWind: BossCharge = createBossCharge()
+  // Coins for the FAIR trade store. They carry over from one stage to the next and a pit costs none.
+  coins = 0
   private readonly hooks: RunDirectorHooks
   private history: LevelUpRecord[] = []
   private lastOffer: PowerUpCard[] = []
@@ -154,6 +156,10 @@ export class RunDirector {
       source: sourceText(stage, this.plan, bossLabel),
     })
     this.lastOffer = []
+  }
+
+  addCoins(amount: number): void {
+    if (amount > 0 && !this.isOver()) this.coins += amount
   }
 
   completeStretch(): void {

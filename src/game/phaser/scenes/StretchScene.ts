@@ -186,7 +186,8 @@ export class StretchScene extends GameplayScene {
         slot.gone = true
       }
     }
-    updatePickups(this, this.player)
+    const coins = updatePickups(this, this.player, dtMs)
+    if (coins > 0) this.gainCoins(coins)
     if (this.rescueMs >= 0) {
       this.stepRescue(dtMs)
       return

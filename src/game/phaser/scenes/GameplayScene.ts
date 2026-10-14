@@ -237,6 +237,10 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
     }
   }
 
+  protected gainCoins(amount: number) {
+    this.director.addCoins(amount)
+  }
+
   protected die(killer: KillerInfo) {
     if (this.holds.has('over')) return
     this.setHold('over', true)
