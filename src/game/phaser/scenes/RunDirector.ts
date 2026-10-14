@@ -23,6 +23,26 @@ export interface RunDirectorHooks {
 
 export const PIT_KILLER: KillerInfo = { kind: 'hazard', label: 'A gap in the provenance' }
 
+export interface PortalLabel {
+  title: string
+  detail: string
+}
+
+function lastPart(id: string): string {
+  return id.split('/').filter(Boolean).pop() ?? id
+}
+
+// The sign over the portal that opens when node boss `index` falls. It names the next part of the
+// path: the process of the next step and where it leads, or the ARC itself after the last node.
+export function portalLabel(plan: RunPlan, index: number): PortalLabel {
+  const next = plan.segments[index + 1]
+  if (!next) return { title: `Next: ${plan.arcTitle || 'the ARC'}`, detail: 'The final boss' }
+  return {
+    title: `Next: ${next.processName}`,
+    detail: `Step ${next.index + 1} of ${plan.segments.length}: ${lastPart(next.fromNodeId)} to ${lastPart(next.toNodeId)}`,
+  }
+}
+
 // The state of one run, free of Phaser. Scenes come and go per stage. The build, the run rng and
 // the clock live here, so they carry over from one scene to the next.
 export class RunDirector {
