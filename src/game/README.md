@@ -28,15 +28,56 @@ time. `model/run/` turns the index into a `RunPlan`:
    visible tells (the node's own annotations), a longer stagger and a smaller stagger bar
    (`bosses/stagger.ts`): a boss at quality 0 is nearly unstaggerable.
 
-The node after each segment is a boss (`model/content/boss.ts`). The final boss has one phase per
-segment in path order, and each phase uses its segment's telegraph timing. Every final phase has
-one heavy and two light attacks from its archetype plus the shared Crate Collapse, so a light attack
-always breaks up the heavy ones. The player is healed to full before the final boss. The same annotation always
-has the same look and kind, because the monster is derived from a hash of the annotation. Its
-stats scale with the segment depth, `1 + 0.12 * segmentIndex`.
+The node after each segment is a boss, see [Bosses](#bosses). The player is healed to full before
+the final boss. The same annotation always has the same look and kind, because the monster is
+derived from a hash of the annotation. Its stats scale with the segment depth,
+`1 + 0.12 * segmentIndex`.
 
 On the death screen a boss (or final boss phase) whose step has 8 or more annotations (quality 1)
 gets no annotate hint, because its attacks already have the longest warnings.
+
+## Bosses
+
+A boss is built like a monster, from slots that annotations fill (`bossGenome` in
+`model/content/bossGenome.ts`). A node boss reads only the annotations of its own step, the segment
+that leads into it, so nothing carries over from earlier bosses, and the same step always gives the
+same boss. The slots follow good annotation practice:
+
+| Slot | Filled by | Effect |
+|---|---|---|
+| Key (1) | the annotation key most annotations of the step share, ties broken by hash | the silhouette, one of the four archetypes, like a monster's key picks its body. The size follows the number of annotations: small (up to 2, drawn at 0.9), medium (up to 7) or large (8 or more, 1.12). A step without annotations takes the silhouette of its node kind |
+| Heavy 1 and 2 | annotations with an ontology term | the accession picks a telegraphed heavy attack: slam, rain, charge, beam, shockwave, pillars or sweep |
+| Light 1 and 2 | annotations with a value and a unit | value and unit pick a light attack: sweep, projectile fan, charge, rain or summon |
+| Mechanic 1 to 3 | one per annotation type on the step, the most common first | characteristic: armored front (40% less from the front), parameter: overclocked (below 40% hp the attacks recharge 30% faster), factor: phase shift (at half hp the light attacks change), component: summoner (a minion every 11 s), protocol: spill (a marked floor patch that burns), performer: teleport, date: shield pulse (blocks hits for 1.4 s), comment: mirror (sends the mage's shots back while a heavy attack winds up) |
+| Theme | the units of the values with a unit, the most common family | time: tempo (15% faster recharge), temperature: heat (flame shots, light attacks 15% harder), length: reach (sweeps, charges and beams 25% longer), mass, amount or volume: dense (15% more hp), other units: precise (two more shots per fan, drops aim at the mage more often) |
+
+So 9 slots in all. An empty first heavy or light slot falls back to a plain attack of the
+archetype and counts as empty, so every boss keeps one heavy and one light attack, and a light and
+a heavy attack never share a kind. The rhythm stays as before: the scheduler never plays two heavy
+attacks in a row while the boss has a light one, and a heavy attack locks the stagger bar. The
+timed mechanics (summoner, spill, teleport, shield) start only while the boss stands idle, one at a
+time and at least 2.5 s apart, the boss starts no attack while a spill is marked or burns, and the
+shield never rises in the punish window right after a heavy attack (`phaser/bosses/mechanics.ts`).
+
+The quality of the step (`annotations / 8`) alone still drives the telegraph time, the hp bar and
+attack names, the safe zones, the weak points, the stagger window and the stagger bar size. It also
+sets a damage multiplier, `1 + 0.55 * (1 - quality)`: 1 at quality 1 up to 1.55 at quality 0, on
+every boss attack, the minions, the spill and the mirrored shots. No single boss hit deals more
+than `MAX_BOSS_HIT` (35), and the mage starts with 100 hp. A well-annotated boss can be followed by
+a poorly annotated one with short warnings, a large stagger bar and harder hits.
+
+The final boss is the ARC itself, with one phase per segment in path order. Each phase is built
+from the genome of its own step, so the fight replays the path: the first heavy slot, the light
+slots, the first two mechanics and the theme, plus the shared Crate Collapse. A phase moves like the
+archetype of its genome and uses its step's telegraph timing.
+
+In the fight, badges over the boss show its mechanics and its theme (`art/bossMarkers.ts`, drawn
+once and cached), and the body is the cached archetype texture drawn at the genome size. In the
+pause menu the boss can be hovered and clicked like a mob. The panel lists every slot: the
+annotation that filled it and the trait it gave, or what was missing ("no ontology term on this
+step, slot stays empty", "no value with a unit, no theme modifier"), and a quality row such as
+"6 of 8 annotations on illumina → telegraph 695 ms, stagger bar ×1.3, hits ×1.14"
+(`model/content/describeBoss.ts`). The final boss shows the phase it is in.
 
 The level-up screen plays a short intro with all input locked, so clicks and keys from the fight cannot pick a card. After it a card is chosen by a left click that starts and ends on the card, or by the keys 1 to 4. Hovering a card for about 600 ms (or pressing ? over it) opens its details, built by `cardDetails` in `model/progression/details.ts`. The mouse button is the `CHOOSE_BUTTON` constant in `LevelUpScene.ts`.
 
@@ -205,8 +246,10 @@ Start Storybook with `npm run storybook` (port 6006) and open these stories:
   toggle double jump, air dash, wall jump and hat glide.
 - `Game/Dev/MobSandbox` puts every monster of a planned Talinum run on one long floor. N spawns a
   random monster next to the player and P a phantom.
-- `Game/Dev/BossSandbox` is one arena with a boss. Keys 1 to 4 pick the archetype and Q and W
-  change the annotation quality. F starts the final boss.
+- `Game/Dev/BossSandbox` is one arena with a boss generated from a step of a planned Talinum run.
+  Keys 1 to 9 pick the step, S switches to another run seed and so another path, Q and W change the
+  quality of the step (the slots stay) and F starts the final boss. An overlay lists the slots as
+  the pause inspection shows them.
 - `Game/Dev/LoadoutSandbox` has a panel that toggles any weapon, mechanic or legendary card.
 - `Game/Dev/CombatSandbox` runs the combat core with dummies and no player, debug outlines on.
 - `Game/Dev/ArtGallery` shows the generated art.
@@ -221,9 +264,11 @@ Click the canvas to give it keyboard focus.
 | Air heavy bounce and Diminishing Returns chain heights | `model/input/motor.ts` (`PLUNGE_BOUNCE_FACTOR`, `CHAIN_BOUNCE_HEIGHTS`) |
 | Mob hp, damage, speed and XP per mob (10, or 15 with an ontology accession) | `model/content/monster.ts` |
 | Mob behaviour timing (windups, knockback, aggro range, blink and bomb timers) | `phaser/mobs/tuning.ts` |
-| Node boss hp (`400 * (1 + 0.35 * segment index)`) and XP | `model/content/boss.ts` |
+| Node boss hp (`400 * (1 + 0.35 * segment index)`, 15% more with a dense theme) and XP | `model/content/boss.ts` |
 | Final boss hp (`600 * segments`) | `model/content/boss.ts` |
-| Boss attack damage and cooldowns | `model/content/bossAttacks.ts` |
+| Boss slots, damage multiplier and hit cap | `model/content/bossGenome.ts` |
+| Boss attack kinds, names, damage and cooldowns | `model/content/bossAttacks.ts` |
+| Boss mechanic timers, armour, shield and spill | `phaser/bosses/mechanics.ts` |
 | Quality and telegraph formulas | `model/run/segment.ts` |
 | XP per level (`20 + 10 * (level - 1)`), hp per level, stat caps, card effects | `model/progression/build.ts` |
 | Card names, texts and rarities (the ids keep the first names, `stat.thickRobe` is Redundant Storage) | `model/progression/catalog.ts`, flavour lines in `flavor.ts` |
