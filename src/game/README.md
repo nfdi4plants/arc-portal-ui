@@ -25,7 +25,8 @@ time. `model/run/` turns the index into a `RunPlan`:
 3. Quality. `quality = min(1, annotations / 8)`.
 4. Telegraph. Heavy boss attacks warn `telegraphMs = 80 + 820 * quality` ms ahead. At quality 0 the
    boss also hides its hp bar and attack names. More quality brings safe zones, weak points,
-   visible tells (the node's own annotations) and a longer stagger window.
+   visible tells (the node's own annotations), a longer stagger and a smaller stagger bar
+   (`bosses/stagger.ts`): a boss at quality 0 is nearly unstaggerable.
 
 The node after each segment is a boss (`model/content/boss.ts`). The final boss has one phase per
 segment in path order, and each phase uses its segment's telegraph timing. Every final phase has

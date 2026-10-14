@@ -616,6 +616,10 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
         body.setVelocity(motor.vx, motor.vy)
       }
     },
+    discardBufferedInput() {
+      carriedPressed.clear()
+      carriedReleased.clear()
+    },
     debugState: () => ({ motor, grounded, attackPhase: attacks.phase(), flinchMs, damageIframesMs }),
     destroy() {
       if (destroyed) return

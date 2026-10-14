@@ -124,6 +124,9 @@ export interface PlayerHandle extends Combatant {
   setLethalHitInterceptor(interceptor: ((hit: HitEvent) => boolean) | null): void
   // Freezes input and physics, for hit-stop, level-up cards and pause.
   setFrozen(frozen: boolean): void
+  // Drops the presses and releases saved while frozen, for freezes whose input should not carry
+  // over, like the pit rescue.
+  discardBufferedInput(): void
   // A shield absorbs the next hit completely. Shield fragments (component monsters) grant one,
   // up to three at a time.
   grantShield(): void

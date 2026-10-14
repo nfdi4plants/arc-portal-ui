@@ -49,7 +49,7 @@ export class StretchScene extends GameplayScene {
   // a level-up or a hit-stop holds it.
   private rescueMs = -1
   private readonly rescue = createRescueFrame()
-  private rescueStage: 'carry' | 'released' | 'settled' | 'vulnerable' = 'carry'
+  private rescueStage: 'carry' | 'released' | 'vulnerable' = 'carry'
   private readonly rescueSpot = { x: 0, y: 0 }
   private cloud: Phaser.GameObjects.Sprite | null = null
 
@@ -237,12 +237,10 @@ export class StretchScene extends GameplayScene {
       this.player.teleport(x + frame.sway, y - frame.lift)
       cloud?.setPosition(x + frame.sway, y - frame.lift - PLAYER_HEIGHT + 2)
     } else {
-      // A frozen player keeps the presses it saw for its first free step, which is the release
-      // step. One more teleport on the next step cancels the jump, dash or attack they started.
-      if (this.rescueStage === 'carry') this.rescueStage = 'released'
-      else if (this.rescueStage === 'released') {
-        this.rescueStage = 'settled'
-        this.player.teleport(x, y)
+      // Presses made on the rope must not fire the moment the mage lands.
+      if (this.rescueStage === 'carry') {
+        this.rescueStage = 'released'
+        this.player.discardBufferedInput()
       }
       cloud?.setPosition(x + frame.cloudDx, y - PLAYER_HEIGHT + 2 + frame.cloudDy).setAlpha(frame.cloudAlpha)
     }
