@@ -24,6 +24,7 @@ export function listProjects(source: string, options: ListProjectsOptions = {}):
   if (options.visibility !== undefined) params.set('visibility', options.visibility)
   if (options.archived !== undefined) params.set('archived', String(options.archived))
   if (options.lastActivityAfter !== undefined) params.set('last_activity_after', options.lastActivityAfter)
+  if (options.membership !== undefined) params.set('membership', String(options.membership))
   return requestPage(source, 'projects', params, options, isProject, 'project')
 }
 

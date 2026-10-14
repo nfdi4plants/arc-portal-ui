@@ -54,6 +54,8 @@ export interface ListProjectsOptions extends GitLabRequestOptions {
   visibility?: 'public' | 'internal' | 'private'
   archived?: boolean
   lastActivityAfter?: string
+  /** Limit results to projects the authenticated user is a member of. */
+  membership?: boolean
 }
 
 export interface GitLabPage<T> {

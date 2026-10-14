@@ -10,7 +10,7 @@ import styles from './ArcTable.module.css'
 export interface ArcTableProps {
   arcs: ArcSummary[]
   hubNames: Map<string, string>
-  sort: SortState
+  sort?: SortState
   onSortChange: (sort: SortState) => void
   now: Date
   onOpen: (arc: ArcSummary) => void
@@ -26,7 +26,7 @@ export function ArcsTable({ arcs, hubNames, sort, onSortChange, now, onOpen, onC
   const rows: Row[] = arcs.map(arc => ({ ...arc, id: arc.key }))
   const columns: Column<Row>[] = [
     {
-      id: 'title', header: 'Title', sortBy: true, rowHeader: true, width: 'grow',
+      id: 'title', header: 'Title', sortBy: !!sort, rowHeader: true, width: 'grow',
       renderCell: arc => <Stack gap="condensed">
         <Link className={styles.titleLink} href={arc.url} target="_blank" rel="noopener noreferrer"
           aria-label={'View ' + arc.title + ' on ' + (hubNames.get(arc.hubId) ?? arc.hubId)}>
@@ -39,7 +39,7 @@ export function ArcsTable({ arcs, hubNames, sort, onSortChange, now, onOpen, onC
     { id: 'access', header: 'Access', width: 'auto', renderCell: arc => arc.access === 'public'
       ? <Label variant="success"><GlobeIcon size={12} /> Public</Label>
       : <Label variant="attention"><LockIcon size={12} /> Private</Label> },
-    { id: 'lastChange', header: 'Last activity', sortBy: true, width: 'auto',
+    { id: 'lastChange', header: 'Last activity', sortBy: !!sort, width: 'auto',
       renderCell: arc => relativeTime(arc.lastActivityAt, now) },
     { id: 'open', header: () => <span className={styles.hidden}>Open</span>, width: 'auto', align: 'end',
       renderCell: arc => <ButtonGroup>
@@ -62,8 +62,8 @@ export function ArcsTable({ arcs, hubNames, sort, onSortChange, now, onOpen, onC
       <p>{onClearFilters ? 'No ARCs match these filters.' : 'No ARCs to show.'}</p>
       {onClearFilters && <Button variant="invisible" onClick={onClearFilters}>Clear filters</Button>}
     </div> : <Table.Container>
-      <DataTable key={sort.column + sort.direction} aria-labelledby={headingId} data={rows} columns={columns}
-        externalSorting initialSortColumn={sort.column} initialSortDirection={sort.direction}
+      <DataTable key={sort ? sort.column + sort.direction : 'unsorted'} aria-labelledby={headingId} data={rows} columns={columns}
+        externalSorting initialSortColumn={sort?.column} initialSortDirection={sort?.direction}
         onToggleSort={(column, direction) => {
           if (column === 'title' || column === 'lastChange') onSortChange({ column, direction })
         }} />
