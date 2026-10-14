@@ -32,6 +32,9 @@ function slotName(id: string | null): string {
   return id ? id.replace(/([A-Z])/g, ' $1').toLowerCase() : ''
 }
 
+// What a spent once-per-boss slot waits for, shown over the slot.
+const SPENT_HINT: Record<string, string> = { secondWind: 'after boss' }
+
 // Runs over the gameplay scenes for the whole run. Every element redraws only when the value it
 // shows has changed.
 export class HudScene extends Phaser.Scene implements HudControl {
@@ -43,6 +46,8 @@ export class HudScene extends Phaser.Scene implements HudControl {
   private slotsGraphics!: Phaser.GameObjects.Graphics
   private keyTexts: Phaser.GameObjects.Text[] = []
   private nameTexts: Phaser.GameObjects.Text[] = []
+  private secondsTexts: Phaser.GameObjects.Text[] = []
+  private hintTexts: Phaser.GameObjects.Text[] = []
   private pathGraphics!: Phaser.GameObjects.Graphics
   private bossGraphics!: Phaser.GameObjects.Graphics
   private bossText!: Phaser.GameObjects.Text
@@ -77,6 +82,8 @@ export class HudScene extends Phaser.Scene implements HudControl {
   private readonly slotIds: (string | null | undefined)[] = [undefined, undefined, undefined, undefined]
   private readonly slotFill = [NaN, NaN, NaN, NaN]
   private readonly slotCharged = [true, true, true, true]
+  // Whole seconds of cooldown left, 0 when ready.
+  private readonly slotSeconds = [NaN, NaN, NaN, NaN]
   private readonly cooldownTotal = [0, 0, 0, 0]
 
   constructor(ctx: RunContext) {
@@ -94,6 +101,7 @@ export class HudScene extends Phaser.Scene implements HudControl {
     this.slotIds.fill(undefined)
     this.slotFill.fill(NaN)
     this.slotCharged.fill(true)
+    this.slotSeconds.fill(NaN)
     this.cooldownTotal.fill(0)
     this.bars = this.add.graphics()
     this.hpText = addText(this, '', 6, { bold: true }).setOrigin(0.5)
@@ -101,6 +109,8 @@ export class HudScene extends Phaser.Scene implements HudControl {
     this.slotsGraphics = this.add.graphics()
     this.keyTexts = ABILITIES.map(() => addText(this, '', 6, { bold: true }))
     this.nameTexts = ABILITIES.map(() => addText(this, '', 5, { align: 'center', wrap: SLOT_W - 4 }).setOrigin(0.5, 1))
+    this.secondsTexts = ABILITIES.map(() => addText(this, '', 6, { color: PALETTE.yellow, bold: true }).setOrigin(1, 0))
+    this.hintTexts = ABILITIES.map(() => addText(this, '', 5, { color: PALETTE.yellow, bold: true, align: 'center' }).setOrigin(0.5, 1))
     this.pathGraphics = this.add.graphics()
     this.bossGraphics = this.add.graphics()
     this.bossText = addText(this, '', 8, { color: PALETTE.navy, bold: true }).setOrigin(0.5, 0)
@@ -173,7 +183,9 @@ export class HudScene extends Phaser.Scene implements HudControl {
       const x = M + i * (SLOT_W + SLOT_GAP)
       const y = h - M - SLOT_H
       this.keyTexts[i].setPosition(x + 2, y + 1)
+      this.secondsTexts[i].setPosition(x + SLOT_W - 2, y + 1)
       this.nameTexts[i].setPosition(x + SLOT_W / 2, y + SLOT_H - 1)
+      this.hintTexts[i].setPosition(x + SLOT_W / 2, y - 1)
     }
     if (this.bannerMs > 0) this.drawBannerBox()
     this.hp = this.maxHp = this.xp = this.nodeIndex = this.bossFill = this.staggerFill = NaN
@@ -275,11 +287,13 @@ export class HudScene extends Phaser.Scene implements HudControl {
       if (remaining <= 0) this.cooldownTotal[i] = 0
       else if (remaining > this.cooldownTotal[i]) this.cooldownTotal[i] = remaining
       const fill = this.cooldownTotal[i] > 0 ? Math.ceil((remaining / this.cooldownTotal[i]) * COOLDOWN_STEPS) : 0
-      const charged = id === 'gitRevert' ? loadout.gitRevertCharged() : true
-      if (id !== this.slotIds[i] || fill !== this.slotFill[i] || charged !== this.slotCharged[i]) {
+      const seconds = remaining > 0 ? Math.ceil(remaining / 1000) : 0
+      const charged = id === 'gitRevert' ? loadout.gitRevertCharged() : id === 'secondWind' ? loadout.secondWindCharged() : true
+      if (id !== this.slotIds[i] || fill !== this.slotFill[i] || charged !== this.slotCharged[i] || seconds !== this.slotSeconds[i]) {
         this.slotIds[i] = id
         this.slotFill[i] = fill
         this.slotCharged[i] = charged
+        this.slotSeconds[i] = seconds
         slotsChanged = true
       }
     }
@@ -353,6 +367,9 @@ export class HudScene extends Phaser.Scene implements HudControl {
       const binding = this.ctx.bindings[ABILITIES[i]][0]
       this.keyTexts[i].setText(binding ? bindingLabel(binding) : '')
       this.nameTexts[i].setText(slotName(id))
+      // The seconds left read better than the fill alone on the long cooldowns.
+      this.secondsTexts[i].setText(id && this.slotSeconds[i] > 0 ? String(this.slotSeconds[i]) : '')
+      this.hintTexts[i].setText(id && !this.slotCharged[i] ? (SPENT_HINT[id] ?? '') : '')
     }
   }
 

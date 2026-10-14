@@ -55,7 +55,7 @@ src/game/
     combat/        hitboxes, projectiles, damage, hit-stop and feedback
     input/         DOM keyboard and mouse listeners on the canvas
     player/        the mage, its attack machine and the staff
-    player/weapons/ the other weapons, mechanics and legendaries (the loadout)
+    player/weapons/ the other weapons, mechanics, legendaries and abilities (the loadout)
     mobs/          mob AI, passives, pickups and speech bubbles
     bosses/        node bosses, the final boss, telegraphs and safe zones
     scenes/        Boot, Stretch, Boss, FinalBoss, Hud, LevelUp, Death and Victory, the run flow
@@ -116,6 +116,44 @@ Each moveset defines its variants (`airHeavy`, `dashLight`, `dashHeavy`, `upLigh
 fallbacks live in `phaser/player/weapons/variants.ts`, and the attack machine in
 `phaser/player/attacks.ts` picks the variant, runs plunges until landing and applies locks.
 
+## Ability slots
+
+The mage has four ability slots on ability1 to ability4 (Q, E, R, F by default). An ability card
+takes the first free slot (`ABILITY_IDS` in `model/progression/catalog.ts`), and once all four are
+full no ability card is offered. The handlers live in `phaser/player/weapons/` (Parry and Familiar
+in `mechanics.ts`, Git Revert in `legendaries.ts`, the rest in `abilities.ts`). A handler that
+returns false from `activate` did nothing (Citation Needed without a target, Second Wind at full hp
+or spent) and starts no cooldown.
+
+| Card | Rarity | Cooldown | Effect |
+|---|---|---|---|
+| Centrifuge Spin | uncommon | 8 s | 0.6 s whirl, 4 hits of 5 damage that pull enemies within 4 tiles in |
+| Fume Hood | uncommon | 12 s | a 5 x 4 tile hood ahead for 4 s: enemy shots at 30% speed, enemies at 70% (bosses 85%) |
+| Sample Freeze | rare | 14 s | freezes enemies in a 6-tile cone for 1.5 s, bosses run at half speed instead |
+| Citation Needed | uncommon | 10 s | marks the nearest enemy ahead for 6 s, the mage's own hits on it deal 30% extra |
+| Autoclave | rare | 16 s | blocks hits for 0.4 s and knocks enemies within 3 tiles away for 8 damage |
+| Second Wind | uncommon | once per boss | heals 50% of max hp, then waits for the next boss to fall |
+| Peer Pressure | legendary | 40 s | 40 damage to every enemy on screen, pushed away, enemy shots on screen vanish |
+| Lab Coat | legendary | 30 s | a 0.28 s super-dash of about 10 tiles that hits for 30, hits miss the mage for 0.45 s |
+
+Pulls and pushes are knockback on hits of the loadout's stand-in attacker, so bosses, turrets and
+boss minions, which ignore knockback, never move. Only the Lab Coat dash is a hit of the mage
+itself, with damage bonuses and crits. The stand-in hits do not count as the mage's own
+(no lifesteal, Echo, Ontology tags, Peer Review or Citation bonus), and their `stagger` field keeps
+them from filling a boss stagger bar much (0.5 for the spin and Peer Pressure, 0 for Autoclave).
+Freezes and slows go through `Combatant.applyStatus` with the rules in `phaser/combat/status.ts`:
+a boss is never frozen, a freeze slows it to half speed, and it takes half of any slow. A slowed
+boss runs its whole clock slower (movement, windups, cooldowns), and its stagger bar and the heavy
+attack lock work as always. Mobs, minions, turrets and boss minions freeze in place and stop
+attacking, and a frozen phantom shows at its hit alpha. The fume hood is a slow zone of the combat
+world (`addSlowZone`), which slows reflectable enemy shots only, so bombs, falling debris and ground
+waves keep their timing.
+
+Second Wind's charge is a `BossCharge` owned by `RunDirector`, so it stays spent from one scene to
+the next. `defeatBoss` recharges it, and so does entering the final boss. The HUD greys a spent slot
+and writes "after boss" over it. Every slot shows its key, its name and, while it cools down, the
+seconds left.
+
 ## Running the sandboxes
 
 Start Storybook with `npm run storybook` (port 6006) and open these stories:
@@ -155,6 +193,8 @@ Click the canvas to give it keyboard focus.
 | Other weapons | `phaser/player/weapons/light.ts`, `phaser/player/weapons/heavy.ts` |
 | Weapon numbers on the level-up screen (follow the movesets, a test compares them) | `model/progression/weaponStats.ts` |
 | Attack buffer and combo grace | `phaser/player/attacks.ts` |
+| Ability cooldowns, reach and damage | `phaser/player/weapons/abilities.ts` |
+| Boss freeze and slow rules | `phaser/combat/status.ts` |
 | Player i-frames and flinch | `phaser/player/Player.ts` |
 | Pit damage, banner time, mob wake distance, monster prewarm rate | `phaser/scenes/StretchScene.ts` |
 | Level layout | `phaser/scenes/levelGen.ts` |
