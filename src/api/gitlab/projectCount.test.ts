@@ -1,8 +1,34 @@
 import { describe, expect, it, vi } from 'vitest'
-import { getProjectCount } from './index.ts'
+import { getGroupProjectCount, getProjectCount } from './index.ts'
 import { Failure, Success } from '../../types/result.ts'
 
 const source = 'https://gitlab.example/gitlab/'
+
+describe('getGroupProjectCount', () => {
+  it('counts a member group in one small request, including descendants and excluding shared projects', async () => {
+    const fetchCall = vi.fn<typeof fetch>().mockResolvedValue(Response.json([{ id: 4 }], { headers: { 'X-Total': '37' } }))
+    expect(await getGroupProjectCount(source, 2, { fetchCall, token: 'runtime-token' })).toEqual(Success(37))
+    expect(fetchCall).toHaveBeenCalledTimes(1)
+    const [input, init] = fetchCall.mock.calls[0]
+    const url = new URL(String(input))
+    expect(url.pathname).toBe('/gitlab/api/v4/groups/2/projects')
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      simple: 'true', order_by: 'id', sort: 'desc', per_page: '1', include_subgroups: 'true', with_shared: 'false',
+    })
+    expect(new Headers(init?.headers).get('PRIVATE-TOKEN')).toBe('runtime-token')
+  })
+
+  it.each([
+    [[], {}, 0],
+    [[{ id: 4 }], {}, null],
+    [[{ id: 4 }], { 'X-Total': '12000' }, 10000],
+    [[{ id: 4 }], { 'X-Next-Page': '2', 'X-Per-Page': '1' }, 10000],
+  ])('preserves empty, hidden-header and capped count behavior', async (data, headers, expected) => {
+    const fetchCall = vi.fn<typeof fetch>().mockResolvedValue(Response.json(data, { headers: headers as HeadersInit }))
+    expect(await getGroupProjectCount(source, 2, { fetchCall })).toEqual(Success(expected))
+    expect(fetchCall).toHaveBeenCalledTimes(1)
+  })
+})
 
 describe('getProjectCount', () => {
   it('gets the public count with one small request', async () => {

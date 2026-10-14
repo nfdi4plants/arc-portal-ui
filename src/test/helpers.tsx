@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 import { render, screen, within } from '@testing-library/react'
 import type userEvent from '@testing-library/user-event'
 import { BaseStyles } from '@primer/react'
@@ -8,6 +8,9 @@ import type { GitLabInstance, GitLabProject } from '../types/gitlab.ts'
 import type { ArcPage } from '../types/arc.ts'
 import type { ArcSummary, DataHubFetchers } from '../types/dashboard.ts'
 import { Success } from '../types/result.ts'
+import { AuthenticationContext, type AuthenticationState } from '../auth/context.ts'
+import { DashboardConfigurationProvider } from '../components/DataHubDashboard/DashboardConfigurationProvider.tsx'
+import type { DashboardConfiguration } from '../components/DataHubDashboard/configuration.ts'
 
 export function renderWithTheme(element: ReactElement, strictMode = false) {
   return render(element, {
@@ -100,6 +103,33 @@ export function fakeDataHubFetchers(overrides: Partial<DataHubFetchers> = {}): D
     fetchContributors: async () => Success([]),
     fetchLatestCommit: async () => Success(null),
     ...overrides,
+  }
+}
+
+export function fakeDashboardConfiguration(overrides: Partial<DashboardConfiguration> = {}): DashboardConfiguration {
+  return {
+    dataHubs: [plantdatahub],
+    fetchProjectCount: async () => Success(3),
+    fetchGroups: async () => Success([]),
+    fetchGroupProjectCount: async () => Success(2),
+    fetchProjects: async () => Success(arcPage([gitLabProjectFull()], { perPage: 25 })),
+    fetchGroupProjects: async () => Success(arcPage([gitLabProjectFull()], { perPage: 25 })),
+    ...overrides,
+  }
+}
+
+export function dashboardWrapper(configuration: DashboardConfiguration, tokens: Record<string, string> = {}) {
+  const authentication: AuthenticationState = {
+    accounts: Object.fromEntries(configuration.dataHubs.map(hub => [hub.id, {
+      session: tokens[hub.id] ? { token: tokens[hub.id], user: { id: 7, name: 'Jane', username: 'jane' } } : null,
+      hasSavedToken: !!tokens[hub.id], checking: false, error: null,
+    }])),
+    login: vi.fn(), retrySavedLogin: vi.fn(), cancelLogin: vi.fn(), logout: vi.fn(),
+  }
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return <ThemeProvider><BaseStyles><DashboardConfigurationProvider configuration={configuration}>
+      <AuthenticationContext value={authentication}>{children}</AuthenticationContext>
+    </DashboardConfigurationProvider></BaseStyles></ThemeProvider>
   }
 }
 

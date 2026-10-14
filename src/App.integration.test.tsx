@@ -15,6 +15,7 @@ const fetchCall = stubGitLabFetch(async url => {
   if (url.pathname === '/api/v4/groups') return Response.json([], { headers: { 'X-Next-Page': '' } })
   return projectResponse([gitLabProjectFull({ name: `${url.host} ARC` })], { 'X-Next-Page': '' })
 })
+const initialFetch = fetchCall.getMockImplementation()!
 
 function hasToken(init?: RequestInit) { return new Headers(init?.headers).has('PRIVATE-TOKEN') }
 function userCalls() { return fetchCall.mock.calls.filter(call => new URL(String(call[0])).pathname === '/api/v4/user') }
@@ -27,7 +28,8 @@ function projectCalls(host?: string) {
 
 beforeEach(() => {
   localStorage.clear()
-  fetchCall.mockClear()
+  fetchCall.mockReset()
+  fetchCall.mockImplementation(initialFetch)
   vi.stubGlobal('fetch', fetchCall)
 })
 
@@ -49,6 +51,7 @@ describe('optional login in the portal', () => {
     render(<App />)
     await screen.findByRole('button', { name: 'Account menu' })
     await waitFor(() => expect(projectCalls('gitlab.plantmicrobe.de').some(call => hasToken(call[1]))).toBe(true))
+    await user.click(await screen.findByRole('button', { name: 'gitlab.plantmicrobe.de: 1 ARCs' }))
     await user.click(await screen.findByRole('button', { name: 'Open gitlab.plantmicrobe.de ARC' }))
     await waitFor(() => expect(fetchCall).toHaveBeenCalledWith(
       'https://gitlab.plantmicrobe.de/api/v4/projects/1/packages/generic/isa_arc_json/0.0.1/arc-ro-crate-metadata.json',
@@ -62,7 +65,7 @@ describe('optional login in the portal', () => {
     const user = userEvent.setup()
     render(<App />)
     expect(await screen.findByRole('button', { name: `Open ${officialHost} ARC` })).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Open gitlab.plantmicrobe.de ARC' })).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Open gitlab.plantmicrobe.de ARC' })).not.toBeInTheDocument()
     expect(userCalls()).toHaveLength(0)
     const dialog = await openLogin(user)
     expect(dialog.getByRole('button', { name: 'Login' })).toBeDisabled()
@@ -138,7 +141,7 @@ describe('optional login in the portal', () => {
     expect(reopened.getByLabelText('Personal access token')).toHaveValue('')
   })
 
-  it('migrates a saved official-instance token while public discovery stays available', async () => {
+  it('migrates a saved official-instance token before mounting discovery', async () => {
     localStorage.setItem(TOKEN_STORAGE_KEY, 'saved-token')
     const pending = deferred<Response>()
     const transport = fetchCall.getMockImplementation()!
@@ -146,11 +149,12 @@ describe('optional login in the portal', () => {
       ? pending.promise : transport(input, init))
     const user = userEvent.setup()
     render(<App />)
-    expect(await screen.findByRole('button', { name: `Open ${officialHost} ARC` })).toBeVisible()
+    expect(screen.getByRole('status', { name: 'Checking saved logins' })).toBeVisible()
     expect(screen.getByText('Checking login…')).toBeVisible()
     const discoveryCalls = fetchCall.mock.calls.filter(call => new URL(String(call[0])).pathname !== '/api/v4/user')
-    expect(discoveryCalls.every(call => !hasToken(call[1]))).toBe(true)
+    expect(discoveryCalls).toHaveLength(0)
     await act(async () => pending.resolve(Response.json(account)))
+    expect(await screen.findByRole('button', { name: `Open ${officialHost} ARC` })).toBeVisible()
     expect(await screen.findByRole('button', { name: 'Account menu' })).toBeVisible()
     const accountMenu = await openAccountMenu(user)
     expect(accountMenu.getByText('Jane Doe')).toBeVisible()

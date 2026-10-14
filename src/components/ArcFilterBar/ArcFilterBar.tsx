@@ -13,7 +13,8 @@ export interface ArcFilterBarProps {
   onRemoveChip: (kind: FilterKind) => void
   onClearAll: () => void
   shown: number
-  total: number
+  total: number | null
+  allowRecent?: boolean
   loading?: boolean
   unavailable?: boolean
   /** Slot for the "More columns" menu. */
@@ -21,7 +22,7 @@ export interface ArcFilterBarProps {
 }
 
 export function ArcFilterBar({
-  query, onSearch, recent, onRecentToggle, chips, onRemoveChip, onClearAll, shown, total, loading, unavailable, moreColumns,
+  query, onSearch, recent, onRecentToggle, chips, onRemoveChip, onClearAll, shown, total, allowRecent = true, loading, unavailable, moreColumns,
 }: ArcFilterBarProps) {
   const [queryInput, setQueryInput] = useState(query)
   return (
@@ -29,11 +30,11 @@ export function ArcFilterBar({
       <form className={styles.search} role="search" aria-label="Search ARCs"
         onSubmit={event => { event.preventDefault(); onSearch(queryInput.trim()) }}>
         <TextInput className={styles.input} type="search" aria-label="Search ARCs" leadingVisual={SearchIcon}
-          placeholder="Search ARCs by title, group, topic, person…" value={queryInput}
+          placeholder="Search ARCs by name, path, description…" value={queryInput}
           onChange={event => setQueryInput(event.target.value)} />
         <Button type="submit" variant="primary">Search</Button>
-        <IconButton type="button" icon={HistoryIcon} size="small" variant="invisible" aria-label="Only recently changed ARCs"
-          aria-pressed={recent} onClick={onRecentToggle} />
+        {allowRecent && <IconButton type="button" icon={HistoryIcon} size="small" variant="invisible" aria-label="Only recently changed ARCs"
+          aria-pressed={recent} onClick={onRecentToggle} />}
         {moreColumns}
       </form>
       <div className={styles.filters}>
@@ -50,7 +51,8 @@ export function ArcFilterBar({
         {chips.length >= 2 && <Button variant="invisible" size="small" onClick={onClearAll}>Clear all</Button>}
         <span role="status" className={styles.count} aria-label={loading ? 'Loading ARC results' : undefined}>
           {loading ? <SkeletonBox height="16px" width="140px" /> : unavailable ? 'ARC count unavailable'
-            : <>Showing <strong>{shown}</strong> of {total} ARCs</>}
+            : total === null ? <>Showing <strong>{shown}</strong> ARCs on this page</>
+              : <>Showing <strong>{shown}</strong> of {total} ARCs</>}
         </span>
       </div>
     </div>

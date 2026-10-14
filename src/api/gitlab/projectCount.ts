@@ -10,10 +10,23 @@ export const PROJECT_COUNT_LIMIT = 10_000
  * null means browser access settings hide the pagination headers. Never scans pages.
  */
 export async function getProjectCount(source: string, options: GitLabRequestOptions = {}): Promise<Result<number | null>> {
-  if (options.signal?.aborted) return Failure('GitLab request canceled.')
   const params = new URLSearchParams({ simple: 'true', order_by: 'id', sort: 'desc', per_page: '1' })
   if (!options.token) params.set('visibility', 'public')
-  const response = await requestGitLab<unknown>(source, 'projects', params, options)
+  return requestProjectCount(source, 'projects', params, options)
+}
+
+/** Counts accessible repositories, including subgroups and excluding shared projects. */
+export function getGroupProjectCount(source: string, id: number, options: GitLabRequestOptions = {}): Promise<Result<number | null>> {
+  if (!validIdentifier(id)) return Promise.resolve(Failure('A valid group ID is required.'))
+  const params = new URLSearchParams({ simple: 'true', order_by: 'id', sort: 'desc', per_page: '1',
+    include_subgroups: 'true', with_shared: 'false' })
+  return requestProjectCount(source, 'groups/' + id + '/projects', params, options)
+}
+
+async function requestProjectCount(source: string, resource: string, params: URLSearchParams,
+  options: GitLabRequestOptions): Promise<Result<number | null>> {
+  if (options.signal?.aborted) return Failure('GitLab request canceled.')
+  const response = await requestGitLab<unknown>(source, resource, params, options)
   if (response.success === false) return Failure(response.error)
   if (options.signal?.aborted) return Failure('GitLab request canceled.')
   const { data, headers } = response.value

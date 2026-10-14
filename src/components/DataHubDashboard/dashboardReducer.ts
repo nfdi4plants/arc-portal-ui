@@ -1,4 +1,4 @@
-import type { Access, DashboardFilters, ExtraColumn, FilterKind, SortState } from '../../types/dashboard.ts'
+import type { DashboardFilters, ExtraColumn, FilterKind, SortState } from '../../types/dashboard.ts'
 
 export interface DashboardState {
   filters: DashboardFilters
@@ -15,7 +15,6 @@ export const initialDashboardState: DashboardState = {
 export type DashboardAction =
   | { type: 'toggleHub'; value: string }
   | { type: 'toggleGroup'; value: string }
-  | { type: 'toggleAccess'; value: Access }
   | { type: 'clearFilters' }
   | { type: 'removeFilter'; kind: FilterKind }
   | { type: 'setQuery'; query: string }
@@ -40,13 +39,11 @@ export function dashboardReducer(state: DashboardState, action: DashboardAction)
       } }
     }
     case 'toggleGroup': return { ...state, filters: { ...filters, groupKey: toggle(filters.groupKey, action.value) } }
-    case 'toggleAccess': return { ...state, filters: { ...filters, access: toggle(filters.access, action.value) } }
     case 'clearFilters': return { ...state, filters: { query: '', recent: false } }
     case 'removeFilter': return { ...state, filters: {
       ...filters,
       hubId: action.kind === 'hub' ? undefined : filters.hubId,
       groupKey: action.kind === 'group' ? undefined : filters.groupKey,
-      access: action.kind === 'access' ? undefined : filters.access,
       query: action.kind === 'query' ? '' : filters.query,
       recent: action.kind === 'recent' ? false : filters.recent,
     } }
