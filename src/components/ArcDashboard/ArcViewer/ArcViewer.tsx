@@ -109,7 +109,16 @@ function ExpandedWebViewer({ provideJson, repositoryUrl, json, token }: { provid
     return () => observer.disconnect()
   }, [repositoryUrl, paths, sizeResult])
 
-  return <>{sizeResult?.error && <p role="status">{sizeResult.error}</p>}<div ref={containerRef} className="viewer-content"><WebViewer jsonString={provideJson} /></div></>;
+  return <>
+    {sizeResult?.error && <p role="status">{sizeResult.error}</p>}
+    <div ref={containerRef} className="viewer-content" onClick={(event) => {
+      // WebViewer handles these links in React. Cancel their browser navigation,
+      // which otherwise replaces Storybook's parent page via its base target.
+      if ((event.target as Element).closest('a[href="#"]')) event.preventDefault()
+    }}>
+      <WebViewer jsonString={provideJson} />
+    </div>
+  </>;
 }
 
 
