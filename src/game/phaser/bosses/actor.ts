@@ -9,8 +9,9 @@ import { createAdds } from './adds'
 import { ATTACK_KINDS, createRun, resetRun } from './attacks'
 import type { AttackEnv, BossBody } from './attacks'
 import type { Arena, BossDeps, BossHandle } from './index'
-import { canStagger, createScheduler, OPENING_DELAY_MS, windupMs } from './scheduler'
+import { createScheduler, OPENING_DELAY_MS, windupMs } from './scheduler'
 import { applyRef, setOriginOf, stillTexture } from './sprites'
+import { staggerBarSize, staggerDurationMs, staggerLocked, staggerProgress } from './stagger'
 import { createTelegraphPool, createTextPool } from './telegraph'
 import { clamp, formatTell, highestWeakPoint, hitsWeakPoint } from './zones'
 
@@ -48,9 +49,10 @@ export interface Actor extends BossHandle {
 const WEAK_MULTIPLIER = 2
 const WEAK_SIZE = 16
 const STAGGER_MULTIPLIER = 1.5
-const STAGGER_HITS = 6
-const STAGGER_WITHIN_MS = 3000
 const STAGGER_RECOVER_MS = 350
+// A stagger pushes the boss this far away from the player, over STAGGER_PUSH_MS.
+const STAGGER_PUSH = 36
+const STAGGER_PUSH_MS = 220
 const TRANSITION_MS = 1200
 const DEFEAT_FADE_MS = 900
 const HURT_FLASH_MS = 70
@@ -117,10 +119,10 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
   let tellMs = 0
   let tellIndex = 0
   let tellText: Phaser.GameObjects.Text | null = null
-  let hitCount = 0
-  // A stagger earned during a heavy attack, started when that attack ends.
-  let staggerPending = false
-  const hitTimes: number[] = new Array(STAGGER_HITS).fill(0)
+  let staggerFill = 0
+  let staggerTotalMs = 0
+  let pushMs = 0
+  let pushDir = 1
   const listeners = new Set<(phase: number) => void>()
   const move = { hopping: false, hopMs: 0, fromX: 0, toX: 0, waitMs: 700, blinkInMs: 2500 }
 
@@ -209,6 +211,8 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
     hpFraction: () => hp / maxHp,
     showHpBar: () => cfg().showHpBar,
     currentAttackName: () => (cfg().showAttackNames && (run.phase === 'windup' || run.phase === 'active') ? run.spec.name : null),
+    staggerFraction: () => (staggerMs > 0 ? staggerMs / staggerTotalMs : Math.min(1, staggerFill / staggerBarSize(cfg().quality))),
+    staggerState: () => (staggerMs > 0 ? 'staggered' : staggerLocked(run.phase, run.spec.heavy) ? 'locked' : 'filling'),
     isDefeated: () => state === 'defeated',
     destroy,
     phaseIndex: () => phase,
@@ -318,7 +322,6 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
         run.phase = 'recovery'
         run.elapsedMs = 0
         releaseZones()
-        if (staggerPending) startStagger()
       }
     } else if (run.phase === 'recovery') {
       body.lean -= body.lean * Math.min(1, dtMs / 120)
@@ -434,9 +437,10 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
   }
 
   function startStagger() {
-    staggerPending = false
-    staggerMs = cfg().staggerWindowMs
-    hitCount = 0
+    staggerFill = 0
+    staggerMs = staggerTotalMs = staggerDurationMs(cfg().staggerWindowMs)
+    pushMs = STAGGER_PUSH_MS
+    pushDir = player.position().x >= body.x ? -1 : 1
     landFromHop()
     interrupt(false)
     scheduler.complete()
@@ -449,8 +453,8 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
     killer = config.killerFor(phase)
     transitionMs = TRANSITION_MS
     staggerMs = 0
-    staggerPending = false
-    hitCount = 0
+    staggerFill = 0
+    pushMs = 0
     interrupt(true)
     combat.cancelOwnedBy(self)
     adds.clear()
@@ -469,7 +473,7 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
     state = 'dying'
     defeatMs = 0
     staggerMs = 0
-    staggerPending = false
+    pushMs = 0
     landFromHop()
     interrupt(true)
     combat.cancelOwnedBy(self)
@@ -504,14 +508,10 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
       startTransition()
       return damage
     }
-    // Six hits within three seconds stagger the boss. The oldest of the last six sits where the
-    // next hit will be written.
-    hitTimes[hitCount % STAGGER_HITS] = clock
-    hitCount++
-    if (staggerMs > 0 || cfg().staggerWindowMs <= 0 || hitCount < STAGGER_HITS) return damage
-    if (clock - hitTimes[hitCount % STAGGER_HITS] > STAGGER_WITHIN_MS) return damage
-    if (canStagger(run.phase, run.spec.heavy)) startStagger()
-    else staggerPending = true
+    // The hit fills the stagger bar unless the boss is staggered already or a heavy attack locks it.
+    if (staggerMs > 0 || cfg().staggerWindowMs <= 0 || staggerLocked(run.phase, run.spec.heavy)) return damage
+    staggerFill += staggerProgress(hit)
+    if (staggerFill >= staggerBarSize(cfg().quality)) startStagger()
     return damage
   }
 
@@ -538,6 +538,11 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
     }
     if (staggerMs > 0) {
       staggerMs = Math.max(0, staggerMs - dtMs)
+      if (pushMs > 0) {
+        const step = Math.min(pushMs, dtMs)
+        pushMs -= step
+        body.x = clamp(body.x + pushDir * STAGGER_PUSH * (step / STAGGER_PUSH_MS), minX, maxX)
+      }
       return
     }
     if (run.phase !== 'none') {

@@ -6,6 +6,7 @@ import { xpForNextLevel } from '../../model/progression'
 import type { View } from '../view'
 import type { MonsterSpec } from '../../contracts/content'
 import type { Segment } from '../../contracts/run'
+import type { StaggerState } from '../bosses'
 import type { HudControl, RunContext } from './context'
 import { LevelHistoryPanel } from './LevelHistoryPanel'
 import { MobInfoPanel } from './MobInfoPanel'
@@ -22,6 +23,10 @@ const COOLDOWN_STEPS = 16
 const HP_COLOR = 0xd9534f
 const ATTACK_COLOR = 0xb3261e
 const BANNER_FADE_MS = 300
+// The boss stagger bar redraws in this many steps, and flashes white this long when it fills.
+const STAGGER_STEPS = 60
+const STAGGER_FLASH_MS = 180
+const STAGGER_LOCKED_COLOR = 0x8c8c8c
 
 function slotName(id: string | null): string {
   return id ? id.replace(/([A-Z])/g, ' $1').toLowerCase() : ''
@@ -41,6 +46,7 @@ export class HudScene extends Phaser.Scene implements HudControl {
   private pathGraphics!: Phaser.GameObjects.Graphics
   private bossGraphics!: Phaser.GameObjects.Graphics
   private bossText!: Phaser.GameObjects.Text
+  private staggerGraphics!: Phaser.GameObjects.Graphics
   private attackText!: Phaser.GameObjects.Text
   private bannerBox!: Phaser.GameObjects.Graphics
   private bannerTitle!: Phaser.GameObjects.Text
@@ -63,6 +69,9 @@ export class HudScene extends Phaser.Scene implements HudControl {
   private nodeIndex = NaN
   private bossFill = NaN
   private bossName: string | null = null
+  private staggerFill = NaN
+  private staggerState: StaggerState | null = null
+  private staggerFlashMs = 0
   private attackName: string | null = null
   private bindingsVersion = NaN
   private readonly slotIds: (string | null | undefined)[] = [undefined, undefined, undefined, undefined]
@@ -79,6 +88,9 @@ export class HudScene extends Phaser.Scene implements HudControl {
     // The scene object outlives a restart, so the cached values start over here.
     this.hp = this.maxHp = this.shields = this.xp = this.level = this.nodeIndex = this.bossFill = this.bindingsVersion = NaN
     this.bossName = this.attackName = null
+    this.staggerFill = NaN
+    this.staggerState = null
+    this.staggerFlashMs = 0
     this.slotIds.fill(undefined)
     this.slotFill.fill(NaN)
     this.slotCharged.fill(true)
@@ -92,6 +104,7 @@ export class HudScene extends Phaser.Scene implements HudControl {
     this.pathGraphics = this.add.graphics()
     this.bossGraphics = this.add.graphics()
     this.bossText = addText(this, '', 8, { color: PALETTE.navy, bold: true }).setOrigin(0.5, 0)
+    this.staggerGraphics = this.add.graphics()
     this.attackText = addText(this, '', 7, { color: ATTACK_COLOR, bold: true }).setOrigin(0.5, 0)
     this.bannerBox = this.add.graphics()
     this.bannerTitle = addText(this, '', 12, { bold: true, align: 'center' }).setOrigin(0.5, 0)
@@ -146,7 +159,7 @@ export class HudScene extends Phaser.Scene implements HudControl {
     const { width: w, height: h } = view
     this.levelText.setPosition(M, M + 19)
     this.bossText.setPosition(w / 2, M + 12)
-    this.attackText.setPosition(w / 2, M + 34)
+    this.attackText.setPosition(w / 2, M + 39)
     this.bannerTitle.setPosition(w / 2, h * 0.24)
     this.bannerSubtitle.setPosition(w / 2, h * 0.24 + 18)
     this.pauseDim.setSize(w, h)
@@ -163,7 +176,7 @@ export class HudScene extends Phaser.Scene implements HudControl {
       this.nameTexts[i].setPosition(x + SLOT_W / 2, y + SLOT_H - 1)
     }
     if (this.bannerMs > 0) this.drawBannerBox()
-    this.hp = this.maxHp = this.xp = this.nodeIndex = this.bossFill = NaN
+    this.hp = this.maxHp = this.xp = this.nodeIndex = this.bossFill = this.staggerFill = NaN
     this.bossName = null
     this.slotFill.fill(NaN)
   }
@@ -286,6 +299,21 @@ export class HudScene extends Phaser.Scene implements HudControl {
       this.bossName = bossName
       this.drawBoss()
     }
+    // Under the hp bar and only with it: the stagger bar, grey while a heavy attack locks it.
+    const staggerFill = shown ? Math.ceil(boss.staggerFraction() * STAGGER_STEPS) : -1
+    const staggerState = shown ? boss.staggerState() : null
+    let staggerChanged = staggerFill !== this.staggerFill || staggerState !== this.staggerState
+    if (staggerState === 'staggered' && this.staggerState !== 'staggered') this.staggerFlashMs = STAGGER_FLASH_MS
+    else if (this.staggerFlashMs > 0) {
+      this.staggerFlashMs -= delta
+      if (this.staggerFlashMs <= 0) staggerChanged = true
+    }
+    if (staggerChanged) {
+      this.staggerFill = staggerFill
+      this.staggerState = staggerState
+      this.drawStagger()
+    }
+
     const attackName = boss?.currentAttackName() ?? null
     if (attackName !== this.attackName) {
       this.attackName = attackName
@@ -338,6 +366,23 @@ export class HudScene extends Phaser.Scene implements HudControl {
       else if (i === this.nodeIndex) g.fillStyle(PALETTE.yellow, 1).fillCircle(x, M + 4, 4.5)
       g.lineStyle(1, PALETTE.navy, 1).strokeCircle(x, M + 4, i === this.nodeIndex ? 4.5 : 3)
     }
+  }
+
+  private drawStagger() {
+    const g = this.staggerGraphics.clear()
+    if (this.staggerFill < 0 || !this.staggerState) return
+    const w = Math.min(220, this.view.width * 0.45)
+    const x = this.view.width / 2 - w / 2
+    const y = M + 33
+    const locked = this.staggerState === 'locked'
+    g.fillStyle(PALETTE.navy, locked ? 0.55 : 0.9).fillRect(x, y, w, 4)
+    const color = this.staggerFlashMs > 0 ? 0xffffff : locked ? STAGGER_LOCKED_COLOR : this.staggerState === 'staggered' ? PALETTE.cream : PALETTE.yellow
+    const fill = this.staggerFlashMs > 0 ? 1 : this.staggerFill / STAGGER_STEPS
+    g.fillStyle(color, 1).fillRect(x + 1, y + 1, (w - 2) * fill, 2)
+    if (!locked) return
+    // Two chain links at the end of the bar.
+    g.lineStyle(1.2, PALETTE.navy, 1).strokeEllipse(x + w + 5, y + 2, 6, 4).strokeEllipse(x + w + 9, y + 2, 6, 4)
+    g.lineStyle(0.8, STAGGER_LOCKED_COLOR, 1).strokeEllipse(x + w + 5, y + 2, 6, 4).strokeEllipse(x + w + 9, y + 2, 6, 4)
   }
 
   private drawBoss() {

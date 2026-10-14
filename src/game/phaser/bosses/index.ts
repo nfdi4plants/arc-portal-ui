@@ -19,6 +19,8 @@ export interface Arena {
   platforms: readonly ArenaPlatform[]
 }
 
+export type StaggerState = 'filling' | 'locked' | 'staggered'
+
 export interface BossDeps {
   combat: CombatWorld
   art: ScribbleArt
@@ -33,6 +35,10 @@ export interface BossHandle extends Combatant {
   showHpBar(): boolean
   // Null unless attack names are shown and an attack is winding up or active.
   currentAttackName(): string | null
+  // The stagger bar, 0 to 1. While staggered it is the share of the stagger still to run.
+  staggerFraction(): number
+  // 'locked' while a heavy attack winds up or hits, then hits do not fill the bar.
+  staggerState(): StaggerState
   // True once hp is 0 and the defeat animation has finished.
   isDefeated(): boolean
   destroy(): void

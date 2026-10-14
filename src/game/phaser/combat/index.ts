@@ -82,6 +82,7 @@ export function createCombatWorld(scene: Phaser.Scene, options: CombatWorldOptio
       crit,
       knockback: mirrorKnockback(attack.spec.knockback, attack.facing),
       tags: [...(attack.spec.tags ?? [])],
+      stagger: attack.spec.stagger ?? 1,
     }
     // Targets react more mildly to shots than to strikes, so every projectile hit says it is one.
     if ('sprite' in attack && !event.tags.includes('projectile')) event.tags.push('projectile')

@@ -51,6 +51,8 @@ export interface HitboxSpec {
   maxTargets: number
   // For example 'heavy', 'projectile', 'reflect'.
   tags?: string[]
+  // Multiplies how much the hit fills a boss stagger bar. Defaults to 1.
+  stagger?: number
 }
 
 export interface ProjectileSpec extends Omit<HitboxSpec, 'follow' | 'activeMs'> {
@@ -73,6 +75,8 @@ export interface HitEvent {
   crit: boolean
   knockback: { x: number; y: number }
   tags: string[]
+  // The stagger multiplier of the hitbox or projectile, 1 when it set none.
+  stagger?: number
 }
 
 export interface CombatWorld {
