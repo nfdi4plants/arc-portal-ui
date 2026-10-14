@@ -15,7 +15,7 @@ import { tiles } from './tiles'
 export { TEXTURE_SCALE, textureBytes }
 export { MINION_ID_SUFFIX, minionArtSpec, releaseMonsters } from './monster'
 export { prewarmTelegraphs, releaseTelegraphs } from './telegraph'
-export { doorArt, shieldFragmentArt } from './props'
+export { CARD_HEIGHT, CARD_WIDTH, RARITY_COLOR, cardArt, doorArt, glowTexture, shieldFragmentArt } from './props'
 export type { BossArt, PartRef } from './parts'
 
 // Puts a sprite on the texture of `ref`, standing on its origin (bottom centre), sized in world

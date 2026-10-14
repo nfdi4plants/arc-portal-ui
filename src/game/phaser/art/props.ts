@@ -1,9 +1,11 @@
 import type Phaser from 'phaser'
 import type { SpriteRef } from '../../contracts/art'
 import { PALETTE } from '../../contracts/constants'
-import { spriteFrom } from './atlas'
+import type { PowerUpKind, Rarity } from '../../contracts/progression'
+import { cached, spriteFrom } from './atlas'
+import { gearPts, starPts, wavePts } from './geometry'
 import type { Pt } from './geometry'
-import { gold, stone } from './looks'
+import { gold, metal, stone, wood } from './looks'
 import { cssColor } from './palette'
 import type { Pen } from './pen'
 
@@ -90,5 +92,102 @@ export function shieldFragmentArt(scene: Phaser.Scene): SpriteRef {
       pen.line(7, 2, 6, 10, { weight: 0.6, rough: 0.3 })
       pen.poly([[3.4, 3.2], [6, 2.8], [5.6, 5.6], [3.6, 6]], { tint: CREAM, line: 'none' })
     },
+  })
+}
+
+export const CARD_WIDTH = 100
+export const CARD_HEIGHT = 136
+
+export const RARITY_COLOR: Record<Rarity, number> = {
+  common: 0x9aa0a6,
+  uncommon: 0x2da44e,
+  rare: 0x3b82f6,
+  legendary: PALETTE.yellow,
+}
+
+const RARITY_TINT: Record<Rarity, string> = {
+  common: '#eceef0',
+  uncommon: '#dcf1e2',
+  rare: '#dbe8fd',
+  legendary: '#fff0b3',
+}
+
+const CARD_OUTLINE: Pt[] = [
+  [7, 1.5], [93, 1.5], [98.5, 7], [98.5, 129], [93, 134.5], [7, 134.5], [1.5, 129], [1.5, 7],
+]
+
+// The round sticker in the middle of a card, centred on (50, 47).
+function stickerIcon(pen: Pen, kind: PowerUpKind, hatch: string): void {
+  if (kind === 'stat') {
+    pen.rect(46, 34, 8, 3.4, { ...wood, weight: 0.8, rough: 0.3 })
+    pen.poly([[47.2, 37.4], [52.8, 37.4], [52.8, 43], [60, 56], [40, 56], [47.2, 43]], { tint: 'rgba(214, 238, 248, 0.9)', weight: 1, rough: 0.4 })
+    pen.poly([[44.4, 50], [55.6, 50], [60, 56], [40, 56]], { tint: hatch, hatch, gap: 1.6, weight: 0.8, rough: 0.3 })
+    pen.ellipse(48.4, 52.6, 2.4, 2.4, { tint: '#ffffff', weight: 0.6, rough: 0.2 })
+    pen.ellipse(52.6, 47, 1.8, 1.8, { tint: '#ffffff', weight: 0.6, rough: 0.2 })
+  } else if (kind === 'weapon') {
+    pen.line(38, 59, 62, 35, { line: '#8a6238', weight: 2.2, rough: 0.3 })
+    pen.ellipse(62.5, 34.5, 7, 7, { tint: '#cfeaf8', hatch, gap: 1.6, weight: 0.9, rough: 0.3 })
+    pen.line(62, 59, 38, 35, { line: '#6b7480', weight: 1.8, rough: 0.3 })
+    pen.poly(starPts(37.5, 34.5, 5.2, 2, 4), { ...gold, weight: 0.8, rough: 0.2 })
+  } else if (kind === 'mechanic') {
+    pen.poly(gearPts(50, 47, 13, 9.5, 8), { ...metal, gap: 2, weight: 1.1, rough: 0.4 })
+    pen.ellipse(50, 47, 8, 8, { tint: '#ffffff', weight: 0.9, rough: 0.3 })
+    pen.dot(50, 47, 1.3)
+  } else {
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2
+      pen.line(50 + Math.cos(a) * 12, 47 + Math.sin(a) * 12, 50 + Math.cos(a) * 15, 47 + Math.sin(a) * 15, { weight: 0.9, rough: 0.2, line: '#e5b92e' })
+    }
+    pen.poly(starPts(50, 47, 12, 5.4, 5), { ...gold, weight: 1.1, rough: 0.4 })
+  }
+}
+
+// A paper trading card for a level-up offer, 100 x 136 world units. It leaves the name, the
+// description and the key number to Text objects. Those sit at the header band (name, y 5 to 28),
+// under the sticker (description, y 66 to 114) and on the bottom row (key at x 14, rarity at x 50).
+export function cardArt(scene: Phaser.Scene, rarity: Rarity, kind: PowerUpKind): SpriteRef {
+  const hatch = cssColor(RARITY_COLOR[rarity])
+  const tint = RARITY_TINT[rarity]
+  return spriteFrom(scene, {
+    key: `scribble:card:${rarity}:${kind}`,
+    width: CARD_WIDTH,
+    height: CARD_HEIGHT,
+    anchors: { weapon: { x: 0, y: -CARD_HEIGHT / 2 }, head: { x: 0, y: -CARD_HEIGHT } },
+    draw(pen) {
+      pen.poly(CARD_OUTLINE, { tint: '#fffdf6', weight: 1.7, rough: 0.7 })
+      pen.poly([[5, 5], [95, 5], [95, 28], [5, 28]], { tint, hatch, fill: rarity === 'legendary' ? 'cross-hatch' : 'hachure', gap: 2.2, weight: 1, rough: 0.5 })
+      pen.ellipse(50, 47, 33, 33, { tint: '#ffffff', hatch, gap: 3, weight: 1.3, rough: 0.5 })
+      stickerIcon(pen, kind, hatch)
+      pen.trace(wavePts(12, 64, 88, 64, 1, 7), { line: hatch, weight: 0.9, rough: 0.3 })
+      pen.ellipse(14, 126, 12, 12, { tint, weight: 0.9, rough: 0.3 })
+      pen.line(24, 126, 36, 126, { line: hatch, weight: 0.8, rough: 0.2 })
+      pen.line(64, 126, 76, 126, { line: hatch, weight: 0.8, rough: 0.2 })
+      pen.poly(starPts(88, 126, 5, 2, 5), { tint, hatch, gap: 1.4, weight: 0.8, rough: 0.2 })
+      sparkle(pen, 19, 40, 3.2, hatch)
+      sparkle(pen, 80, 54, 2.6, hatch)
+      pen.dot(24, 56, 1, hatch)
+      pen.dot(77, 38, 1, hatch)
+    },
+  })
+}
+
+const GLOW_KEY = 'scribble:card:glow'
+
+// A soft white disc that fades to nothing at the rim. Tint it to the colour of the glow.
+export function glowTexture(scene: Phaser.Scene): string {
+  return cached(scene, GLOW_KEY, () => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 64
+    canvas.height = 64
+    const ctx = canvas.getContext('2d')
+    if (ctx) {
+      const gradient = ctx.createRadialGradient(32, 32, 4, 32, 32, 32)
+      gradient.addColorStop(0, 'rgba(255, 255, 255, 0.9)')
+      gradient.addColorStop(1, 'rgba(255, 255, 255, 0)')
+      ctx.fillStyle = gradient
+      ctx.fillRect(0, 0, 64, 64)
+    }
+    scene.textures.create(GLOW_KEY, canvas)?.add('__BASE', 0, 0, 0, 64, 64)
+    return GLOW_KEY
   })
 }

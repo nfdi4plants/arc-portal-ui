@@ -37,6 +37,8 @@ stats scale with the segment depth, `1 + 0.12 * segmentIndex`.
 On the death screen a boss (or final boss phase) whose step has 8 or more annotations (quality 1)
 gets no annotate hint, because its attacks already have the longest warnings.
 
+The level-up screen plays a short intro with all input locked, so clicks and keys from the fight cannot pick a card. After it a card is chosen by a left click that starts and ends on the card, or by the keys 1 to 4. Hovering a card for about 600 ms (or pressing ? over it) opens its details, built by `cardDetails` in `model/progression/details.ts`. The mouse button is the `CHOOSE_BUTTON` constant in `LevelUpScene.ts`.
+
 ## Folder layout
 
 ```

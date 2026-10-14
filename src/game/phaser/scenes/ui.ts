@@ -12,15 +12,20 @@ function textResolution(scene: Phaser.Scene): number {
   return Math.min(4, Math.max(1, Math.ceil(scene.cameras.main.zoom)))
 }
 
+// Texts inside containers count too.
+function applyResolution(children: Phaser.GameObjects.GameObject[], resolution: number): void {
+  for (const child of children) {
+    if (child instanceof Phaser.GameObjects.Text && child.style.resolution !== resolution) child.setResolution(resolution)
+    else if (child instanceof Phaser.GameObjects.Container) applyResolution(child.list, resolution)
+  }
+}
+
 // Camera of an overlay scene. (0, 0) is the top left of the visible game area and sizes are world
 // units, the same as in the gameplay scenes, so the overlays scale with the box.
 export function overlayView(scene: Phaser.Scene, layout: (view: View) => void): void {
   followView(scene, (view) => {
     scene.cameras.main.centerOn(view.width / 2, view.height / 2)
-    const resolution = textResolution(scene)
-    for (const child of scene.children.list) {
-      if (child instanceof Phaser.GameObjects.Text && child.style.resolution !== resolution) child.setResolution(resolution)
-    }
+    applyResolution(scene.children.list, textResolution(scene))
     layout(view)
   })
 }
@@ -52,24 +57,36 @@ export interface Button {
 // A press that is still held when a screen opens (the attack button, say) would choose whatever it
 // is released over. The target acts on a release only after a pointerdown on itself, and loses
 // that arming when the pointer leaves it or is released anywhere else.
-export function onClick(scene: Phaser.Scene, target: Phaser.GameObjects.GameObject, handler: () => void): void {
+export function onClick(
+  scene: Phaser.Scene,
+  target: Phaser.GameObjects.GameObject,
+  handler: () => void,
+  // Mouse button that arms and fires the target (0 left, 1 middle, 2 right). Any button by default.
+  button?: 0 | 1 | 2,
+): void {
   let armed = false
+  const matches = (pointer: Phaser.Input.Pointer) => button === undefined || pointer.button === button
   const disarm = () => {
     armed = false
   }
-  target.on('pointerdown', () => {
-    armed = true
+  target.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+    if (matches(pointer)) armed = true
   })
   target.on('pointerout', disarm)
-  target.on('pointerup', () => {
-    if (!armed) return
+  target.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+    // Releasing another button while the armed one is still held leaves the arming alone.
+    if (!armed || !matches(pointer)) return
     armed = false
     handler()
   })
   // Phaser emits the scene-wide pointerup after the target's own. A release over another target or
   // outside the canvas clears the arming here.
-  scene.input.on('pointerup', disarm)
-  scene.input.on('pointerupoutside', disarm)
+  scene.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+    if (matches(pointer)) disarm()
+  })
+  scene.input.on('pointerupoutside', (pointer: Phaser.Input.Pointer) => {
+    if (matches(pointer)) disarm()
+  })
 }
 
 // A labelled box. It acts on release after its own press (see onClick).
@@ -95,10 +112,10 @@ export function addButton(scene: Phaser.Scene, label: string, width: number, hei
 }
 
 // Phaser's keyboard plugin is off, so overlay keys come from the canvas, which has focus.
-export function onCanvasKey(scene: Phaser.Scene, handler: (code: string) => void): void {
+export function onCanvasKey(scene: Phaser.Scene, handler: (code: string, event: KeyboardEvent) => void): void {
   const canvas = scene.game.canvas
   const listener = (event: KeyboardEvent) => {
-    if (!event.repeat) handler(event.code)
+    if (!event.repeat) handler(event.code, event)
   }
   canvas.addEventListener('keydown', listener)
   scene.events.once('shutdown', () => canvas.removeEventListener('keydown', listener))
