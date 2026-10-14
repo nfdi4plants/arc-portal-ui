@@ -8,6 +8,7 @@ import { bossCoinDrop } from '../../model/progression'
 import { applySpriteRef, doorArt, prewarmTelegraphs, releaseTelegraphs, TRADER_HEIGHT, TRADER_WIDTH, traderArt } from '../art'
 import { freeFloorX } from '../bosses/zones'
 import { spawnBoss, type Arena, type Boss } from '../bosses'
+import type { InspectTarget } from '../mobs'
 import { acquireBubble } from '../mobs/bubbles'
 import { dropCoins, updatePickups } from '../mobs/pickups'
 import type { View } from '../view'
@@ -97,6 +98,11 @@ export class BossScene extends GameplayScene {
 
   protected onView(view: View) {
     this.parallax?.layout(view)
+  }
+
+  // The boss can be inspected in the pause menu like a mob, until it falls.
+  protected inspectableMobs(): InspectTarget[] {
+    return this.boss && this.portalMs < 0 ? [this.boss] : []
   }
 
   protected xpFor(target: Combatant): number {

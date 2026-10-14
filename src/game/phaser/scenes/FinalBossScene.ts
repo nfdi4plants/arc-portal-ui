@@ -2,6 +2,7 @@ import { SCENE } from '../../contracts/constants'
 import type { Combatant } from '../../contracts/combat'
 import { prewarmTelegraphs, releaseTelegraphs } from '../art'
 import { spawnFinalBoss, type Arena, type FinalBoss } from '../bosses'
+import type { InspectTarget } from '../mobs'
 import type { View } from '../view'
 import { buildArena } from './arena'
 import type { RunContext } from './context'
@@ -64,6 +65,11 @@ export class FinalBossScene extends GameplayScene {
 
   protected onView(view: View) {
     this.parallax?.layout(view)
+  }
+
+  // The boss can be inspected in the pause menu like a mob, until it falls.
+  protected inspectableMobs(): InspectTarget[] {
+    return this.boss && this.outroMs < 0 ? [this.boss] : []
   }
 
   protected xpFor(target: Combatant): number {

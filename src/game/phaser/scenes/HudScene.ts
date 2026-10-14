@@ -5,9 +5,9 @@ import { bindingLabel } from '../../model/input'
 import { CARDS, xpForNextLevel } from '../../model/progression'
 import { applySpriteRef, coinArt } from '../art'
 import type { View } from '../view'
-import type { MonsterSpec } from '../../contracts/content'
 import type { Segment } from '../../contracts/run'
 import type { StaggerState } from '../bosses'
+import { isDescription, type InspectInfo } from '../mobs'
 import type { HudControl, RunContext } from './context'
 import { LevelHistoryPanel } from './LevelHistoryPanel'
 import { MobInfoPanel } from './MobInfoPanel'
@@ -149,17 +149,21 @@ export class HudScene extends Phaser.Scene implements HudControl {
     this.overButtons = 0
     this.mobInfo = new MobInfoPanel(this)
     this.history = new LevelHistoryPanel(this, () => this.closeHistory())
-    // A click pins the panel, hovering only shows it until the pointer leaves.
-    const onMobInfo = (spec?: MonsterSpec, segment?: Segment) => {
-      const anchor = this.registry.get(MOB_ANCHOR_KEY) as NormRect | undefined
-      if (spec && segment && anchor && this.paused && !this.history.isOpen()) this.mobInfo.show(spec, segment, anchor, true)
+    // A click pins the panel, hovering only shows it until the pointer leaves. A boss sends its
+    // description ready-made, a mob its spec.
+    const showInfo = (info: InspectInfo | undefined, segment: Segment | null | undefined, anchor: NormRect | undefined, pinned: boolean) => {
+      if (!info || !anchor || !this.paused || this.history.isOpen()) this.mobInfo.hide()
+      else if (isDescription(info)) this.mobInfo.showDescription(info, anchor, pinned)
+      else if (segment) this.mobInfo.show(info, segment, anchor, pinned)
       else this.mobInfo.hide()
     }
-    const onMobHover = (spec?: MonsterSpec, anchor?: NormRect) => {
+    const onMobInfo = (info?: InspectInfo, segment?: Segment | null) => {
+      showInfo(info, segment, this.registry.get(MOB_ANCHOR_KEY) as NormRect | undefined, true)
+    }
+    const onMobHover = (info?: InspectInfo, anchor?: NormRect) => {
       if (this.mobInfo.isPinned()) return
-      const segment = spec ? this.ctx.director?.segment(spec.segmentIndex) : undefined
-      if (spec && segment && anchor && this.paused && !this.history.isOpen()) this.mobInfo.show(spec, segment, anchor, false)
-      else this.mobInfo.hide()
+      const segment = info && !isDescription(info) ? this.ctx.director?.segment(info.segmentIndex) : undefined
+      showInfo(info, segment, anchor, false)
     }
     this.game.events.on(MOB_INFO_EVENT, onMobInfo)
     this.game.events.on(MOB_HOVER_EVENT, onMobHover)

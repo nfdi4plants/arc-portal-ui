@@ -2,7 +2,7 @@ import type Phaser from 'phaser'
 import { PALETTE } from '../../contracts/constants'
 import type { MonsterSpec } from '../../contracts/content'
 import type { Segment } from '../../contracts/run'
-import { describeMonster, type DescribeColor } from '../../model/content'
+import { describeMonster, type DescribeColor, type MonsterDescription } from '../../model/content'
 import type { View } from '../view'
 import { MOB_PANEL_RECT_KEY, type NormRect } from './mobInfoEvent'
 import { drawScribbleBox } from './panelFrame'
@@ -12,7 +12,9 @@ import { addText } from './ui'
 const MARGIN = 8
 const PAD = 8
 const MAX_WIDTH = 360
-const ROWS = 5
+// A boss lists a dozen slots, so its panel gets more width to keep each row on one line.
+const WIDE_MAX_WIDTH = 460
+const MOB_ROWS = 5
 const ARROW_W = 14
 const ROW_GAP = 5
 const LEFT_SHARE = 0.4
@@ -34,11 +36,11 @@ interface Row {
   right: Phaser.GameObjects.Text
 }
 
-// Explains the annotation behind a mob the player hovers or clicks in the pause menu. Each row
-// reads "annotation part: its value", an arrow, then the monster trait it caused, and both sides
-// share a colour. The panel is not an input target, so the pause buttons below it keep their
-// hover and clicks. The inspector learns where it sits from the registry. Every object is created
-// once and reused for the next mob.
+// Explains the annotation behind a mob, or the slots of a boss, that the player hovers or clicks in
+// the pause menu. Each row reads "annotation part: its value", an arrow, then the trait it caused,
+// and both sides share a colour. The panel is not an input target, so the pause buttons below it
+// keep their hover and clicks. The inspector learns where it sits from the registry. Every object
+// is created once and reused for the next target, a boss adds the rows it needs once.
 export class MobInfoPanel {
   private readonly frame: Phaser.GameObjects.Graphics
   private readonly title: Phaser.GameObjects.Text
@@ -58,16 +60,26 @@ export class MobInfoPanel {
     this.scene = scene
     this.frame = scene.add.graphics()
     this.title = addText(scene, '', 11, { color: PALETTE.cream, bold: true })
-    this.rows = Array.from({ length: ROWS }, () => ({
-      left: addText(scene, '', 8, { bold: true }),
-      arrow: addText(scene, '→', 10, { bold: true }),
-      right: addText(scene, '', 8, { bold: true }),
-    }))
+    this.rows = []
     this.body = addText(scene, '', 7, { color: PALETTE.cream })
     this.hint = addText(scene, 'Click outside to close', 6, { color: PALETTE.blue })
-    this.all = [this.frame, this.title, this.body, this.hint, ...this.rows.flatMap((row) => [row.left, row.arrow, row.right])]
+    this.all = [this.frame, this.title, this.body, this.hint]
     for (const part of this.all) (part as Phaser.GameObjects.GameObject & Phaser.GameObjects.Components.Depth).setDepth(DEPTH)
+    this.ensureRows(MOB_ROWS)
     this.apply(false)
+  }
+
+  private ensureRows(count: number): void {
+    while (this.rows.length < count) {
+      const row = {
+        left: addText(this.scene, '', 8, { bold: true }),
+        arrow: addText(this.scene, '→', 10, { bold: true }),
+        right: addText(this.scene, '', 8, { bold: true }),
+      }
+      for (const part of [row.left, row.arrow, row.right]) part.setDepth(DEPTH).setAlpha(this.dimmed ? DIMMED_ALPHA : 1).setVisible(false)
+      this.rows.push(row)
+      this.all.push(row.left, row.arrow, row.right)
+    }
   }
 
   isOpen(): boolean {
@@ -79,11 +91,15 @@ export class MobInfoPanel {
   }
 
   show(spec: MonsterSpec, segment: Segment, anchor: NormRect, pinned: boolean): void {
+    this.showDescription(describeMonster(spec, segment), anchor, pinned)
+  }
+
+  showDescription({ title, rows, lines }: MonsterDescription, anchor: NormRect, pinned: boolean): void {
     this.anchor = anchor
     this.pinned = pinned
-    const { title, rows, lines } = describeMonster(spec, segment)
     this.title.setText(title)
-    this.used = Math.min(rows.length, ROWS)
+    this.ensureRows(rows.length)
+    this.used = rows.length
     for (let i = 0; i < this.used; i++) {
       const color = cssHex(rowColor(rows[i].color))
       const row = this.rows[i]
@@ -116,7 +132,7 @@ export class MobInfoPanel {
   layout(view: View | null): void {
     this.view = view
     if (!view || !this.open) return
-    const width = Math.min(view.width - 2 * MARGIN, MAX_WIDTH)
+    const width = Math.min(view.width - 2 * MARGIN, this.used > MOB_ROWS ? WIDE_MAX_WIDTH : MAX_WIDTH)
     const inner = width - 2 * PAD
     const leftW = Math.floor(inner * LEFT_SHARE)
     const rightW = inner - leftW - ARROW_W

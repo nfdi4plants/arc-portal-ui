@@ -1,9 +1,9 @@
-// The gameplay scene emits this on the game's event emitter when the player clicks a mob while
-// paused. With a spec, its segment and the mob's vertical place in the view (0 to 1) the HUD pins
-// the info panel next to the mob, without arguments it unpins and closes it.
+// The gameplay scene emits this on the game's event emitter when the player clicks a mob or a boss
+// while paused. With a mob's spec and its segment, or a boss description, the HUD pins the info
+// panel next to it, without arguments it unpins and closes it.
 export const MOB_INFO_EVENT = 'mob-info'
-// The inspector emits this when the pointer has rested on a mob long enough (spec and the mob's
-// rectangle) or has left it for good (no arguments). The HUD shows the panel unless one is pinned.
+// The inspector emits this when the pointer has rested on a mob or a boss long enough (its spec or
+// description and its rectangle) or has left it for good (no arguments). The HUD shows the panel unless one is pinned.
 export const MOB_HOVER_EVENT = 'mob-hover'
 
 // A rectangle as fractions of the view, so the gameplay camera and the HUD camera can exchange
