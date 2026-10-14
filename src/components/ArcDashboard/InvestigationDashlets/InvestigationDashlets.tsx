@@ -1,5 +1,5 @@
 import { Text } from '@primer/react'
-import { BeakerIcon, BookIcon, BrowserIcon, DatabaseIcon, FileIcon, OrganizationIcon, PeopleIcon } from '@primer/octicons-react'
+import { PlayIcon, WorkflowIcon, BeakerIcon, BookIcon, BrowserIcon, DatabaseIcon, FileIcon, OrganizationIcon, PeopleIcon } from '@primer/octicons-react'
 import { lazy, Suspense, type RefObject } from 'react'
 import { PopupDashlet } from '../../PopupDashlet'
 import { ContactList } from '../Investigation/ContactList'
@@ -50,22 +50,34 @@ export function InvestigationDashlets({ metadata, arcJson, classNamePrefix, ids,
       content: <OrganizationList organizations={metadata.organizations} />,
     },
     {
-      id: 'publications', title: investigationDashletTitles.publications,
+      id: 'publications', title: `${investigationDashletTitles.publications} (${metadata.publications.length})`,
       symbol: <BookIcon size={48} />,
       description: 'Related publications, authors, publication status, and DOI links.',
       content: <PublicationList publications={metadata.publications} showHeading={false} description="Publications associated with this ARC." />,
     },
     {
-      id: 'assays', title: investigationDashletTitles.assays,
+      id: 'assays', title: `${investigationDashletTitles.assays} (${metadata.assays.length})`,
       symbol: <BeakerIcon size={48} />,
       description: 'Experimental assays and measurement workflows recorded in this ARC.',
       content: <NamedEntityList title="Assays" items={metadata.assays} />,
     },
     {
-      id: 'studies', title: investigationDashletTitles.studies,
+      id: 'studies', title: `${investigationDashletTitles.studies} (${metadata.studies.length})`,
       symbol: <DatabaseIcon size={48} />,
       description: 'Studies and sample collections recorded in this ARC.',
       content: <NamedEntityList title="Studies" items={metadata.studies} />,
+    },
+    {
+      id: 'runs', title: `${investigationDashletTitles.runs} (${metadata.runs.length})`,
+      symbol: <PlayIcon size={48} />,
+      description: 'Runs recorded in this ARC.',
+      content: <NamedEntityList title="Runs" items={metadata.runs} />,
+    },
+    {
+      id: 'workflows', title: `${investigationDashletTitles.workflows} (${metadata.workflows.length})`,
+      symbol: <WorkflowIcon size={48} />,
+      description: 'Workflows recorded in this ARC.',
+      content: <NamedEntityList title="Workflows" items={metadata.workflows} />,
     },
     {
       id: 'webview', title: investigationDashletTitles.webview,

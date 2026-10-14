@@ -34,7 +34,7 @@ const meta = {
   parameters: {
     docs: {
       description: {
-        component: 'Alternate investigation dashboard with a circular ARC header and eight equally sized, compact dashlets: Description, Contacts, Organizations, Publications, Assays, Studies, Webview, and Graphview. Hover for 1.5 seconds to preview; click to expand over the dashboard. Click outside, press Escape, or use the shrink icon to restore the dashlet. Overview is omitted. The layout stacks on smaller screens. Uses the bundled Talinum ARC without DataHub requests.',
+        component: 'Alternate investigation dashboard with a circular ARC header and ten equally sized, compact dashlets: Description, Contacts, Organizations, Publications, Assays, Studies, Runs, Workflows, Webview, and Graphview. Hover for 1.5 seconds to preview; click to expand over the dashboard. Click outside, press Escape, or use the shrink icon to restore the dashlet. Overview is omitted. The layout stacks on smaller screens. Uses the bundled Talinum ARC without DataHub requests.',
       },
     },
   },

@@ -36,9 +36,11 @@ export function InvestigationDetails({ metadata }: InvestigationDetailsProps) {
           <UnderlinePanels.Tab value="description">Description</UnderlinePanels.Tab>
           <UnderlinePanels.Tab value="contacts">Contacts</UnderlinePanels.Tab>
           <UnderlinePanels.Tab value="organizations">Organizations</UnderlinePanels.Tab>
-          <UnderlinePanels.Tab value="publications">Publications</UnderlinePanels.Tab>
-          <UnderlinePanels.Tab value="assays">Assays</UnderlinePanels.Tab>
-          <UnderlinePanels.Tab value="studies">Studies</UnderlinePanels.Tab>
+          <UnderlinePanels.Tab value="publications">Publications ({metadata.publications.length})</UnderlinePanels.Tab>
+          <UnderlinePanels.Tab value="assays">Assays ({metadata.assays.length})</UnderlinePanels.Tab>
+          <UnderlinePanels.Tab value="studies">Studies ({metadata.studies.length})</UnderlinePanels.Tab>
+          <UnderlinePanels.Tab value="runs">Runs ({metadata.runs.length})</UnderlinePanels.Tab>
+          <UnderlinePanels.Tab value="workflows">Workflows ({metadata.workflows.length})</UnderlinePanels.Tab>
           <UnderlinePanels.Panel value="overview" className="investigation-details-panel" aria-hidden={activeTab !== 'overview'} inert={activeTab !== 'overview'}>
             <InvestigationOverview metadata={metadata} onNavigate={navigateFromOverview} />
           </UnderlinePanels.Panel>
@@ -59,6 +61,12 @@ export function InvestigationDetails({ metadata }: InvestigationDetailsProps) {
           </UnderlinePanels.Panel>
           <UnderlinePanels.Panel value="studies" className="investigation-details-panel" aria-hidden={activeTab !== 'studies'} inert={activeTab !== 'studies'}>
             <NamedEntityList title="Studies" items={metadata.studies} />
+          </UnderlinePanels.Panel>
+          <UnderlinePanels.Panel value="runs" className="investigation-details-panel" aria-hidden={activeTab !== 'runs'} inert={activeTab !== 'runs'}>
+            <NamedEntityList title="Runs" items={metadata.runs} />
+          </UnderlinePanels.Panel>
+          <UnderlinePanels.Panel value="workflows" className="investigation-details-panel" aria-hidden={activeTab !== 'workflows'} inert={activeTab !== 'workflows'}>
+            <NamedEntityList title="Workflows" items={metadata.workflows} />
           </UnderlinePanels.Panel>
         </UnderlinePanels>
       </div>
