@@ -14,5 +14,7 @@
 }
 .scrolling-dashboard-navigation { display: flex; flex-wrap: wrap; gap: 8px; }
 .scrolling-dashboard-viewer { height: max(360px, 75dvh); flex-shrink: 0; min-width: 0; }
+/* The game starts as a compact card, as tall as the tiles in the tile layouts. */
+.scrolling-dashboard-viewer.scrolling-dashboard-game { height: 180px; }
 .scrolling-dashboard-viewer > .popup-dashlet { height: 100%; }
 .scrolling-dashboard-viewer:focus-visible { outline: 2px solid var(--borderColor-accent-emphasis); outline-offset: 2px; }

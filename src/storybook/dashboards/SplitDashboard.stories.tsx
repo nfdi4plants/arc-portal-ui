@@ -13,7 +13,7 @@ const meta = {
   parameters: {
     docs: {
       description: {
-        component: 'Full-width Graphview above Webview with a draggable 40/60 height split. Use Up/Down on the divider to resize with the keyboard. Either viewer can collapse to its title bar or open as a popup. A compact ARC header and investigation dropdown buttons keep most of the space available to the viewers. Uses the bundled Talinum ARC without DataHub requests.',
+        component: 'Full-width Graphview above Webview with a draggable 40/60 height split. Use Up/Down on the divider to resize with the keyboard. Either viewer can collapse to its title bar or open as a popup. A compact ARC header, investigation dropdown buttons, and an ARCade button that opens the game keep most of the space available to the viewers. Uses the bundled Talinum ARC without DataHub requests.',
       },
     },
   },

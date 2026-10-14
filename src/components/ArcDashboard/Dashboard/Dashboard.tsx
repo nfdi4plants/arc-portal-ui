@@ -7,6 +7,7 @@ import { lazy, Suspense } from 'react'
 import { Dashlet } from '../../DashboardWindow'
 import { ArcDashboardFrame } from '../ArcDashboardFrame'
 import { ArcDetails } from '../ArcDetails'
+import { ArcGameDashlet } from '../Game'
 import { InvestigationDetails } from '../Investigation/InvestigationDetails'
 import { GraphviewDashlet } from '../Provenance/GraphviewDashlet'
 import type { DashboardContentProps, DashboardProps } from '../dashboardTypes'
@@ -40,6 +41,7 @@ export function DashboardContent({ metadata, provenance, actions, ...props }: Da
         </Suspense>
       </Dashlet>
       {provenance && <GraphviewDashlet index={provenance} />}
+      {provenance && <ArcGameDashlet index={provenance} arcTitle={metadata.title} />}
     </main>
   )
 }

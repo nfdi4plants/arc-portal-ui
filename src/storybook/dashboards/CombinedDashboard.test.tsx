@@ -33,6 +33,8 @@ describe('CombinedDashboard', () => {
     expect(screen.getByRole('region', { name: 'Provenance explorer' })).toBeVisible()
     expect(screen.getByRole('button', { name: 'Expand Webview' })).toBeVisible()
     expect(screen.getByRole('button', { name: 'Expand Graphview' })).toBeVisible()
+    expect(screen.getByRole('region', { name: 'ARCade' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Expand ARCade' })).toBeVisible()
     const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: 'Expand Contacts (12)' }))
     const contacts = screen.getByRole('dialog', { name: 'Contacts (12)' })

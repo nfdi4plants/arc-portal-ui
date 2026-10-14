@@ -4,6 +4,7 @@ import type { DashboardContentProps } from '../../components/ArcDashboard/dashbo
 import { InvestigationDashlets } from '../../components/ArcDashboard/InvestigationDashlets/InvestigationDashlets'
 import { investigationDetailIds } from '../../components/ArcDashboard/InvestigationDashlets/investigationDashletOptions'
 import { ViewerWorkspace } from '../../components/ArcDashboard/ViewerWorkspace/ViewerWorkspace'
+import { PopupArcGame } from '../../components/ArcDashboard/Game/PopupArcGame'
 import './viewerDashboard.css'
 import './splitDashboard.css'
 import './scrollingDashboard.css'
@@ -14,9 +15,12 @@ export function SplitDashboardLayout({ metadata, provenance, actions, scrolling 
     <>
       {actions && <div className="viewer-dashboard-actions split-dashboard-actions">{actions}</div>}
       <ArcDetails {...props} metadata={metadata} />
-      <nav className="split-dashboard-metadata" aria-label="Investigation dashlets">
-        <InvestigationDashlets repository={props.repository} repositoryUrl={props.repositoryUrl} token={props.token} metadata={metadata} arcJson={props.arcJson} classNamePrefix="split-dashboard" ids={investigationDetailIds} presentation="dropdown" onNavigateFolder={path => setFolderRequest({ path })} />
-      </nav>
+      <div className="split-dashboard-toolbar">
+        <nav className="split-dashboard-metadata" aria-label="Investigation dashlets">
+          <InvestigationDashlets repository={props.repository} repositoryUrl={props.repositoryUrl} token={props.token} metadata={metadata} arcJson={props.arcJson} classNamePrefix="split-dashboard" ids={investigationDetailIds} presentation="dropdown" onNavigateFolder={path => setFolderRequest({ path })} />
+        </nav>
+        <PopupArcGame index={provenance} arcTitle={metadata.title} className="split-dashboard-game" />
+      </div>
     </>
   )
 

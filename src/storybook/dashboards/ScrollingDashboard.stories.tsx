@@ -9,6 +9,7 @@ import { InvestigationMenu } from '../../components/ArcDashboard/InvestigationMe
 import { PopupGraphview } from '../../components/ArcDashboard/Provenance/PopupGraphview'
 import { TalinumStory } from '../TalinumStory'
 import { privateTalinumDataHubData, publicTalinumDataHubData, talinumArcJson, talinumRepository } from '../fixtures/talinumArc'
+import { PopupArcGame } from '../../components/ArcDashboard/Game/PopupArcGame'
 import './viewerDashboard.css'
 import './scrollingDashboard.css'
 
@@ -16,6 +17,7 @@ function ScrollingDashboardLayout({ metadata, provenance, actions, ...props }: D
   const header = useRef<HTMLElement>(null)
   const webview = useRef<HTMLElement>(null)
   const graphview = useRef<HTMLElement>(null)
+  const game = useRef<HTMLElement>(null)
   const jumpTo = (section: HTMLElement | null) => {
     if (!section) return
     section.style.scrollMarginTop = `${(header.current?.getBoundingClientRect().height ?? 0) + 16}px`
@@ -31,6 +33,7 @@ function ScrollingDashboardLayout({ metadata, provenance, actions, ...props }: D
         <nav className="scrolling-dashboard-navigation" aria-label="Viewer navigation">
           <Button onClick={() => jumpTo(graphview.current)}>Jump to Graphview</Button>
           <Button onClick={() => jumpTo(webview.current)}>Jump to Webview</Button>
+          {provenance && <Button onClick={() => jumpTo(game.current)}>Jump to ARCade</Button>}
           <InvestigationMenu metadata={metadata} arcJson={props.arcJson} />
         </nav>
       </header>
@@ -40,6 +43,9 @@ function ScrollingDashboardLayout({ metadata, provenance, actions, ...props }: D
       <section ref={webview} tabIndex={-1} aria-label="Webview section" className="scrolling-dashboard-viewer">
         <InvestigationDashlets repository={props.repository} repositoryUrl={props.repositoryUrl} token={props.token} metadata={metadata} arcJson={props.arcJson} classNamePrefix="scrolling-dashboard" ids={['webview']} interactive />
       </section>
+      {provenance && <section ref={game} tabIndex={-1} aria-label="ARCade section" className="scrolling-dashboard-viewer scrolling-dashboard-game">
+        <PopupArcGame index={provenance} arcTitle={metadata.title} />
+      </section>}
     </main>
   )
 }
@@ -51,7 +57,7 @@ const meta = {
   argTypes: { content: { control: false, table: { disable: true } }, label: { table: { disable: true } }, fillHeight: { table: { disable: true } } },
   args: { repository: talinumRepository, arcJson: talinumArcJson, content: ScrollingDashboardLayout, label: 'ScrollingDashboard', fillHeight: false },
   parameters: { docs: { description: {
-    component: 'A continuous scrolling dashboard with a sticky ARC header and Investigation menu. Full-width Graphview comes first, followed by Webview. Each viewer occupies 75% of the viewport height, with a minimum height of 360px. Jump buttons scroll to a viewer and move keyboard focus there. Both viewers stay mounted and retain popup controls. Uses the bundled Talinum ARC without DataHub requests.',
+    component: 'A continuous scrolling dashboard with a sticky ARC header and Investigation menu. Full-width Graphview comes first, followed by Webview. Each viewer occupies 75% of the viewport height, with a minimum height of 360px. Jump buttons scroll to a viewer and move keyboard focus there. Both viewers stay mounted and retain popup controls. A compact ARCade card below them expands into the game. Uses the bundled Talinum ARC without DataHub requests.',
   } } },
 } satisfies Meta<typeof ArcDashboardFrame>
 

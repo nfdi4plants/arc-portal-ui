@@ -3,7 +3,7 @@ import { ARC } from '@nfdi4plants/arctrl'
 import { useMemo } from 'react'
 import { Button } from '@primer/react'
 import { buildProvenanceIndex } from '../../arc/provenance/buildIndex.ts'
-import { DashboardContent } from './Dashboard'
+import { NewDashboardContent } from './NewDashboard'
 import { DashboardWindow } from '../DashboardWindow'
 import { selectInvestigationMetadata } from './Investigation/selectInvestigationMetadata'
 import type { ArcRepositoryOverview } from '../../api/gitlab'
@@ -25,8 +25,8 @@ function LoadedArc({ arc, name, url, token, onBack, dataHubData }: { arc: ARC } 
     const arcJson = useMemo(() => ARC.toROCrateJsonString()(arc), [arc])
 
     return (
-        <DashboardWindow label="ARC-Dashboard">
-            <DashboardContent
+        <DashboardWindow label="ARC-Dashboard" fillHeight>
+            <NewDashboardContent
                 metadata={metadata}
                 provenance={provenance}
                 arcJson={arcJson}

@@ -54,6 +54,8 @@ describe.each([
     expect(await screen.findByRole('link', { name: 'Download README.md from GitLab' })).toHaveAttribute('href', 'https://gitlab.example/research/talinum/-/raw/HEAD/README.md?inline=false')
     expect(await screen.findByRole('cell', { name: '2.0 KiB' })).toBeVisible()
     expect(loadFileSizes).toHaveBeenCalledWith('https://gitlab.example/research/talinum', expect.any(AbortSignal), 'test-token', expect.any(Function))
+    expect(screen.getByRole('region', { name: 'ARCade' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Expand ARCade' })).toBeVisible()
     const toolbar = screen.getByRole('navigation', { name: 'Investigation dashlets' })
     expect(within(toolbar).getAllByRole('button').map(button => button.getAttribute('aria-label')))
       .toEqual(['Description', 'Contacts (12)', 'Organizations (4)', 'Publications (2)', 'Assays (3)', 'Studies (2)', 'Runs (6)', 'Workflows (6)'])
