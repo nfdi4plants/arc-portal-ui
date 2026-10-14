@@ -1,4 +1,6 @@
 .split-dashboard-workspace {
+  /* Keep viewer controls below dropdowns rendered in Primer's portal layer. */
+  isolation: isolate;
   display: grid;
   flex: 1;
   grid-template-columns: minmax(0, 1fr);

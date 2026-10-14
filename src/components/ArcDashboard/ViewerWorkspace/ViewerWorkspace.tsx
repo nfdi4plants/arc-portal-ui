@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
+import { useEffect, useId, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
 import type { DashboardContentProps } from '../dashboardTypes'
 import { InvestigationDashlets } from '../InvestigationDashlets/InvestigationDashlets'
 import { PopupGraphview } from '../Provenance/PopupGraphview'
@@ -8,12 +8,16 @@ export type ViewerWorkspaceMode = 'webview' | 'graphview' | 'compare'
 const clampShare = (share: number) => Math.max(20, Math.min(80, share))
 
 /** Keep the same viewers mounted in single-view and comparison modes. */
-export function ViewerWorkspace({ metadata, arcJson, provenance, repository, repositoryUrl, token, mode = 'compare', firstViewer = 'webview' }: Pick<DashboardContentProps, 'metadata' | 'arcJson' | 'provenance' | 'repository' | 'repositoryUrl' | 'token'> & {
+export function ViewerWorkspace({ metadata, arcJson, provenance, repository, repositoryUrl, token, folderRequest, mode = 'compare', firstViewer = 'webview' }: Pick<DashboardContentProps, 'metadata' | 'arcJson' | 'provenance' | 'repository' | 'repositoryUrl' | 'token'> & {
+  folderRequest?: { path: string }
   mode?: ViewerWorkspaceMode
   firstViewer?: 'webview' | 'graphview'
 }) {
   const [webviewShare, setWebviewShare] = useState(60)
   const [collapsed, setCollapsed] = useState<'webview' | 'graphview' | null>(null)
+  useEffect(() => {
+    if (folderRequest) setCollapsed(current => current === 'webview' ? null : current)
+  }, [folderRequest])
   const workspace = useRef<HTMLDivElement>(null)
   const webviewId = useId()
   const graphviewId = useId()
@@ -29,7 +33,7 @@ export function ViewerWorkspace({ metadata, arcJson, provenance, repository, rep
   }
   const webviewPane = (
     <div key="webview" id={webviewId} className="split-dashboard-pane" hidden={mode === 'graphview'}>
-      <InvestigationDashlets repository={repository} repositoryUrl={repositoryUrl} token={token} metadata={metadata} arcJson={arcJson} classNamePrefix="split-dashboard" ids={['webview']} interactive collapsed={mode === 'graphview' || effectiveCollapsed === 'webview'} onToggleCollapsed={compare ? () => togglePane('webview') : undefined} />
+      <InvestigationDashlets folderRequest={folderRequest} repository={repository} repositoryUrl={repositoryUrl} token={token} metadata={metadata} arcJson={arcJson} classNamePrefix="split-dashboard" ids={['webview']} interactive collapsed={mode === 'graphview' || effectiveCollapsed === 'webview'} onToggleCollapsed={compare ? () => togglePane('webview') : undefined} />
     </div>
   )
   const graphviewPane = (
