@@ -8,7 +8,7 @@ import type { GitLabInstance } from '../../types/gitlab.ts'
 import { DashboardHeader } from '../DashboardHeader/DashboardHeader.tsx'
 import { BarList } from '../BarList/BarList.tsx'
 import { WorkingGroupChart } from '../WorkingGroupChart/WorkingGroupChart.tsx'
-import { ArcsTable } from '../ArcTable/ArcTable.tsx'
+import { ArcResultsList } from '../ArcResultsList/ArcResultsList.tsx'
 import { ArcFilterBar } from '../ArcFilterBar/ArcFilterBar.tsx'
 import { useDashboardConfiguration, type DashboardGroup } from './configuration.ts'
 import { useDataHubs } from './hooks/useDataHubs.ts'
@@ -133,7 +133,7 @@ function DataHubDashboard({ onArcClick, now = () => new Date() }: DataHubDashboa
         </section>}
         {projects.status === 'error' && <Banner variant="critical" title="Could not load ARCs" description={projects.error}
           primaryAction={<Banner.PrimaryAction onClick={projects.retry}>Retry ARCs</Banner.PrimaryAction>} />}
-        {projects.status === 'success' && <ArcsTable arcs={arcs} hubNames={hubNames}
+        {projects.status === 'success' && <ArcResultsList arcs={arcs} hubNames={hubNames}
           sort={view.repositories === 'mostStarred' ? undefined : view.sort} now={current}
           pagination={projects.result.data} onPageChange={page => setView(previous => ({ ...previous, page }))}
           onSortChange={sort => setView(previous => ({ ...previous, sort, page: 1 }))}
