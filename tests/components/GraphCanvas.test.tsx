@@ -670,3 +670,19 @@ describe('GraphCanvas in a measured box', () => {
     })
   })
 })
+
+it('zooms the graph in and out while keeping nodes interactive', async () => {
+  const user = userEvent.setup()
+  const onNodeClick = vi.fn()
+  render(canvas({ onNodeClick }))
+  const zoomIn = await screen.findByRole('button', { name: 'Zoom in' })
+  const svg = region().querySelector('svg')!
+  const originalWidth = Number(svg.getAttribute('width'))
+  await user.click(zoomIn)
+  expect(Number(svg.getAttribute('width'))).toBe(originalWidth * 1.25)
+  expect(within(screen.getByRole('group', { name: 'Graph zoom' })).getByText('125%')).toBeVisible()
+  await user.click(screen.getByRole('button', { name: 'Alpha, select to open' }))
+  expect(onNodeClick).toHaveBeenCalledWith('a')
+  await user.click(screen.getByRole('button', { name: 'Zoom out' }))
+  expect(Number(svg.getAttribute('width'))).toBe(originalWidth)
+})

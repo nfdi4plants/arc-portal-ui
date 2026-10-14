@@ -299,6 +299,7 @@ export function GraphCanvas({
   focusOnMount = false,
 }: GraphCanvasProps) {
   const rootRef = useRef<HTMLDivElement>(null)
+  const [zoom, setZoom] = useState(1)
   const scrolledFor = useRef<string | null>(null)
   const markerPrefix = useId().replace(/:/g, '')
 
@@ -412,108 +413,117 @@ export function GraphCanvas({
     const clamp = (value: number, max: number) => Math.max(0, Math.min(value, max))
     // The compact layout keeps its main flow on the left, so it only scrolls down to the node.
     if (!layout.compact) {
-      root.scrollLeft = clamp(target.x + target.width / 2 - root.clientWidth / 2, root.scrollWidth - root.clientWidth)
+      root.scrollLeft = clamp((target.x + target.width / 2) * zoom - root.clientWidth / 2, root.scrollWidth - root.clientWidth)
     }
-    root.scrollTop = clamp(target.y + target.height / 2 - root.clientHeight / 2, root.scrollHeight - root.clientHeight)
-  }, [layout, failed, resetKey, centerNodeId])
+    root.scrollTop = clamp((target.y + target.height / 2) * zoom - root.clientHeight / 2, root.scrollHeight - root.clientHeight)
+  }, [layout, failed, resetKey, centerNodeId, zoom])
 
   return (
-    <div ref={rootRef} className={styles.root} role="region" aria-label={ariaLabel} tabIndex={-1}>
-      {layout ? (
-        <div className={cx(styles.canvas, layout.compact && styles.canvasCompact)}>
-          <svg
-            className={styles.svg}
-            xmlns="http://www.w3.org/2000/svg"
-            width={layout.width}
-            height={layout.height}
-            viewBox={`0 0 ${layout.width} ${layout.height}`}
-            role="group"
-          >
-            <defs>
-              {ARROWS.map(({ name, className }) => (
-                <marker
-                  key={name}
-                  id={`${markerPrefix}-${name}`}
-                  className={className}
-                  markerWidth={8}
-                  markerHeight={8}
-                  refX={7}
-                  refY={4}
-                  orient="auto"
-                >
-                  <path className={styles.arrowHead} d="M0,0 L8,4 L0,8 z" />
-                </marker>
+    <div className={styles.viewport}>
+      <div ref={rootRef} className={styles.root} role="region" aria-label={ariaLabel} tabIndex={-1}>
+        {layout ? (
+          <div className={cx(styles.canvas, layout.compact && styles.canvasCompact)}>
+            <svg
+              className={styles.svg}
+              xmlns="http://www.w3.org/2000/svg"
+              width={layout.width * zoom}
+              height={layout.height * zoom}
+              viewBox={`0 0 ${layout.width} ${layout.height}`}
+              role="group"
+            >
+              <defs>
+                {ARROWS.map(({ name, className }) => (
+                  <marker
+                    key={name}
+                    id={`${markerPrefix}-${name}`}
+                    className={className}
+                    markerWidth={8}
+                    markerHeight={8}
+                    refX={7}
+                    refY={4}
+                    orient="auto"
+                  >
+                    <path className={styles.arrowHead} d="M0,0 L8,4 L0,8 z" />
+                  </marker>
+                ))}
+              </defs>
+              {layout.edges.map((laid) => {
+                const owner = ownerOf(laid)
+                // The list takes over the "+N" toggle when the expanded edge would not fit the box, and in compact mode.
+                const listed = layout.compact || !fitsInline(laid.minInlineWidth, boxWidth)
+                // A count pill is a bare number, so its tooltip says what is counted. Property pills keep the full
+                // text, because their tooltip only adds the category.
+                const texts = laid.pills
+                  .filter(({ view }) => view.kind !== 'toggle')
+                  .map(({ view }) => (view.kind === 'property' ? view.fullText : (view.tooltip ?? view.fullText)))
+                return (
+                  <g
+                    key={laid.edge.id}
+                    role="group"
+                    aria-label={`From ${owner}${texts.length ? `: ${texts.join(', ')}` : ''}`}
+                  >
+                    {laid.path && (
+                      <path
+                        className={cx(
+                          styles.edge,
+                          colorClass(laid.edge.color, styles.edgeNeutral),
+                          laid.edge.highlighted && styles.highlighted,
+                        )}
+                        d={laid.path}
+                        markerEnd={`url(#${markerPrefix}-${arrowName(laid)})`}
+                      >
+                        {laid.edge.tooltip && <title>{laid.edge.tooltip}</title>}
+                      </path>
+                    )}
+                    {laid.pills.map((placed) => (
+                      <Pill
+                        key={placed.view.key}
+                        placed={placed}
+                        highlighted={laid.edge.highlighted}
+                        owner={owner}
+                        listOpen={listed && placed.view.toggle === 'more' ? openMenu?.edgeId === laid.edge.id : undefined}
+                        onToggle={(anchor) => {
+                          if (!listed || placed.view.toggle === 'less') toggle(laid.edge.id)
+                          else if (openMenu?.edgeId === laid.edge.id) closeMenu()
+                          else setMenu({ edgeId: laid.edge.id, layout, width: boxWidth, opener: anchor })
+                        }}
+                      />
+                    ))}
+                  </g>
+                )
+              })}
+              {layout.nodes.map((laid) => (
+                <NodeShape key={laid.node.id} laid={laid} onClick={onNodeClick} />
               ))}
-            </defs>
-            {layout.edges.map((laid) => {
-              const owner = ownerOf(laid)
-              // The list takes over the "+N" toggle when the expanded edge would not fit the box, and in compact mode.
-              const listed = layout.compact || !fitsInline(laid.minInlineWidth, boxWidth)
-              // A count pill is a bare number, so its tooltip says what is counted. Property pills keep the full
-              // text, because their tooltip only adds the category.
-              const texts = laid.pills
-                .filter(({ view }) => view.kind !== 'toggle')
-                .map(({ view }) => (view.kind === 'property' ? view.fullText : (view.tooltip ?? view.fullText)))
-              return (
-                <g
-                  key={laid.edge.id}
-                  role="group"
-                  aria-label={`From ${owner}${texts.length ? `: ${texts.join(', ')}` : ''}`}
-                >
-                  {laid.path && (
-                    <path
-                      className={cx(
-                        styles.edge,
-                        colorClass(laid.edge.color, styles.edgeNeutral),
-                        laid.edge.highlighted && styles.highlighted,
-                      )}
-                      d={laid.path}
-                      markerEnd={`url(#${markerPrefix}-${arrowName(laid)})`}
-                    >
-                      {laid.edge.tooltip && <title>{laid.edge.tooltip}</title>}
-                    </path>
-                  )}
-                  {laid.pills.map((placed) => (
-                    <Pill
-                      key={placed.view.key}
-                      placed={placed}
-                      highlighted={laid.edge.highlighted}
-                      owner={owner}
-                      listOpen={listed && placed.view.toggle === 'more' ? openMenu?.edgeId === laid.edge.id : undefined}
-                      onToggle={(anchor) => {
-                        if (!listed || placed.view.toggle === 'less') toggle(laid.edge.id)
-                        else if (openMenu?.edgeId === laid.edge.id) closeMenu()
-                        else setMenu({ edgeId: laid.edge.id, layout, width: boxWidth, opener: anchor })
-                      }}
-                    />
-                  ))}
-                </g>
-              )
-            })}
-            {layout.nodes.map((laid) => (
-              <NodeShape key={laid.node.id} laid={laid} onClick={onNodeClick} />
-            ))}
-          </svg>
-          {openMenu && menuEdge && (
-            <PillMenu
-              boxHeight={box?.height ?? 0}
-              rootRef={rootRef}
-              label={`${layout.compact ? 'Details' : 'More properties'} of ${ownerOf(menuEdge)}`}
-              pills={layout.compact ? [...menuEdge.edge.pills, ...(menuEdge.edge.morePills ?? [])] : (menuEdge.edge.morePills ?? [])}
-              opener={openMenu.opener}
-              onClose={closeMenu}
-            />
-          )}
-        </div>
-      ) : shown ? (
-        <p className={styles.status} role="alert">
-          Could not lay out this graph.
-        </p>
-      ) : (
-        <p className={styles.status} role="status">
-          Laying out…
-        </p>
-      )}
+            </svg>
+            {openMenu && menuEdge && (
+              <PillMenu
+                boxHeight={box?.height ?? 0}
+                rootRef={rootRef}
+                label={`${layout.compact ? 'Details' : 'More properties'} of ${ownerOf(menuEdge)}`}
+                pills={layout.compact ? [...menuEdge.edge.pills, ...(menuEdge.edge.morePills ?? [])] : (menuEdge.edge.morePills ?? [])}
+                opener={openMenu.opener}
+                onClose={closeMenu}
+              />
+            )}
+          </div>
+        ) : shown ? (
+          <p className={styles.status} role="alert">
+            Could not lay out this graph.
+          </p>
+        ) : (
+          <p className={styles.status} role="status">
+            Laying out…
+          </p>
+        )}
+      </div>
+      {layout && <div className={styles.zoomControls} role="group" aria-label="Graph zoom">
+        <button type="button" aria-label="Zoom out" title="Zoom out" disabled={zoom <= 0.25}
+          onClick={() => { closeMenu(); setZoom(value => Math.max(0.25, value - 0.25)) }}>−</button>
+        <span aria-live="polite" aria-atomic="true">{Math.round(zoom * 100)}%</span>
+        <button type="button" aria-label="Zoom in" title="Zoom in" disabled={zoom >= 2}
+          onClick={() => { closeMenu(); setZoom(value => Math.min(2, value + 0.25)) }}>+</button>
+      </div>}
     </div>
   )
 }
