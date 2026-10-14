@@ -1,0 +1,30 @@
+/* The banner fills the symbol area of the popup tile, which centres its child. */
+.banner {
+  align-self: stretch;
+  justify-self: stretch;
+  width: 100%;
+  height: 100%;
+}
+
+.icon {
+  display: grid;
+  height: 100%;
+  place-items: center;
+  color: var(--fgColor-muted);
+  background: var(--bgColor-default);
+}
+
+.screen {
+  justify-content: center;
+}
+
+/* A tile taller than wide puts the logo under the mage. */
+.screen[data-tall] {
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.screen[data-tall] > .content {
+  flex: none;
+  align-items: center;
+}
