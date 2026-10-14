@@ -23,7 +23,6 @@ export const PASSIVE_IDS: readonly PassiveId[] = [
   'reflectDash',
   'echoStrike',
   'shockwaveHeavy',
-  'pogo',
   'familiar',
   'extraChoice',
   'theOntology',

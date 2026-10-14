@@ -221,15 +221,6 @@ describe('attack variants', () => {
     expect(rangedAir.started[0]).toMatchObject({ name: 'air', variant: 'air' })
   })
 
-  it('leaves a light in the air with up and down held to the pogo', () => {
-    // The player sets env.up only when down is not held, so the ground light (and its pogo) plays.
-    const { env, started, press } = setup(100, 1, all)
-    env.grounded = false
-    env.up = false
-    press(LIGHT)
-    expect(started[0]).toMatchObject({ name: 'a', variant: 'ground' })
-  })
-
   it('keeps a plunge active until it lands, then locks for landingLockMs', () => {
     const { env, machine, started, landed, press, wait } = setup(100, 1, all, false)
     env.grounded = false

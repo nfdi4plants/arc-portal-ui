@@ -27,7 +27,6 @@ export type MechanicId =
   | 'reflectDash'
   | 'echoStrike'
   | 'shockwaveHeavy'
-  | 'pogo'
   | 'familiar'
   | 'extraChoice'
 

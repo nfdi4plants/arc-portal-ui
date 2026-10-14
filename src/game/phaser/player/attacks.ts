@@ -35,7 +35,7 @@ export interface AttackStepEnv {
   // True while a dash runs. A buffered press does not run out meanwhile, so it plays the dash
   // variant when the dash ends.
   holdBuffer?: boolean
-  // Up held and down not held, so a pogo (down + light in the air) keeps its place.
+  // Up held and down not held.
   up?: boolean
 }
 

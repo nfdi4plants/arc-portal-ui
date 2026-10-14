@@ -27,7 +27,6 @@ export const FLAVOR: Record<string, string> = {
   'mechanic.reflectDash': 'Not my pipette, not my problem.',
   'mechanic.echoStrike': 'Reproducibility, but for punches.',
   'mechanic.shockwaveHeavy': 'The ripple effect of a very heavy dataset.',
-  'mechanic.pogo': 'Bounces between assays with real enthusiasm.',
   'mechanic.familiar': 'A tiny assistant who never asks for authorship.',
   'mechanic.extraChoice': 'One more option, one more thing to annotate.',
   'legendary.theOntology': 'Everything is tagged, even the coffee mug.',

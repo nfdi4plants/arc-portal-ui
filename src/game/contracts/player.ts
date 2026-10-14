@@ -95,8 +95,7 @@ export interface AbilityHandler {
 }
 
 export interface PlayerEvents {
-  // held is the set of actions held when the attack started, for moves that depend on a direction
-  // (down + light in the air is a pogo).
+  // held is the set of actions held when the attack started, for moves that depend on a direction.
   attackStarted: { slot: WeaponSlot; comboIndex: number; move: AttackMove; held: ReadonlySet<Action>; variant: AttackVariant }
   attackActive: { slot: WeaponSlot; comboIndex: number; move: AttackMove }
   dashed: { direction: 1 | -1 }

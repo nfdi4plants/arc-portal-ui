@@ -88,8 +88,8 @@ describe('buildSummary stats', () => {
 
 describe('buildSummary mechanics and legendaries', () => {
   it('lists the names of the owned ones', () => {
-    const summary = buildSummary(pick(createBuild(), 'mechanic.doubleJump', 'mechanic.pogo', 'legendary.peerReview'))
-    expect(summary.mechanics).toEqual(['Double Jump', 'Pogo'])
+    const summary = buildSummary(pick(createBuild(), 'mechanic.doubleJump', 'mechanic.wallJump', 'legendary.peerReview'))
+    expect(summary.mechanics).toEqual(['Double Jump', 'Wall Jump'])
     expect(summary.legendaries).toEqual(['Peer Review'])
   })
 

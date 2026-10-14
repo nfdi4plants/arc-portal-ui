@@ -184,7 +184,6 @@ const EFFECTS = new Map<string, Effect>([
   ['mechanic.reflectDash', mechanic('reflectDash')],
   ['mechanic.echoStrike', mechanic('echoStrike')],
   ['mechanic.shockwaveHeavy', mechanic('shockwaveHeavy')],
-  ['mechanic.pogo', mechanic('pogo')],
   ['mechanic.familiar', mechanic('familiar')],
   ['mechanic.extraChoice', mechanic('extraChoice', (build) => ({ ...build, offerSize: 4 }))],
   ['legendary.theOntology', legendary('theOntology')],
