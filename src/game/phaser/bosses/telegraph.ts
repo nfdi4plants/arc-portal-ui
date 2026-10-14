@@ -1,14 +1,9 @@
-import type Phaser from 'phaser'
+import Phaser from 'phaser'
 import type { ScribbleArt, TelegraphArt } from '../../contracts/art'
 import { DEPTH } from '../../contracts/constants'
+import { fillCrop, impactFlash, type FillCrop, type FillMode } from './fill'
 
-// How a zone fills while the wind-up runs. The anchor (x, y) of a ZoneSpec depends on it:
-//   radial  centre, grows in both directions
-//   wide    centre, grows left and right
-//   right   left edge, grows to the right (turned by `rotation`, so it also draws diagonal lines)
-//   left    right edge, grows to the left
-//   up      bottom centre, grows upward
-export type FillMode = 'radial' | 'wide' | 'right' | 'left' | 'up'
+export type { FillMode } from './fill'
 
 export interface ZoneSpec {
   shape: TelegraphArt
@@ -23,9 +18,10 @@ export interface ZoneSpec {
 }
 
 export interface Zone {
-  // 0 to 1. Progress is shown by cropping or scaling the zone image, nothing is redrawn.
+  // 0 to 1, the share of the wind-up that has passed. Progress is shown by cropping or scaling the
+  // fill layer, nothing is redrawn.
   setProgress(progress: number): void
-  // The wind-up is over and the zone hits. Shows it in full.
+  // The wind-up is over and the zone hits. Shows it in full with a short flash.
   activate(): void
   release(): void
 }
@@ -38,12 +34,17 @@ const ORIGIN: Record<FillMode, readonly [number, number]> = {
   up: [0.5, 1],
 }
 
-const WARN = { base: 0.4, fill: 0.75 }
+// The base shows the whole zone, outline included, from the first frame. The fill layer on top is
+// the same image painted solid red, so the part that has filled stands out clearly from the rest.
+const WARN = { base: 0.45, fill: 0.8 }
 const LIVE = { base: 0.6, fill: 0.95 }
+const FILL_TINT = 0xd8343a
+const FLASH_TINT = 0xffffff
+// How much the base grows at the impact flash.
+const FLASH_POP = 0.08
 // Safe spots breathe between these alphas, about once a second, so they stand out from the danger.
 const SAFE_ALPHA = { min: 0.65, max: 0.95 }
 const SAFE_PULSE_MS = 160
-const MIN_PROGRESS = 0.001
 
 interface Slot extends Zone {
   base: Phaser.GameObjects.Image
@@ -51,17 +52,23 @@ interface Slot extends Zone {
   mode: FillMode
   safe: boolean
   used: boolean
+  scaleX: number
+  scaleY: number
+  // Scene time of the impact, or -1 when no flash runs.
+  flashAt: number
 }
+
+const crop: FillCrop = { x: 0, y: 0, w: 0, h: 0, scale: 1 }
 
 export interface TelegraphPool {
   show(spec: ZoneSpec): Zone
-  // Pulses the safe spots. Call once per rendered frame with the scene time.
+  // Pulses the safe spots and plays the impact flashes. Call once per rendered frame with the scene time.
   update(now: number): void
   destroy(): void
 }
 
 // Danger zones and safe spots share a pool of image pairs: a dim image of the whole zone and a
-// bright copy on top that grows over the telegraph time.
+// solid red copy on top that fills up over the telegraph time and is full when the attack hits.
 export function createTelegraphPool(scene: Phaser.Scene, art: ScribbleArt): TelegraphPool {
   const slots: Slot[] = []
   const free: Slot[] = []
@@ -75,31 +82,28 @@ export function createTelegraphPool(scene: Phaser.Scene, art: ScribbleArt): Tele
       mode: 'right',
       safe: false,
       used: false,
+      scaleX: 1,
+      scaleY: 1,
+      flashAt: -1,
       setProgress(progress) {
         if (slot.safe) return
-        const k = Math.min(1, Math.max(MIN_PROGRESS, progress))
         const image = slot.fillImage
-        if (slot.mode === 'radial') {
-          image.setScale(slot.base.scaleX * k, slot.base.scaleY * k)
-          return
-        }
         const frame = image.frame
-        const w = frame.realWidth
-        const h = frame.realHeight
-        if (slot.mode === 'right') image.setCrop(0, 0, w * k, h)
-        else if (slot.mode === 'left') image.setCrop(w * (1 - k), 0, w * k, h)
-        else if (slot.mode === 'wide') image.setCrop((w * (1 - k)) / 2, 0, w * k, h)
-        else image.setCrop(0, h * (1 - k), w, h * k)
+        fillCrop(slot.mode, progress, frame.realWidth, frame.realHeight, crop)
+        if (slot.mode === 'radial') image.setScale(slot.scaleX * crop.scale, slot.scaleY * crop.scale)
+        else image.setCrop(crop.x, crop.y, crop.w, crop.h)
       },
       activate() {
         if (slot.safe) return
         slot.base.setAlpha(LIVE.base)
-        slot.fillImage.setAlpha(LIVE.fill)
+        slot.fillImage.setAlpha(LIVE.fill).setTint(FLASH_TINT)
         slot.setProgress(1)
+        slot.flashAt = scene.time.now
       },
       release() {
         if (!slot.used) return
         slot.used = false
+        slot.flashAt = -1
         slot.base.setVisible(false)
         slot.fillImage.setVisible(false)
         free.push(slot)
@@ -119,6 +123,7 @@ export function createTelegraphPool(scene: Phaser.Scene, art: ScribbleArt): Tele
       slot.used = true
       slot.mode = spec.fill
       slot.safe = !!spec.safe
+      slot.flashAt = -1
       for (const image of [slot.base, slot.fillImage]) {
         image
           .setTexture(texture)
@@ -129,15 +134,30 @@ export function createTelegraphPool(scene: Phaser.Scene, art: ScribbleArt): Tele
           .setDepth(depth)
           .setCrop()
       }
+      slot.scaleX = slot.base.scaleX
+      slot.scaleY = slot.base.scaleY
       slot.base.setAlpha(slot.safe ? SAFE_ALPHA.max : WARN.base).setVisible(true)
-      slot.fillImage.setAlpha(WARN.fill).setVisible(!slot.safe)
+      slot.fillImage.setAlpha(WARN.fill).setTint(FILL_TINT).setTintMode(Phaser.TintModes.FILL).setVisible(!slot.safe)
       if (!slot.safe) slot.setProgress(0)
       return slot
     },
     update(now) {
       const k = 0.5 + 0.5 * Math.sin(now / SAFE_PULSE_MS)
       const alpha = SAFE_ALPHA.min + (SAFE_ALPHA.max - SAFE_ALPHA.min) * k
-      for (const slot of slots) if (slot.used && slot.safe) slot.base.setAlpha(alpha)
+      for (const slot of slots) {
+        if (!slot.used) continue
+        if (slot.safe) {
+          slot.base.setAlpha(alpha)
+          continue
+        }
+        if (slot.flashAt < 0) continue
+        // The zone pops and flashes white at the impact, then settles in solid red.
+        const flash = impactFlash(now - slot.flashAt)
+        slot.base.setScale(slot.scaleX * (1 + FLASH_POP * flash), slot.scaleY * (1 + FLASH_POP * flash))
+        if (flash > 0) continue
+        slot.flashAt = -1
+        slot.fillImage.setTint(FILL_TINT)
+      }
     },
     destroy() {
       for (const slot of slots) {
