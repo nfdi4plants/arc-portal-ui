@@ -1,4 +1,5 @@
 import type { PlayerBuild, PowerUpCard, Rarity, RollOffer } from '../../contracts/progression'
+import type { Rng } from '../../contracts/rng'
 import { canApply } from './build'
 import { CARDS } from './catalog'
 
@@ -37,14 +38,15 @@ function rollRarity(r: number, legendary: number): Rarity {
   return 'common'
 }
 
-export const rollOffer: RollOffer = (build, rng) => {
+// Draws `size` different cards that canApply allows, each at a rolled rarity. The level-up offer
+// and the FAIR trade store both draw this way.
+export function drawCards(build: PlayerBuild, rng: Rng, size: number, legendary: number): PowerUpCard[] {
   const offer: PowerUpCard[] = []
-  const legendary = legendaryChance(build)
-  for (let slot = 0; slot < build.offerSize; slot++) {
+  for (let slot = 0; slot < size; slot++) {
     const start = STEP_DOWN.indexOf(rollRarity(rng.next(), legendary))
     // The last slot of an offer that is all weapons so far takes something else, so a player
     // happy with their weapons always has a card to pick.
-    const needsOther = slot === build.offerSize - 1 && offer.length > 0 && offer.every((card) => card.kind === 'weapon')
+    const needsOther = slot === size - 1 && offer.length > 0 && offer.every((card) => card.kind === 'weapon')
     let candidates: PowerUpCard[] = []
     for (const rarity of STEP_DOWN.slice(start)) {
       candidates = CARDS_BY_RARITY[rarity].filter(
@@ -57,3 +59,5 @@ export const rollOffer: RollOffer = (build, rng) => {
   }
   return offer
 }
+
+export const rollOffer: RollOffer = (build, rng) => drawCards(build, rng, build.offerSize, legendaryChance(build))

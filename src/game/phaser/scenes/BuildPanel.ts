@@ -164,7 +164,11 @@ export class BuildPanel {
     const total = groups[0].length + groups[1].length
     this.empty.setFontSize(size - 0.5).setVisible(total === 0).setPosition(PAD, top)
     let y = top
-    if (total === 0) return y + this.empty.height + PAD
+    if (total === 0) {
+      // The headings would otherwise sit at the top left of the panel, over its title.
+      for (const head of this.heads) head.setVisible(false)
+      return y + this.empty.height + PAD
+    }
     let used = 0
     groups.forEach((names, g) => {
       const head = this.heads[g]
