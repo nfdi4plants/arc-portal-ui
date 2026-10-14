@@ -43,8 +43,42 @@ export const HURTBOX_HEIGHT = 0.85
 // Flyers start this high above the point the scene gives them.
 export const HOVER_HEIGHT: Partial<Record<BodyKind, number>> = { wisp: 40, bat: 72 }
 
-// Heavier mobs are pushed less.
-export const KNOCKBACK_MASS: Record<MonsterSpec['size'], number> = { small: 1, medium: 0.8, large: 0.55 }
+export interface PoiseEntry {
+  // Multiplies the hit's world-space knockback.
+  knockback: number
+  // Upward speed added to a mob that stands on the ground.
+  launch: number
+  staggerMs: number
+}
+
+// How a mob of each size reacts to a light and to a heavy player hit.
+export const POISE: Record<MonsterSpec['size'], { light: PoiseEntry; heavy: PoiseEntry }> = {
+  small: { light: { knockback: 1.3, launch: 0, staggerMs: 220 }, heavy: { knockback: 2.2, launch: 260, staggerMs: 520 } },
+  medium: { light: { knockback: 0.9, launch: 0, staggerMs: 120 }, heavy: { knockback: 1.6, launch: 0, staggerMs: 380 } },
+  large: { light: { knockback: 0.35, launch: 0, staggerMs: 0 }, heavy: { knockback: 0.8, launch: 0, staggerMs: 260 } },
+}
+
+// Bodies that resist more than their size says. A turret never moves and staggers only from heavy hits.
+export const BODY_POISE: Partial<Record<BodyKind, { knockback: number; launch: number; stagger: number }>> = {
+  golem: { knockback: 0.7, launch: 0.5, stagger: 0.75 },
+  turret: { knockback: 0, launch: 0, stagger: 1 },
+}
+
+// Armored front and defensive stance each shave this much off knockback and stagger.
+export const BRACE_FACTOR = 0.8
+// Stagger longer than this shows the dizzy stars.
+export const DIZZY_MIN_MS = 300
+// A staggered mob may attack this long after it recovers.
+export const STAGGER_RECOVER_MS = 250
+// The pause dim of the gameplay scene sits above the world and below the mob the player inspects.
+export const INSPECT_DIM_DEPTH = 150
+export const PAUSE_DIM_ALPHA = 0.45
+export const SQUASH_MS = 140
+export const HIT_TILT_DEG = 12
+export const HIT_SQUASH = 0.18
+// Time in the air before a launched mob counts as landed, so the first step after the launch
+// (which still reports the ground) is skipped.
+export const LAUNCH_GRACE_MS = 90
 
 export interface MeleeTuning {
   windupMs: number

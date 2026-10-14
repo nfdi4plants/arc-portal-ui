@@ -1,8 +1,9 @@
 import Phaser from 'phaser'
 import type { SpriteRef } from '../../contracts/art'
 import type { Combatant, CombatWorld, HitEvent } from '../../contracts/combat'
-import { DEPTH } from '../../contracts/constants'
+import { DEPTH, PALETTE } from '../../contracts/constants'
 import type { EnemyWeaponKind, MonsterSpec } from '../../contracts/content'
+import { SUMMONED_SUFFIX } from '../../model/content'
 import { MINION_ID_SUFFIX, applySpriteRef } from '../art'
 import { bodyOf, isOneWay } from '../player/oneWay'
 import { aimVelocity, lobFlightS, lobVelocity } from './aim'
@@ -11,10 +12,12 @@ import { acquireBubble, releaseBubble } from './bubbles'
 import { bubbleAt, chatterText, chunkText } from './chatter'
 import { hitFromAbove, hitFromFront, incomingDamage } from './defense'
 import { playFx } from './fx'
+import { registerInspectable } from './inspect'
 import { LEDGE_DEPTH, LEDGE_LOOKAHEAD, PIT_DEPTH, groundProbe, sameLevel, turnsAtLedge } from './ledge'
 import type { Box } from './ledge'
 import { approach, blinkDestination } from './motion'
 import { dropShieldFragment } from './pickups'
+import { hitReaction } from './reaction'
 import { createStance, stanceMods, stepStance } from './stance'
 import type { StanceMods } from './stance'
 import {
@@ -31,16 +34,20 @@ import {
   CONTACT_KNOCKBACK,
   CONTACT_ACTIVE_MS,
   DEATH_MS,
+  DIZZY_MIN_MS,
   FALL_LIMIT,
   GOLEM_DAMAGE,
   GOLEM_WINDUP_MS,
   GRAVITY,
   HIT_FLASH_MS,
+  HIT_SQUASH,
+  HIT_TILT_DEG,
   HIT_STUN_MS,
   HOVER_HEIGHT,
+  INSPECT_DIM_DEPTH,
   HURTBOX_HEIGHT,
   HURTBOX_WIDTH,
-  KNOCKBACK_MASS,
+  LAUNCH_GRACE_MS,
   LOB_GRAVITY,
   MAX_SPEED_X,
   MELEE,
@@ -50,6 +57,8 @@ import {
   PATROL_RADIUS,
   PROJECTILE_KNOCKBACK,
   RANGED,
+  SQUASH_MS,
+  STAGGER_RECOVER_MS,
   TERMINAL_FALL,
   WANDER_RADIUS,
 } from './tuning'
@@ -123,7 +132,7 @@ function minionSpecOf(spec: MonsterSpec): MonsterSpec {
   return {
     ...spec,
     id: `${spec.id}${MINION_ID_SUFFIX}`,
-    label: `${spec.label} (summoned)`,
+    label: `${spec.label}${SUMMONED_SUFFIX}`,
     body: 'slime',
     size: 'small',
     xp: 0,
@@ -167,6 +176,8 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
 
   const sprite = scene.add.sprite(x, startFeetY, ref.textureKey).setDepth(DEPTH.enemies)
   applySpriteRef(sprite, ref)
+  const baseScaleX = sprite.scaleX
+  const baseScaleY = sprite.scaleY
 
   // A one-way platform only stops a body that was above it on the previous step.
   const processCollision = (a: unknown, b: unknown): boolean => {
@@ -210,6 +221,11 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     blinkX: 0,
     blinkCy: 0,
     chatterMs: 0,
+    staggerMs: 0,
+    squashMs: 0,
+    tiltDir: 1,
+    squashAmount: 0,
+    airborneMs: 0,
   }
   let facing: 1 | -1 = 1
   let flipped = false
@@ -248,6 +264,11 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
   let shownLine = -1
   let bubbleUp = false
   let tintCode = 0
+  let dizzy = false
+  let dizzyStars: Phaser.GameObjects.Sprite[] | null = null
+  let launched = false
+  let inspectable = false
+  let highlight = 0
 
   const cx = () => body.x + halfW
   const cy = () => body.y + H / 2
@@ -755,6 +776,20 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     ghost?.setVisible(false)
   }
 
+  // A stagger breaks the swing in progress. Bombs already thrown keep flying.
+  function interruptAttack() {
+    activeBox?.cancel()
+    activeBox = null
+    phase = 'idle'
+    st.phaseMs = 0
+    if (charge !== 'none') endCharge(300)
+    if (swoop === 'dive') swoop = 'rise'
+    if (st.blinkMs > 0) {
+      st.blinkMs = 0
+      ghost?.setVisible(false)
+    }
+  }
+
   function touchPlayer(dt: number) {
     st.contactMs -= dt
     if (st.contactMs > 0 || stats.contactDamage <= 0) return
@@ -875,6 +910,43 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     else sprite.setTint(code === 4 ? TINT.aggressive : TINT.defensive).setTintMode(Phaser.TintModes.MULTIPLY)
   }
 
+  function updateDizzy() {
+    const show = dizzy && st.staggerMs > 0
+    if (!show) {
+      if (dizzyStars) for (const star of dizzyStars) star.setVisible(false)
+      return
+    }
+    if (!dizzyStars) {
+      const orb = art.projectile(scene, 'orb')
+      dizzyStars = [0, 1, 2].map(() => {
+        const star = scene.add.sprite(0, 0, orb.textureKey).setDepth(DEPTH.enemies + 3)
+        applySpriteRef(star, { ...orb, width: 7, height: 7 })
+        return star.setOrigin(0.5, 0.5).setTint(PALETTE.yellow)
+      })
+    }
+    const top = feetY() - ref.height
+    for (let i = 0; i < dizzyStars.length; i++) {
+      const angle = st.clockMs / 200 + (i * Math.PI * 2) / dizzyStars.length
+      dizzyStars[i].setVisible(true).setPosition(cx() + Math.cos(angle) * halfW, top + Math.sin(angle) * 4)
+    }
+  }
+
+  function hideDizzy() {
+    dizzy = false
+    if (dizzyStars) for (const star of dizzyStars) star.setVisible(false)
+  }
+
+  // A quick squash and a lean away from the hit that relax together.
+  function applySquash() {
+    if (st.squashMs <= 0) {
+      if (sprite.angle !== 0 || sprite.scaleY !== baseScaleY) sprite.setAngle(0).setScale(baseScaleX, baseScaleY)
+      return
+    }
+    const t = (st.squashMs / SQUASH_MS) * st.squashAmount
+    sprite.setAngle(st.tiltDir * HIT_TILT_DEG * t)
+    sprite.setScale(baseScaleX * (1 + HIT_SQUASH * 0.8 * t), baseScaleY * (1 - HIT_SQUASH * t))
+  }
+
   function syncSprite() {
     sprite.setPosition(cx(), feetY())
     const flip = facing === -1
@@ -884,6 +956,41 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     }
   }
 
+  // Inspection
+
+  function applyInspect() {
+    if (destroyed) return
+    const can = inspectable && !asleep && !dead
+    if (can) {
+      if (!sprite.input?.enabled) sprite.setInteractive({ useHandCursor: true })
+    } else if (sprite.input?.enabled) sprite.disableInteractive()
+  }
+
+  function setHighlight(level: number) {
+    if (destroyed || level === highlight) return
+    highlight = level
+    if (level <= 0) {
+      tintCode = -1
+      refreshTint()
+      return
+    }
+    const grey = Math.round(0x18 + 0x40 * level)
+    sprite.setTint((grey << 16) | (grey << 8) | grey).setTintMode(Phaser.TintModes.ADD)
+    tintCode = -2
+  }
+
+  // Draws the sprite above the pause dim.
+  function setRaised(on: boolean) {
+    if (!destroyed) sprite.setDepth(on ? INSPECT_DIM_DEPTH + 1 : DEPTH.enemies)
+  }
+
+  function setInspectable(on: boolean) {
+    inspectable = on
+    for (const minionMob of minions) minionMob.setInspectable(on)
+    if (!on) setHighlight(0)
+    applyInspect()
+  }
+
   // Life cycle
 
   function leaveWorld() {
@@ -891,6 +998,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     awake.delete(body)
     world.disableBody(body)
     for (const collider of colliders) collider.active = false
+    applyInspect()
   }
 
   function die() {
@@ -898,6 +1006,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     st.hp = 0
     leaveWorld()
     cancelAttacks()
+    hideDizzy()
     dropBubble()
     st.flashMs = HIT_FLASH_MS
     playFx(scene, art, 'death', cx(), feetY() - H / 2, Math.max(ref.width, ref.height) * 1.1)
@@ -910,6 +1019,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     st.deathMs = DEATH_MS
     leaveWorld()
     cancelAttacks()
+    hideDizzy()
     dropBubble()
     sprite.setVisible(false)
   }
@@ -927,18 +1037,29 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     minions.length = kept
   }
 
+  // Dust where a launched mob comes down again.
+  function checkLanding(dt: number) {
+    st.airborneMs += dt
+    if (st.airborneMs < LAUNCH_GRACE_MS || !onGround) return
+    launched = false
+    playFx(scene, art, 'dust', cx(), feetY() - 4, W * 1.4)
+  }
+
   function update(dt: number) {
     if (asleep || destroyed) return
     body.moves = true
     st.clockMs += dt
     st.stunMs = Math.max(0, st.stunMs - dt)
     st.flashMs = Math.max(0, st.flashMs - dt)
+    st.staggerMs = Math.max(0, st.staggerMs - dt)
+    st.squashMs = Math.max(0, st.squashMs - dt)
 
     if (dead) {
       st.deathMs += dt
       sprite.setAlpha(clamp(1 - st.deathMs / DEATH_MS, 0, 1))
       updateMinions(dt)
       refreshTint()
+      applySquash()
       return
     }
 
@@ -962,10 +1083,13 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
       applyGroundVelocity(dt)
     }
 
-    touchPlayer(dt)
+    if (st.staggerMs <= 0) touchPlayer(dt)
+    if (launched) checkLanding(dt)
     if (passive === 'chatter') updateChatter(dt)
     if (minions.length > 0) updateMinions(dt)
     refreshTint()
+    applySquash()
+    updateDizzy()
     syncSprite()
   }
 
@@ -977,6 +1101,8 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     if (dead) return
     if (next) {
       cancelAttacks()
+      hideDizzy()
+      st.staggerMs = 0
       dropBubble()
       leaveWorld()
       sprite.setActive(false)
@@ -990,6 +1116,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     awake.add(body)
     combat.register(mob)
     sprite.setActive(true)
+    applyInspect()
   }
 
   function destroy(sceneDown = false) {
@@ -1009,6 +1136,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     body.destroy()
     sprite.destroy()
     ghost?.destroy()
+    for (const star of dizzyStars ?? []) star.destroy()
   }
   const onShutdown = () => destroy(true)
 
@@ -1038,23 +1166,49 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
         die()
         return damage
       }
+      const reaction = hitReaction({
+        size: spec.size,
+        body: spec.body,
+        heavy: hit.tags.includes('heavy'),
+        armoredFront: passive === 'armored' && hitFromFront(cx(), facing, attacker.x) && !hitFromAbove(attacker.y, body.y),
+        defensiveStance: mods.damageTaken < 1,
+      })
       st.flashMs = HIT_FLASH_MS
-      st.stunMs = HIT_STUN_MS
-      if (charge === 'run' || charge === 'windup') endCharge(300)
-      if (swoop === 'dive') swoop = 'rise'
+      st.stunMs = Math.max(HIT_STUN_MS, reaction.staggerMs)
+      st.squashMs = SQUASH_MS
+      st.squashAmount = reaction.staggerMs > 0 ? 1 : 0.5
+      st.tiltDir = hit.knockback.x >= 0 ? 1 : -1
+      if (reaction.staggerMs > 0) {
+        interruptAttack()
+        st.staggerMs = Math.max(st.staggerMs, reaction.staggerMs)
+        st.attackCdMs = reaction.staggerMs + STAGGER_RECOVER_MS
+        dizzy = reaction.staggerMs > DIZZY_MIN_MS
+      } else {
+        if (charge === 'run' || charge === 'windup') endCharge(300)
+        if (swoop === 'dive') swoop = 'rise'
+      }
       if (spec.body === 'turret') return damage
-      const mass = KNOCKBACK_MASS[spec.size]
-      body.velocity.x = hit.knockback.x * 0.5 * mass
-      if (flies) body.velocity.y = hit.knockback.y * 0.4 * mass
-      else if (onGround) body.velocity.y = -110 * mass
+      body.velocity.x = hit.knockback.x * 0.5 * reaction.knockbackScale
+      if (flies) body.velocity.y = hit.knockback.y * 0.4 * reaction.knockbackScale
+      else if (onGround) {
+        body.velocity.y = reaction.launch > 0 ? -reaction.launch : -110 * Math.min(1, reaction.knockbackScale)
+        if (reaction.launch > 0) {
+          launched = true
+          st.airborneMs = 0
+        }
+      }
       return damage
     },
     update,
     setAsleep,
+    setInspectable,
+    setHighlight,
+    setRaised,
     isGone: () => dead && st.deathMs >= DEATH_MS && minions.every((minionMob) => minionMob.isGone()),
     destroy: () => destroy(false),
   }
 
+  registerInspectable(sprite, mob)
   xpByMob.set(mob, minion ? 0 : spec.xp)
   awake.add(body)
   combat.register(mob)

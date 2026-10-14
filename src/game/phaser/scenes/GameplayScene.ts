@@ -1,13 +1,17 @@
 import Phaser from 'phaser'
 import type { Combatant, CombatWorld, HitEvent, KillerInfo } from '../../contracts/combat'
+import { PALETTE } from '../../contracts/constants'
 import type { Bindings, InputFrame } from '../../contracts/input'
 import { preloadCoreAssets } from '../assets'
 import { createCombatWorld } from '../combat'
 import { createInputLayer, type InputLayer } from '../input/InputLayer'
-import { mobXp } from '../mobs'
+import type { Segment } from '../../contracts/run'
+import { INSPECT_DIM_DEPTH, PAUSE_DIM_ALPHA } from '../mobs/tuning'
+import { createInspector, mobXp, type Inspector, type Mob } from '../mobs'
 import { attachLoadout, type LoadoutWithStatus } from '../player/weapons'
 import { createPlayer, type Player } from '../player/Player'
 import { followView, viewForBox, type View } from '../view'
+import { MOB_INFO_EVENT } from './mobInfoEvent'
 import type { GameplayControl, RunContext } from './context'
 import { PIT_KILLER, type RunDirector } from './RunDirector'
 
@@ -20,6 +24,9 @@ export interface LevelSetup {
 }
 
 const LOOK_AHEAD = 56
+// A heavy player hit nudges the camera. Light hits do not.
+const HEAVY_SHAKE_MS = 60
+const HEAVY_SHAKE_INTENSITY = 0.0025
 
 // What Stretch, Boss and FinalBoss share: the player, the loadout, the combat world, the camera,
 // XP and death, the intro banner and every way the world can be held still.
@@ -36,6 +43,8 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
   private frozen = false
   private bannerMs = 0
   private lookAhead = 0
+  private inspector: Inspector | null = null
+  private pauseDim: Phaser.GameObjects.Rectangle | null = null
 
   constructor(key: string, ctx: RunContext) {
     super(key)
@@ -53,6 +62,13 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
   protected onBannerFrame(): void {}
   protected onBannerDone(): void {}
   protected onShutdown(): void {}
+  // The mobs the pause menu lets the player inspect, and the step they come from.
+  protected inspectableMobs(): Mob[] {
+    return []
+  }
+  protected inspectSegment(): Segment | null {
+    return null
+  }
   // XP for a kill by the player's side. Boss scenes credit the boss through its spec instead.
   protected xpFor(target: Combatant): number {
     return mobXp(target)
@@ -110,6 +126,10 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
     })
     this.loadout.sync(director.build)
     this.combat.on('kill', (event) => this.onKill(event))
+    this.combat.on('hit', (event) => this.onHit(event))
+    this.inspector = createInspector(this, (mob) => this.pickMob(mob))
+    // Drawn here, not in the HUD, so the mob under the pointer can sit above it at full brightness.
+    this.pauseDim = this.add.rectangle(0, 0, 1, 1, PALETTE.navy, PAUSE_DIM_ALPHA).setDepth(INSPECT_DIM_DEPTH).setVisible(false)
 
     const camera = this.cameras.main
     const { x, y, width, height } = level.bounds
@@ -124,8 +144,12 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
     this.setup()
   }
 
-  update(_time: number, delta: number) {
+  update(time: number, delta: number) {
     if (!this.director || !this.player) return
+    if (this.holds.has('pause')) {
+      this.inspector?.update(time)
+      this.fitPauseDim()
+    }
     // The world does not step while held, so the scene reads the pause key here instead.
     if (this.physics.world.isPaused) this.readInput()
     if (this.holds.has('banner') && this.holds.size === 1) {
@@ -166,6 +190,9 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
     if (this.holds.has('levelUp') || this.holds.has('over') || this.holds.has('external')) return
     const paused = !this.holds.has('pause')
     this.setHold('pause', paused)
+    this.inspector?.setActive(paused, paused ? this.inspectableMobs() : [])
+    this.pauseDim?.setVisible(paused)
+    if (paused) this.fitPauseDim()
     this.ctx.hud?.showPause(paused)
     this.ctx.emit({ type: 'paused', paused })
   }
@@ -224,6 +251,29 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
     next(this.director)
   }
 
+  private onHit(event: HitEvent) {
+    if (event.attacker === this.player && event.tags.includes('heavy')) this.cameras.main.shake(HEAVY_SHAKE_MS, HEAVY_SHAKE_INTENSITY)
+  }
+
+  // Covers the camera view. The camera can still drift a little while the world is held.
+  private fitPauseDim() {
+    const view = this.cameras.main.worldView
+    this.pauseDim?.setPosition(view.centerX, view.centerY).setSize(view.width + 8, view.height + 8)
+  }
+
+  // Vertical place of the mob in the camera view, 0 at the top to 1 at the bottom.
+  private focusOf(mob: Mob): number {
+    const view = this.cameras.main.worldView
+    return (mob.hurtbox().centerY - view.y) / view.height
+  }
+
+  private pickMob(mob: Mob | null) {
+    this.inspector?.select(mob)
+    const segment = this.inspectSegment()
+    if (mob && segment) this.game.events.emit(MOB_INFO_EVENT, mob.spec, segment, this.focusOf(mob))
+    else this.game.events.emit(MOB_INFO_EVENT)
+  }
+
   private onKill(event: HitEvent) {
     if (event.target === this.player) {
       this.die(event.attacker.killer ?? PIT_KILLER)
@@ -259,6 +309,8 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
   resumeFromPause() {
     if (!this.holds.has('pause')) return
     this.setHold('pause', false)
+    this.inspector?.setActive(false, [])
+    this.pauseDim?.setVisible(false)
     this.ctx.hud?.showPause(false)
     this.ctx.emit({ type: 'paused', paused: false })
   }
@@ -280,6 +332,9 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
 
   private shutdown() {
     this.onShutdown()
+    this.inspector?.destroy()
+    this.inspector = null
+    this.pauseDim = null
     this.loadout.destroy()
     this.controls.destroy()
     this.ctx.hud?.showPause(false)

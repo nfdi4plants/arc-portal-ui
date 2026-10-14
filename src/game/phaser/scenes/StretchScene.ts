@@ -205,6 +205,16 @@ export class StretchScene extends GameplayScene {
     return { x: this.safeX, y: this.safeY }
   }
 
+  protected inspectableMobs(): Mob[] {
+    const mobs: Mob[] = []
+    for (const slot of this.slots) if (slot.mob && !slot.gone && !slot.asleep) mobs.push(slot.mob)
+    return mobs
+  }
+
+  protected inspectSegment(): Segment {
+    return this.segment
+  }
+
   protected onShutdown() {
     for (const slot of this.slots) if (!slot.gone) slot.mob?.destroy()
     this.slots = []

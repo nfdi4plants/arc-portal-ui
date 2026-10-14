@@ -21,6 +21,12 @@ export interface Mob extends Combatant {
   setAsleep(asleep: boolean): void
   // True after the death animation finished and every minion a summoner called is gone. The scene
   // may then drop the mob.
+  // Lets the pointer hover and click the mob. Off during play, so hover costs nothing.
+  setInspectable(on: boolean): void
+  // 0 clears the highlight, up to 1 for the brightest pulse step.
+  setHighlight(level: number): void
+  // Lifts the sprite above the pause dim, so the inspected mob shows at full brightness.
+  setRaised(on: boolean): void
   isGone(): boolean
   destroy(): void
 }

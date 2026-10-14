@@ -4,7 +4,12 @@ import type { Action } from '../../contracts/input'
 import { bindingLabel } from '../../model/input'
 import { xpForNextLevel } from '../../model/progression'
 import type { View } from '../view'
+import type { MonsterSpec } from '../../contracts/content'
+import type { Segment } from '../../contracts/run'
 import type { HudControl, RunContext } from './context'
+import { LevelHistoryPanel } from './LevelHistoryPanel'
+import { MobInfoPanel } from './MobInfoPanel'
+import { MOB_INFO_EVENT } from './mobInfoEvent'
 import { addButton, addText, overlayView, type Button } from './ui'
 
 const M = 8
@@ -44,6 +49,9 @@ export class HudScene extends Phaser.Scene implements HudControl {
   private pauseDim!: Phaser.GameObjects.Rectangle
   private pauseTitle!: Phaser.GameObjects.Text
   private pauseButtons: Button[] = []
+  private mobInfo!: MobInfoPanel
+  private history!: LevelHistoryPanel
+  private paused = false
 
   // Last drawn values. NaN forces a redraw.
   private hp = NaN
@@ -87,12 +95,23 @@ export class HudScene extends Phaser.Scene implements HudControl {
     this.bannerBox = this.add.graphics()
     this.bannerTitle = addText(this, '', 12, { bold: true, align: 'center' }).setOrigin(0.5, 0)
     this.bannerSubtitle = addText(this, '', 8, { align: 'center' }).setOrigin(0.5, 0)
-    this.pauseDim = this.add.rectangle(0, 0, 1, 1, PALETTE.navy, 0.6).setOrigin(0, 0)
+    // The visible dim is drawn by the gameplay scene, under the mob the player inspects. This one
+    // stays invisible and only marks the pause.
+    this.pauseDim = this.add.rectangle(0, 0, 1, 1, PALETTE.navy, 0).setOrigin(0, 0)
     this.pauseTitle = addText(this, 'Paused', 16, { bold: true }).setOrigin(0.5)
     this.pauseButtons = [
-      addButton(this, 'Resume', 110, 22, () => this.ctx.gameplay?.resumeFromPause()),
-      addButton(this, 'Quit to menu', 110, 22, () => this.ctx.quitToMenu()),
+      addButton(this, 'Resume', 130, 22, () => this.ctx.gameplay?.resumeFromPause()),
+      addButton(this, 'Level-up provenance', 130, 22, () => this.openHistory()),
+      addButton(this, 'Quit to menu', 130, 22, () => this.ctx.quitToMenu()),
     ]
+    this.paused = false
+    this.mobInfo = new MobInfoPanel(this, () => this.syncMenu())
+    this.history = new LevelHistoryPanel(this, () => this.closeHistory())
+    const onMobInfo = (spec?: MonsterSpec, segment?: Segment, focusY?: number) => {
+      if (spec && segment && this.paused && !this.history.isOpen()) this.mobInfo.show(spec, segment, focusY)
+      else this.mobInfo.hide()
+    }
+    this.game.events.on(MOB_INFO_EVENT, onMobInfo)
     this.bannerMs = 0
     this.setBannerAlpha(0)
     this.showPause(false)
@@ -100,6 +119,7 @@ export class HudScene extends Phaser.Scene implements HudControl {
     overlayView(this, (view) => this.layout(view))
     this.ctx.hud = this
     this.events.once('shutdown', () => {
+      this.game.events.off(MOB_INFO_EVENT, onMobInfo)
       if (this.ctx.hud === this) this.ctx.hud = null
     })
   }
@@ -113,9 +133,12 @@ export class HudScene extends Phaser.Scene implements HudControl {
     this.bannerTitle.setPosition(w / 2, h * 0.24)
     this.bannerSubtitle.setPosition(w / 2, h * 0.24 + 18)
     this.pauseDim.setSize(w, h)
-    this.pauseTitle.setPosition(w / 2, h / 2 - 34)
-    this.pauseButtons[0].setPosition(w / 2, h / 2)
-    this.pauseButtons[1].setPosition(w / 2, h / 2 + 28)
+    this.pauseTitle.setPosition(w / 2, h / 2 - 48)
+    this.pauseButtons[0].setPosition(w / 2, h / 2 - 14)
+    this.pauseButtons[1].setPosition(w / 2, h / 2 + 14)
+    this.pauseButtons[2].setPosition(w / 2, h / 2 + 42)
+    this.mobInfo.layout(view)
+    this.history.layout(view)
     for (let i = 0; i < ABILITIES.length; i++) {
       const x = M + i * (SLOT_W + SLOT_GAP)
       const y = h - M - SLOT_H
@@ -160,9 +183,31 @@ export class HudScene extends Phaser.Scene implements HudControl {
   }
 
   showPause(visible: boolean) {
+    this.paused = visible
     this.pauseDim.setVisible(visible)
-    this.pauseTitle.setVisible(visible)
-    for (const button of this.pauseButtons) button.setVisible(visible)
+    if (!visible) {
+      this.mobInfo.hide()
+      this.history.hide()
+    }
+    this.syncMenu()
+  }
+
+  // The title and buttons make room while a panel is open, so a panel never covers a button.
+  private syncMenu() {
+    const shown = this.paused && !this.mobInfo.isOpen() && !this.history.isOpen()
+    this.pauseTitle.setVisible(shown)
+    for (const button of this.pauseButtons) button.setVisible(shown)
+  }
+
+  private openHistory() {
+    this.mobInfo.hide()
+    this.history.show(this.ctx.director?.levelHistory ?? [])
+    this.syncMenu()
+  }
+
+  private closeHistory() {
+    this.history.hide()
+    this.syncMenu()
   }
 
   update(_time: number, delta: number) {

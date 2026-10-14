@@ -5,6 +5,7 @@ import type { PlayerBuild, PowerUpCard } from '../../contracts/progression'
 import { createRng, type Rng } from '../../contracts/rng'
 import type { RunPlan, Segment } from '../../contracts/run'
 import { bossFromNode, finalBossFromPlan } from '../../model/content'
+import { appendLevelUp, sourceText, type LevelUpRecord } from './levelHistory'
 import { addXp, applyCard, createBuild, rollOffer } from '../../model/progression'
 
 export type RunStage =
@@ -33,6 +34,8 @@ export class RunDirector {
   // Levels gained whose card has not been chosen yet.
   pendingLevelUps = 0
   private readonly hooks: RunDirectorHooks
+  private history: LevelUpRecord[] = []
+  private lastOffer: PowerUpCard[] = []
   private readonly bossSpecs = new Map<number, BossSpec>()
   private finalSpec: FinalBossSpec | null = null
 
@@ -97,14 +100,36 @@ export class RunDirector {
     return levelsGained
   }
 
+  // The cards chosen so far, in level order. A new run starts with a new director, so it starts empty.
+  get levelHistory(): readonly LevelUpRecord[] {
+    return this.history
+  }
+
   rollOffer(): PowerUpCard[] {
-    return rollOffer(this.build, this.rng)
+    this.lastOffer = rollOffer(this.build, this.rng)
+    return this.lastOffer
   }
 
   // Null skips a level whose offer came out empty.
   chooseCard(cardId: string | null): void {
+    if (this.pendingLevelUps > 0) this.recordLevelUp(cardId)
     if (cardId) this.build = applyCard(this.build, cardId)
     this.pendingLevelUps = Math.max(0, this.pendingLevelUps - 1)
+  }
+
+  private recordLevelUp(cardId: string | null): void {
+    const chosen = cardId ? this.lastOffer.find((card) => card.id === cardId) : undefined
+    const stage = this.stage
+    const bossLabel = stage.kind === 'boss' ? this.bossSpec(stage.index).label : ''
+    this.history = appendLevelUp(this.history, {
+      level: this.build.level - this.pendingLevelUps + 1,
+      cardId,
+      cardName: cardId ? (chosen?.name ?? cardId) : null,
+      rarity: chosen?.rarity ?? null,
+      offered: this.lastOffer.filter((card) => card.id !== cardId).map((card) => ({ id: card.id, name: card.name })),
+      source: sourceText(stage, this.plan, bossLabel),
+    })
+    this.lastOffer = []
   }
 
   completeStretch(): void {
