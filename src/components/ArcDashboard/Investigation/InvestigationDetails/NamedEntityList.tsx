@@ -1,7 +1,7 @@
 import { MetadataList } from '../Primitive Components'
 import type { NamedEntity } from '../types'
 
-export function NamedEntityList({ title, items }: { title: 'Assays' | 'Studies'; items: NamedEntity[] }) {
+export function NamedEntityList({ title, items }: { title: 'Assays' | 'Studies' | 'Runs' | 'Workflows'; items: NamedEntity[] }) {
   return (
     <MetadataList
       title={title}

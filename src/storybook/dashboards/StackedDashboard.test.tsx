@@ -22,7 +22,7 @@ describe('StackedDashboard', () => {
     expect(within(dashboard).getByRole('heading', { level: 1, name: 'Facultative CAM in Talinum triangulare' })).toBeVisible()
     expect(within(dashboard).getByRole('link', { name: 'research/talinum' })).toHaveAttribute('href', 'https://gitlab.example/research/talinum')
     const cards = screen.getByRole('complementary', { name: 'Investigation dashlets' })
-    const titles = ['Description', 'Contacts', 'Organizations', 'Publications', 'Assays', 'Studies', 'Webview']
+    const titles = ['Description', 'Contacts (12)', 'Organizations (4)', 'Publications (2)', 'Assays (3)', 'Studies (2)', 'Runs (6)', 'Workflows (6)', 'Webview']
     expect(within(cards).getAllByRole('heading', { level: 2 }).map(heading => heading.textContent)).toEqual(titles)
     for (const title of titles) expect(within(cards).getByRole('button', { name: `Expand ${title}` })).toBeVisible()
     expect(within(screen.getByRole('region', { name: 'Graphview' })).getByRole('region', { name: 'Provenance explorer' })).toBeVisible()

@@ -38,7 +38,7 @@ function ScrollingDashboardLayout({ metadata, provenance, actions, ...props }: D
         <PopupGraphview index={provenance} label="Graphview" className="scrolling-dashboard-graphview" expandOnClick={false} />
       </section>
       <section ref={webview} tabIndex={-1} aria-label="Webview section" className="scrolling-dashboard-viewer">
-        <InvestigationDashlets metadata={metadata} arcJson={props.arcJson} classNamePrefix="scrolling-dashboard" ids={['webview']} interactive />
+        <InvestigationDashlets repository={props.repository} repositoryUrl={props.repositoryUrl} token={props.token} metadata={metadata} arcJson={props.arcJson} classNamePrefix="scrolling-dashboard" ids={['webview']} interactive />
       </section>
     </main>
   )

@@ -45,13 +45,13 @@ describe('NewDashboard', () => {
     await user.click(screen.getByRole('button', { name: 'Expand Description' }))
     expect(within(screen.getByRole('dialog', { name: 'Description' })).getByText(/^Drought tolerance/)).toBeVisible()
     await user.click(screen.getByRole('button', { name: 'Shrink Description' }))
-    for (const [name, count] of [['Contacts', 12], ['Organizations', 4], ['Publications', 2], ['Assays', 3], ['Studies', 2]] as const) {
+    for (const [name, count] of [['Contacts (12)', 12], ['Organizations (4)', 4], ['Publications (2)', 2], ['Assays (3)', 3], ['Studies (2)', 2], ['Runs (6)', 6], ['Workflows (6)', 6]] as const) {
       const dashlet = screen.getByRole('region', { name: `${name} dashlet` })
       expect(dashlet).toBeVisible()
       expect(within(dashlet).getByRole('img', { name: `${name} symbol` })).toBeVisible()
       await user.click(within(dashlet).getByRole('button', { name: `Expand ${name}` }))
       expect(within(screen.getByRole('dialog', { name })).getAllByRole('listitem')).toHaveLength(count)
-      if (name === 'Publications') expect(screen.getByRole('link', { name: /^Reversible Burst/ })).toHaveAttribute('href', 'https://doi.org/10.1104/pp.15.01076')
+      if (name === 'Publications (2)') expect(screen.getByRole('link', { name: /^Reversible Burst/ })).toHaveAttribute('href', 'https://doi.org/10.1104/pp.15.01076')
       await user.click(screen.getByRole('button', { name: `Shrink ${name}` }))
     }
     expect(within(dashboard).queryByRole('tab')).not.toBeInTheDocument()
@@ -62,5 +62,5 @@ describe('NewDashboard', () => {
     await user.click(screen.getByRole('button', { name: 'Shrink Webview' }))
     await user.click(screen.getByRole('button', { name: 'Expand Graphview' }))
     expect(within(screen.getByRole('dialog', { name: 'Graphview' })).getByRole('region', { name: 'Provenance explorer' })).toBeVisible()
-  }, 15000)
+  }, 25000)
 })

@@ -16,7 +16,7 @@ function SampleInvestigationDetails() {
 const meta = {
   title: 'InvestigationDetails',
   component: SampleInvestigationDetails,
-  parameters: { docs: { description: { component: 'Investigation dashlet with clickable Overview previews and full Description, Contacts, Organizations, Publications, Assays, and Studies tabs. All lists reuse MetadataList.' } } },
+  parameters: { docs: { description: { component: 'Investigation dashlet with clickable Overview previews and full Description, Contacts, Organizations, Publications, Assays, Studies, Runs, and Workflows tabs. All lists reuse MetadataList.' } } },
 } satisfies Meta<typeof SampleInvestigationDetails>
 
 export default meta

@@ -20,7 +20,7 @@ async function openDashboard() {
 }
 
 describe('HubDashboard', () => {
-  it('shows the ARC header, six metadata cards, and both viewers', async () => {
+  it('shows the ARC header, eight metadata cards, and both viewers', async () => {
     await openDashboard()
     expect(screen.getByRole('heading', { level: 1, name: 'Facultative CAM in Talinum triangulare' })).toBeVisible()
     expect(screen.getByRole('navigation', { name: 'DataHub links' })).toBeVisible()
@@ -28,9 +28,9 @@ describe('HubDashboard', () => {
     expect(screen.getByRole('img', { name: 'Public ARC' })).toBeVisible()
     expect(screen.getByRole('complementary', { name: 'ARC ownership and visibility' })).toBeVisible()
     const left = screen.getByRole('navigation', { name: 'Description, contacts, and organizations' })
-    const right = screen.getByRole('navigation', { name: 'Publications, assays, and studies' })
-    expect(within(left).getAllByRole('heading', { level: 2 }).map(heading => heading.textContent)).toEqual(['Description', 'Contacts', 'Organizations'])
-    expect(within(right).getAllByRole('heading', { level: 2 }).map(heading => heading.textContent)).toEqual(['Publications', 'Assays', 'Studies'])
+    const right = screen.getByRole('navigation', { name: 'Publications, assays, studies, runs, and workflows' })
+    expect(within(left).getAllByRole('heading', { level: 2 }).map(heading => heading.textContent)).toEqual(['Description', 'Contacts (12)', 'Organizations (4)'])
+    expect(within(right).getAllByRole('heading', { level: 2 }).map(heading => heading.textContent)).toEqual(['Publications (2)', 'Assays (3)', 'Studies (2)', 'Runs (6)', 'Workflows (6)'])
     expect(screen.getByRole('region', { name: 'Provenance explorer' })).toBeVisible()
     expect(screen.getByRole('separator')).toHaveAttribute('aria-valuenow', '60')
   })
@@ -43,9 +43,9 @@ describe('HubDashboard', () => {
     divider.focus()
     await user.keyboard('{ArrowDown}')
     expect(divider).toHaveAttribute('aria-valuenow', '65')
-    await user.click(screen.getByRole('button', { name: 'Expand Contacts' }))
-    expect(within(screen.getByRole('dialog', { name: 'Contacts' })).getAllByRole('listitem')).toHaveLength(12)
-    await user.click(screen.getByRole('button', { name: 'Shrink Contacts' }))
+    await user.click(screen.getByRole('button', { name: 'Expand Contacts (12)' }))
+    expect(within(screen.getByRole('dialog', { name: 'Contacts (12)' })).getAllByRole('listitem')).toHaveLength(12)
+    await user.click(screen.getByRole('button', { name: 'Shrink Contacts (12)' }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Expand Webview' }))
     expect(within(screen.getByRole('dialog', { name: 'Webview' })).getByRole('textbox')).toHaveValue('assays')

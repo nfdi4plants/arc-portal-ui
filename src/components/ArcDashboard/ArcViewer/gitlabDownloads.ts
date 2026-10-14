@@ -30,7 +30,7 @@ export function directItemCount(paths: string[], folder: string): number {
 }
 
 /** The embedded viewer has no download-renderer prop; enhance its existing file rows. */
-export function attachGitlabDownloads(container: HTMLElement, repositoryUrl: string, paths: string[], sizes?: FileSizes, sizesLoading = false) {
+export function attachGitlabDownloads(container: HTMLElement, repositoryUrl: string | undefined, paths: string[], sizes?: FileSizes, sizesLoading = false) {
   for (const table of container.querySelectorAll('table')) {
     const headers = [...table.querySelectorAll('thead th')].map(header => header.textContent?.trim())
     const downloadIndex = headers.indexOf('Download')
@@ -71,11 +71,12 @@ export function attachGitlabDownloads(container: HTMLElement, repositoryUrl: str
           }
           const count = directItemCount(paths, path)
           const label = `${count} ${count === 1 ? 'item' : 'items'}`
-          if (badge.textContent !== label) badge.textContent = label
+          if (badge.textContent !== `(${label})`) badge.textContent = `(${label})`
           badge.setAttribute('aria-label', `${label}, immediate files and folders`)
         }
         continue
       }
+      if (!repositoryUrl) continue
       const href = gitlabDownloadUrl(repositoryUrl, path)
       const existing = cell.querySelector<HTMLAnchorElement>('a[data-gitlab-download]')
       if (existing?.href === href) continue

@@ -1,6 +1,6 @@
 import type { InvestigationMetadata } from '../types'
 
-export type OverviewTab = 'description' | 'contacts' | 'organizations' | 'publications' | 'assays' | 'studies'
+export type OverviewTab = 'description' | 'contacts' | 'organizations' | 'publications' | 'assays' | 'studies' | 'runs' | 'workflows'
 
 function ListPreview({ count, firstName }: { count: number; firstName?: string }) {
   const moreCount = count - (firstName === undefined ? 0 : 1)
@@ -13,7 +13,7 @@ function ListPreview({ count, firstName }: { count: number; firstName?: string }
 }
 
 export function InvestigationOverview({ metadata, onNavigate }: {
-  metadata: Pick<InvestigationMetadata, 'description' | 'contacts' | 'organizations' | 'publications' | 'assays' | 'studies'>
+  metadata: Pick<InvestigationMetadata, 'description' | 'contacts' | 'organizations' | 'publications' | 'assays' | 'studies' | 'runs' | 'workflows'>
   onNavigate: (tab: OverviewTab) => void
 }) {
   return (
@@ -41,6 +41,14 @@ export function InvestigationOverview({ metadata, onNavigate }: {
       <button className="investigation-overview-row" aria-label="View studies" onClick={() => onNavigate('studies')}>
         <span className="investigation-overview-label">Studies:</span>
         <ListPreview count={metadata.studies.length} />
+      </button>
+      <button className="investigation-overview-row" aria-label="View runs" onClick={() => onNavigate('runs')}>
+        <span className="investigation-overview-label">Runs:</span>
+        <ListPreview count={metadata.runs.length} />
+      </button>
+      <button className="investigation-overview-row" aria-label="View workflows" onClick={() => onNavigate('workflows')}>
+        <span className="investigation-overview-label">Workflows:</span>
+        <ListPreview count={metadata.workflows.length} />
       </button>
     </section>
   )

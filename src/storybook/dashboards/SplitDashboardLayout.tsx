@@ -13,7 +13,7 @@ export function SplitDashboardLayout({ metadata, provenance, actions, scrolling 
       {actions && <div className="viewer-dashboard-actions split-dashboard-actions">{actions}</div>}
       <ArcDetails {...props} metadata={metadata} />
       <nav className="split-dashboard-metadata" aria-label="Investigation dashlets">
-        <InvestigationDashlets metadata={metadata} arcJson={props.arcJson} classNamePrefix="split-dashboard" ids={investigationDetailIds} />
+        <InvestigationDashlets repository={props.repository} repositoryUrl={props.repositoryUrl} token={props.token} metadata={metadata} arcJson={props.arcJson} classNamePrefix="split-dashboard" ids={investigationDetailIds} />
       </nav>
     </>
   )
@@ -21,7 +21,7 @@ export function SplitDashboardLayout({ metadata, provenance, actions, scrolling 
   return (
     <main className={`viewer-dashboard split-dashboard${scrolling ? ' scrolling-dashboard' : ''}`}>
       {scrolling ? <header className="scrolling-dashboard-header">{header}</header> : header}
-      <ViewerWorkspace metadata={metadata} provenance={provenance} arcJson={props.arcJson} firstViewer="graphview" />
+      <ViewerWorkspace repository={props.repository} repositoryUrl={props.repositoryUrl} token={props.token} metadata={metadata} provenance={provenance} arcJson={props.arcJson} firstViewer="graphview" />
     </main>
   )
 }

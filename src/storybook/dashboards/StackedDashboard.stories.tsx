@@ -16,7 +16,7 @@ function StackedDashboardLayout({ metadata, provenance, actions, ...props }: Das
       <ArcDetails {...props} metadata={metadata} />
       <div className="stacked-dashboard-body">
         <aside className="stacked-dashboard-cards" aria-label="Investigation dashlets">
-          <InvestigationDashlets metadata={metadata} arcJson={props.arcJson} classNamePrefix="stacked-dashboard" />
+          <InvestigationDashlets repository={props.repository} repositoryUrl={props.repositoryUrl} token={props.token} metadata={metadata} arcJson={props.arcJson} classNamePrefix="stacked-dashboard" />
         </aside>
         {provenance ? (
           <PopupGraphview

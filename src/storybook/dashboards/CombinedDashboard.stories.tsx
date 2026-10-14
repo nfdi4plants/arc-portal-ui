@@ -17,13 +17,13 @@ function CombinedDashboardLayout({ metadata, provenance, actions, ...props }: Da
           <div className="combined-dashboard-details">
             <ArcDetails {...props} metadata={metadata} />
             <section className="combined-dashboard-row" aria-label="Description, contacts, and organizations">
-              <InvestigationDashlets metadata={metadata} arcJson={props.arcJson} classNamePrefix="combined-dashboard" ids={['description', 'contacts', 'organizations']} />
+              <InvestigationDashlets repository={props.repository} repositoryUrl={props.repositoryUrl} token={props.token} metadata={metadata} arcJson={props.arcJson} classNamePrefix="combined-dashboard" ids={['description', 'contacts', 'organizations']} />
             </section>
-            <section className="combined-dashboard-row" aria-label="Publications, assays, and studies">
-              <InvestigationDashlets metadata={metadata} arcJson={props.arcJson} classNamePrefix="combined-dashboard" ids={['publications', 'assays', 'studies']} />
+            <section className="combined-dashboard-row" aria-label="Publications, assays, studies, runs, and workflows">
+              <InvestigationDashlets repository={props.repository} repositoryUrl={props.repositoryUrl} token={props.token} metadata={metadata} arcJson={props.arcJson} classNamePrefix="combined-dashboard" ids={['publications', 'assays', 'studies', 'runs', 'workflows']} />
             </section>
           </div>
-          <InvestigationDashlets metadata={metadata} arcJson={props.arcJson} classNamePrefix="combined-dashboard" ids={['webview']} interactive />
+          <InvestigationDashlets repository={props.repository} repositoryUrl={props.repositoryUrl} token={props.token} metadata={metadata} arcJson={props.arcJson} classNamePrefix="combined-dashboard" ids={['webview']} interactive />
         </div>
         <PopupGraphview
           index={provenance}
