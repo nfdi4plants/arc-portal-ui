@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Annotation } from '../../../src/arc/provenance/types'
 import { createRng } from '../../../src/game/contracts/rng'
 import type { RunNode, RunPlan, Segment } from '../../../src/game/contracts/run'
-import { bossFromNode } from '../../../src/game/model/content'
+import { SUMMONED_SUFFIX, bossFromNode } from '../../../src/game/model/content'
 import { segmentQuality, telegraphMs } from '../../../src/game/model/run'
 import { deathText } from '../../../src/game/phaser/scenes/deathText'
 
@@ -33,6 +33,20 @@ function nodeBossKiller(segment: Segment) {
 }
 
 describe('deathText', () => {
+  it('blames a missing value when a phantom killed the mage', () => {
+    const empty = { ...annotation(0), value: '  ', unit: 'kg' }
+    const text = deathText({ kind: 'mob', annotation: empty, label: 'Parameter · parameter 0' }, null)
+    expect(text.headline).toBe('Slain by a phantom')
+    expect(text.detail).toBe('Parameter · parameter 0 has no value. A missing value in your ARC hides what is really there. Fill it in and the phantom shows its face.')
+    expect(deathText({ kind: 'mob', annotation: { ...empty, value: null }, label: 'x' }, null).headline).toBe('Slain by a phantom')
+  })
+
+  it('treats a minion of a phantom as an ordinary mob', () => {
+    const empty = { ...annotation(0), value: null }
+    const text = deathText({ kind: 'mob', annotation: empty, label: `Parameter · parameter 0${SUMMONED_SUFFIX}` }, null)
+    expect(text.headline).toBe(`Slain by Parameter · parameter 0${SUMMONED_SUFFIX}`)
+  })
+
   it('names the mob that killed the mage', () => {
     const text = deathText({ kind: 'mob', annotation: annotation(0), label: 'a flaky pipette' }, null)
     expect(text).toEqual({ headline: 'Slain by a flaky pipette', detail: '' })

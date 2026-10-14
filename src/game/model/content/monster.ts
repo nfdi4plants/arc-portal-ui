@@ -1,7 +1,7 @@
 import type { AnnotationCategory } from '../../../arc/provenance/types'
 import type { BodyKind, EnemyWeaponKind, MonsterFromAnnotation, MonsterSpec, PassiveKind } from '../../contracts/content'
 import { hashString } from '../../contracts/rng'
-import { annotationLabel } from './label'
+import { annotationLabel, isMissingValue } from './label'
 
 const BODIES: BodyKind[] = ['slime', 'wisp', 'beetle', 'golem', 'imp', 'turret', 'bat', 'crawler']
 const WEAPONS: EnemyWeaponKind[] = ['claw', 'spear', 'bow', 'wand', 'bomb', 'shield', 'whip', 'flask']
@@ -50,8 +50,7 @@ const clamp = (value: number, min: number, max: number) => Math.min(max, Math.ma
 
 // Text values and empty values give 1. A number scales the weapon on a log curve.
 function weaponScale(value: string | null): number {
-  const text = value?.trim() ?? ''
-  const parsed = text === '' ? Number.NaN : Number(text)
+  const parsed = isMissingValue(value) ? Number.NaN : Number(value)
   if (!Number.isFinite(parsed)) return 1
   return clamp(0.75 + 0.2 * Math.log10(Math.abs(parsed) + 1), 0.75, 1.6)
 }
@@ -123,5 +122,6 @@ export const monsterFromAnnotation: MonsterFromAnnotation = (annotation, segment
     },
     xp: accession ? 15 : 10,
     segmentIndex,
+    phantom: isMissingValue(value),
   }
 }

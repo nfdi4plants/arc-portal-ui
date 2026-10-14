@@ -2,6 +2,11 @@ import type { AnnotationLabel } from '../../contracts/content'
 
 const MAX_VALUE_LENGTH = 40
 
+// A missing value is null, empty or only spaces. A unit alone does not count as a value.
+export function isMissingValue(value: string | null | undefined): boolean {
+  return value == null || value.trim() === ''
+}
+
 // For example "Parameter · temperature day = 22 °C". The label drops an empty value and unit.
 export const annotationLabel: AnnotationLabel = ({ category, name, value, unit }) => {
   const heading = `${category.charAt(0).toUpperCase()}${category.slice(1)} · ${name}`

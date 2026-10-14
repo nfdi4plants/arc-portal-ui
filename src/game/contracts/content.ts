@@ -44,6 +44,9 @@ export interface MonsterSpec {
   stats: { hp: number; contactDamage: number; speed: number; aggroRange: number }
   xp: number
   segmentIndex: number
+  // The annotation has no value (null, empty or only spaces). The monster is nearly invisible and a
+  // kill by it gets its own death screen. Its stats are not changed by this.
+  phantom: boolean
 }
 
 export type BossArchetype =

@@ -48,6 +48,13 @@ const row = (result: ReturnType<typeof describeOf>, part: string) => {
 }
 
 describe('describeMonster', () => {
+  it('explains a phantom and where its weapon comes from', () => {
+    const result = describeOf({ value: null, unit: null })
+    expect(row(result, 'Value')).toMatchObject({ value: 'missing', color: 'teal' })
+    expect(row(result, 'Value').arrowTo).toMatch(/^invisible phantom, weapon: \w+ \(from the empty value\)/)
+    expect(describeOf({ value: '22' }).rows.some((r) => r.arrowTo.includes('phantom'))).toBe(false)
+  })
+
   it('titles the card with the annotation label', () => {
     const source = annotation()
     const spec = monsterFromAnnotation(source, 1)
@@ -91,8 +98,7 @@ describe('describeMonster', () => {
     const withUnit = describeOf()
     expect(row(withUnit, 'Key').value).toBe('"temperature day"')
     expect(row(withUnit, 'Value').value).toBe('"22" + unit "°C"')
-    const bare = describeOf({ unit: null, value: null })
-    expect(row(bare, 'Value').value).toBe('none')
+    expect(row(describeOf({ unit: null, value: null }), 'Value').value).toBe('missing')
     expect(row(describeOf({ unit: null }), 'Value').value).toBe('"22"')
   })
 

@@ -74,14 +74,14 @@ export function describeMonster(spec: MonsterSpec, segment: Segment): MonsterDes
 
   const scale = spec.weapon.scale
   const size = scale === 1 ? 'normal size (the value is text or empty)' : `size ${scale.toFixed(2)}x`
-  const weapon = `weapon: ${titleCase(spec.weapon.kind)}, ${size}${spec.weapon.calibrated ? ', aims precisely (has a unit)' : ''}`
+  const weapon = `weapon: ${titleCase(spec.weapon.kind)}${spec.phantom ? ' (from the empty value)' : ''}, ${size}${spec.weapon.calibrated ? ', aims precisely (has a unit)' : ''}`
   const passive = PASSIVE_TEXT[spec.passive.kind]
-  const shown = value ? `"${value}"${unit ? ` + unit "${unit}"` : ''}` : 'none'
+  const shown = spec.phantom ? 'missing' : `"${value}"${unit ? ` + unit "${unit}"` : ''}`
   const depth = (1 + DEPTH_STEP * spec.segmentIndex).toFixed(2)
 
   const rows: DescribeRow[] = [
     { part: 'Key', value: `"${name}"`, arrowTo: `body: ${titleCase(spec.body)}, ${hueName(spec.hue)} hue, ${spec.size}`, color: 'blue' },
-    { part: 'Value', value: shown, arrowTo: weapon, color: 'teal' },
+    { part: 'Value', value: shown, arrowTo: spec.phantom ? `invisible phantom, ${weapon}` : weapon, color: 'teal' },
     { part: 'Type', value: titleCase(category), arrowTo: `passive: ${passive.name}, ${passive.effect}`, color: 'yellow' },
     {
       part: 'Ontology term',

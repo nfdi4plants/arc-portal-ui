@@ -16,6 +16,8 @@ import { registerInspectable } from './inspect'
 import { LEDGE_DEPTH, LEDGE_LOOKAHEAD, PIT_DEPTH, groundProbe, sameLevel, turnsAtLedge } from './ledge'
 import type { Box } from './ledge'
 import { approach, blinkDestination } from './motion'
+import { createFlimmer } from './phantom'
+import type { Flimmer } from './phantom'
 import { dropShieldFragment } from './pickups'
 import { hitReaction } from './reaction'
 import { createStance, stanceMods, stepStance } from './stance'
@@ -72,6 +74,18 @@ let nextId = 1
 const NEUTRAL: StanceMods = { speed: 1, cooldown: 1, damageTaken: 1 }
 const ZERO: Vec = { x: 0, y: 0 }
 const TINT = { hit: 0xffffff, windup: 0xff7a3d, blink: 0xbfe9ff, aggressive: 0xff9d90, defensive: 0x93b4ff } as const
+
+// A phantom's body is almost invisible. It shows fully while it attacks, briefly when it is hit and
+// halfway during the pause inspection, so the player can tell what they hit and what the panel means.
+const PHANTOM_ALPHA = 0.08
+const PHANTOM_REVEAL_ALPHA = 0.6
+const PHANTOM_REVEAL_MS = 150
+const PHANTOM_INSPECT_ALPHA = 0.5
+const PHANTOM_DUST_ALPHA = 0.22
+const PHANTOM_STEP_MS = 320
+const PHANTOM_LAND_AIR_MS = 80
+const PHANTOM_WALK_SPEED = 12
+const PHANTOM_BUBBLE = ['...']
 
 const HOP_SPEED = 340
 const IMP_JUMP_SPEED = 380
@@ -134,6 +148,7 @@ function minionSpecOf(spec: MonsterSpec): MonsterSpec {
   return {
     ...spec,
     id: `${spec.id}${MINION_ID_SUFFIX}`,
+    phantom: false,
     label: `${spec.label}${SUMMONED_SUFFIX}`,
     body: 'slime',
     size: 'small',
@@ -159,6 +174,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
   const passive = minion ? null : spec.passive.kind
   const armed = !minion
   const flies = spec.body === 'wisp' || spec.body === 'bat'
+  const phantom = spec.phantom && !minion
   const awake = holdOnHitStop(combat)
 
   const ref = art.monster(scene, spec)
@@ -178,6 +194,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
 
   const sprite = scene.add.sprite(x, startFeetY, ref.textureKey).setDepth(DEPTH.enemies)
   applySpriteRef(sprite, ref)
+  if (phantom) sprite.setAlpha(PHANTOM_ALPHA)
   const baseScaleX = sprite.scaleX
   const baseScaleY = sprite.scaleY
 
@@ -228,6 +245,10 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     tiltDir: 1,
     squashAmount: 0,
     airborneMs: 0,
+    revealMs: 0,
+    stepMs: 0,
+    airMs: 0,
+    deathFrom: 1,
   }
   let facing: 1 | -1 = 1
   let flipped = false
@@ -261,7 +282,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
   const minions: Mob[] = []
   let summoned = false
   let ghost: Phaser.GameObjects.Sprite | null = null
-  const lines = passive === 'chatter' ? chunkText(chatterText(spec.source.name, spec.source.value, spec.source.unit)) : []
+  const lines = passive === 'chatter' ? (phantom ? PHANTOM_BUBBLE : chunkText(chatterText(spec.source.name, spec.source.value, spec.source.unit))) : []
   let bubble: Phaser.GameObjects.Text | null = null
   let shownLine = -1
   let bubbleUp = false
@@ -271,6 +292,9 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
   let launched = false
   let inspectable = false
   let highlight = 0
+  let raised = false
+  let shownAlpha = phantom ? PHANTOM_ALPHA : 1
+  const flimmer: Flimmer | null = phantom ? createFlimmer(scene, W, H, rng.next()) : null
 
   const cx = () => body.x + halfW
   const cy = () => body.y + H / 2
@@ -968,6 +992,46 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     }
   }
 
+  // Phantom
+
+  function phantomAlpha(): number {
+    if (phase !== 'idle' || charge !== 'none' || swoop === 'dive' || st.blinkMs > 0) return 1
+    if (highlight > 0 || raised) return PHANTOM_INSPECT_ALPHA
+    if (st.revealMs > 0 || st.flashMs > 0) return PHANTOM_REVEAL_ALPHA
+    return PHANTOM_ALPHA
+  }
+
+  function applyPhantomAlpha() {
+    const next = phantomAlpha()
+    if (next === shownAlpha) return
+    shownAlpha = next
+    sprite.setAlpha(next)
+  }
+
+  // Dust on every other footstep and where a hop or a fall ends, at a low alpha.
+  function phantomDust(dt: number) {
+    if (flies) return
+    if (!onGround) {
+      st.airMs += dt
+      return
+    }
+    const landed = st.airMs >= PHANTOM_LAND_AIR_MS
+    st.airMs = 0
+    st.stepMs -= dt
+    if (Math.abs(body.velocity.x) > PHANTOM_WALK_SPEED) {
+      if (st.stepMs > 0 && !landed) return
+      st.stepMs = PHANTOM_STEP_MS
+    } else if (!landed) return
+    playFx(scene, art, 'dust', cx(), feetY() - 5, W * 1.2, PHANTOM_DUST_ALPHA)
+  }
+
+  function updatePhantom(dt: number) {
+    st.revealMs = Math.max(0, st.revealMs - dt)
+    phantomDust(dt)
+    applyPhantomAlpha()
+    flimmer?.update(st.clockMs, cx(), cy(), shownAlpha > PHANTOM_INSPECT_ALPHA ? 0.4 : 1)
+  }
+
   // Inspection
 
   function applyInspect() {
@@ -981,6 +1045,10 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
   function setHighlight(level: number) {
     if (destroyed || level === highlight) return
     highlight = level
+    if (phantom) {
+      applyPhantomAlpha()
+      flimmer?.update(st.clockMs, cx(), cy(), 1)
+    }
     if (level <= 0) {
       tintCode = -1
       refreshTint()
@@ -993,7 +1061,11 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
 
   // Draws the sprite above the pause dim.
   function setRaised(on: boolean) {
-    if (!destroyed) sprite.setDepth(on ? INSPECT_DIM_DEPTH + 1 : DEPTH.enemies)
+    if (destroyed) return
+    raised = on
+    sprite.setDepth(on ? INSPECT_DIM_DEPTH + 1 : DEPTH.enemies)
+    flimmer?.setDepth(on ? INSPECT_DIM_DEPTH + 2 : DEPTH.enemies + 1)
+    if (phantom) applyPhantomAlpha()
   }
 
   function setInspectable(on: boolean) {
@@ -1021,6 +1093,13 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     hideDizzy()
     dropBubble()
     st.flashMs = HIT_FLASH_MS
+    if (phantom) {
+      // The killing blow shows it for a moment, then it fades from there.
+      st.deathFrom = Math.max(shownAlpha, PHANTOM_REVEAL_ALPHA)
+      shownAlpha = st.deathFrom
+      sprite.setAlpha(shownAlpha)
+      flimmer?.setVisible(false)
+    }
     playFx(scene, art, 'death', cx(), feetY() - H / 2, Math.max(ref.width, ref.height) * 1.1)
     if (passive === 'shieldDrop') dropShieldFragment(scene, cx(), feetY() - 10)
   }
@@ -1034,6 +1113,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     hideDizzy()
     dropBubble()
     sprite.setVisible(false)
+    flimmer?.setVisible(false)
   }
 
   function updateMinions(dt: number) {
@@ -1068,7 +1148,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
 
     if (dead) {
       st.deathMs += dt
-      sprite.setAlpha(clamp(1 - st.deathMs / DEATH_MS, 0, 1))
+      sprite.setAlpha(st.deathFrom * clamp(1 - st.deathMs / DEATH_MS, 0, 1))
       updateMinions(dt)
       refreshTint()
       applySquash()
@@ -1103,6 +1183,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     applySquash()
     updateDizzy()
     syncSprite()
+    if (phantom) updatePhantom(dt)
   }
 
   function setAsleep(next: boolean) {
@@ -1118,6 +1199,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
       dropBubble()
       leaveWorld()
       sprite.setActive(false)
+      flimmer?.setVisible(false)
       return
     }
     world.add(body)
@@ -1128,6 +1210,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     awake.add(body)
     combat.register(mob)
     sprite.setActive(true)
+    flimmer?.setVisible(true)
     applyInspect()
   }
 
@@ -1148,6 +1231,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     body.destroy()
     sprite.destroy()
     ghost?.destroy()
+    flimmer?.destroy()
     for (const star of dizzyStars ?? []) star.destroy()
   }
   const onShutdown = () => destroy(true)
@@ -1186,6 +1270,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
         defensiveStance: mods.damageTaken < 1,
       })
       st.flashMs = HIT_FLASH_MS
+      st.revealMs = PHANTOM_REVEAL_MS
       st.stunMs = Math.max(HIT_STUN_MS, reaction.staggerMs)
       st.squashMs = SQUASH_MS
       st.squashAmount = reaction.staggerMs > 0 ? 1 : 0.5

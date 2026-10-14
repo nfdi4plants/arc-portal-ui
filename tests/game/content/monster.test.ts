@@ -18,6 +18,19 @@ function annotation(overrides: Partial<Annotation> = {}): Annotation {
 }
 
 describe('monsterFromAnnotation', () => {
+  it('makes a phantom of an annotation with a missing value', () => {
+    for (const value of [null, '', '   ']) expect(monsterFromAnnotation(annotation({ value }), 0).phantom).toBe(true)
+    expect(monsterFromAnnotation(annotation({ value: null, unit: 'kg' }), 0).phantom).toBe(true)
+    for (const value of ['0', 'x']) expect(monsterFromAnnotation(annotation({ value }), 0).phantom).toBe(false)
+  })
+
+  it('leaves the stats of a phantom as computed', () => {
+    const phantom = monsterFromAnnotation(annotation({ value: '' }), 2)
+    expect(phantom.stats.hp).toBeGreaterThan(0)
+    expect(phantom.weapon.scale).toBe(1)
+    expect(phantom.id).toBe(monsterFromAnnotation(annotation({ value: '' }), 0).id)
+  })
+
   it('builds the same monster whenever it sees the same annotation', () => {
     expect(sampleAnnotations.length).toBeGreaterThan(100)
     const forward = sampleAnnotations.map((source) => monsterFromAnnotation(source, 2))

@@ -63,6 +63,7 @@ function monsterSpec(
     stats: { hp: 10, contactDamage: 1, speed: 40, aggroRange: 120 },
     xp: 10,
     segmentIndex: 0,
+    phantom: false,
   }
 }
 

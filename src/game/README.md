@@ -69,6 +69,16 @@ src/game/
 `RunDirector` holds the run state (build, rng, clock, stage) free of Phaser. Scenes come and go per
 stage and read it through `RunContext`.
 
+## Phantoms
+
+An annotation whose value is null, empty or only spaces (`isMissingValue` in `model/content/label.ts`)
+makes a phantom, `MonsterSpec.phantom`. Its stats and its id are unchanged, and its weapon comes
+from the empty value. In play the body sprite sits at about 8 percent opacity and a few pooled
+scribbles rise through its hurtbox like heat haze (`phaser/mobs/phantom.ts`), with a faint dust puff
+on footsteps and landings. It shows fully while it attacks, at 60 percent for 150 ms when hit and at
+50 percent during the pause inspection. If a phantom kills the mage, the death screen reads "Slain
+by a phantom" and tells the player to fill in the missing value. Key P in the MobSandbox spawns one.
+
 ## Attack variants
 
 Heavy pressed in the air plays the weapon's air heavy, mostly a plunge with a landing hit and a
@@ -91,7 +101,7 @@ Start Storybook with `npm run storybook` (port 6006) and open these stories:
 - `Game/Dev/TestRoom` is the movement and combat room. F3 shows the motor state, and keys 1 to 4
   toggle double jump, air dash, wall jump and hat glide.
 - `Game/Dev/MobSandbox` puts every monster of a planned Talinum run on one long floor. N spawns a
-  random monster next to the player.
+  random monster next to the player and P a phantom.
 - `Game/Dev/BossSandbox` is one arena with a boss. Keys 1 to 4 pick the archetype and Q and W
   change the annotation quality. F starts the final boss.
 - `Game/Dev/LoadoutSandbox` has a panel that toggles any weapon, mechanic or legendary card.

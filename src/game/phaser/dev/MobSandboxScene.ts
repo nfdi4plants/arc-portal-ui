@@ -30,6 +30,9 @@ const OVERLAY_INTERVAL_MS = 250
 const SLEEP_VIEWS = 1.5
 const RESPAWN_MS = 1500
 const SEED = 'mob-sandbox'
+// A hand-built annotation with an empty value, so a phantom can be tried without one in the ARC.
+// The name changes with each press, which gives a different body every time.
+const phantomAnnotation = (n: number): Annotation => ({ name: `sample temperature ${n}`, value: '', unit: null, accession: null, category: 'parameter' })
 
 interface Entry {
   mob: Mob
@@ -58,7 +61,7 @@ function annotationsOfPlan(): { annotation: Annotation; segmentIndex: number }[]
 
 // Spawns every monster of a planned Talinum run along a long floor. Monsters far from the camera
 // sleep, so the awake count shows how many do any work. Press N to add a random monster next to
-// the player.
+// the player and P to add a phantom.
 export class MobSandboxScene extends Phaser.Scene {
   constructor() {
     super(SCENE.mobSandbox)
@@ -161,8 +164,9 @@ export class MobSandboxScene extends Phaser.Scene {
     let lookAhead = 0
 
     const groundBelow = (x: number, y: number) => this.physics.overlapRect(x - 2, y - 2, 4, 40, false, true).length > 0
-    const spawnNearPlayer = () => {
-      if (found.length === 0) return
+    let phantoms = 0
+    const spawnNearPlayer = (phantom = false) => {
+      if (found.length === 0 && !phantom) return
       const here = player.position()
       const side = rng.chance(0.5) ? 1 : -1
       let x = here.x
@@ -172,12 +176,14 @@ export class MobSandboxScene extends Phaser.Scene {
         x = candidate
         break
       }
-      const { annotation, segmentIndex } = rng.pick(found)
+      const { annotation, segmentIndex } = phantom ? { annotation: phantomAnnotation(++phantoms), segmentIndex: 0 } : rng.pick(found)
       spawn({ spec: monsterFromAnnotation(annotation, segmentIndex), x, y: here.y })
     }
 
     const onKey = (event: KeyboardEvent) => {
-      if (event.code === 'KeyN' && !event.repeat) spawnNearPlayer()
+      if (event.repeat) return
+      if (event.code === 'KeyN') spawnNearPlayer()
+      else if (event.code === 'KeyP') spawnNearPlayer(true)
     }
     this.game.canvas.addEventListener('keydown', onKey)
 
@@ -225,7 +231,7 @@ export class MobSandboxScene extends Phaser.Scene {
         `mobs ${entries.length}  awake ${awake}`,
         `kills ${kills}  xp ${xp}`,
         `hp ${player.hp()}  shields ${player.shieldCount()}`,
-        'N spawns a random monster next to you.',
+        'N spawns a random monster next to you, P a phantom.',
       ].join('\n')
     })
 

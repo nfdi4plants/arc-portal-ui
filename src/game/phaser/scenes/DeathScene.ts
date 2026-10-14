@@ -2,9 +2,13 @@ import Phaser from 'phaser'
 import type { KillerInfo } from '../../contracts/combat'
 import { PALETTE, SCENE } from '../../contracts/constants'
 import type { RunContext } from './context'
-import { deathText } from './deathText'
+import { deathText, isPhantomKill } from './deathText'
 import { addEndButtons } from './endScreen'
 import { addText, overlayView } from './ui'
+
+// The headline of a phantom kill flickers like the monster did.
+const FLICKER_MS = 110
+const FLICKER_ALPHAS = [1, 0.35, 0.9, 0.5, 1, 1, 0.25, 0.7]
 
 export class DeathScene extends Phaser.Scene {
   private readonly ctx: RunContext
@@ -21,6 +25,10 @@ export class DeathScene extends Phaser.Scene {
     const title = addText(this, 'The run is over', 10, { color: PALETTE.yellow, bold: true }).setOrigin(0.5)
     const main = addText(this, headline, 13, { bold: true, align: 'center' }).setOrigin(0.5, 0)
     const sub = addText(this, detail, 8, { align: 'center' }).setOrigin(0.5, 0)
+    if (isPhantomKill(data.killer)) {
+      let step = 0
+      this.time.addEvent({ delay: FLICKER_MS, loop: true, callback: () => main.setAlpha(FLICKER_ALPHAS[++step % FLICKER_ALPHAS.length]) })
+    }
     const placeButtons = addEndButtons(this, this.ctx)
     overlayView(this, ({ width: w, height: h }) => {
       dim.setSize(w, h)

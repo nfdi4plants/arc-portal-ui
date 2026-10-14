@@ -1,5 +1,6 @@
 import type { KillerInfo } from '../../contracts/combat'
 import type { RunPlan, Segment } from '../../contracts/run'
+import { SUMMONED_SUFFIX, annotationLabel, isMissingValue } from '../../model/content'
 import { plural } from './plural'
 
 const ANNOTATE_HINT = 'Annotate this step in your ARC to give the next mage a fighting chance.'
@@ -14,12 +15,25 @@ function stepDetail(segment: Segment, warner: string): string {
   return `${segment.processName} has ${count}. ${ANNOTATE_HINT}`
 }
 
+// A minion that a phantom summoned carries the phantom's annotation but is an ordinary slime.
+export function isPhantomKill(killer: KillerInfo): boolean {
+  return killer.kind === 'mob' && isMissingValue(killer.annotation.value) && !killer.label.endsWith(SUMMONED_SUFFIX)
+}
+
 // Headline and explanation for the death screen. The plan names the step of a final boss phase,
 // which the killer info only holds as an index.
 export function deathText(killer: KillerInfo, plan: RunPlan | null): { headline: string; detail: string } {
   switch (killer.kind) {
-    case 'mob':
+    case 'mob': {
+      if (isPhantomKill(killer)) {
+        const heading = annotationLabel({ ...killer.annotation, value: null, unit: null })
+        return {
+          headline: 'Slain by a phantom',
+          detail: `${heading} has no value. A missing value in your ARC hides what is really there. Fill it in and the phantom shows its face.`,
+        }
+      }
       return { headline: `Slain by ${killer.label}`, detail: '' }
+    }
     case 'boss':
       return { headline: `Defeated by ${killer.spec.label}`, detail: stepDetail(killer.segment, 'this boss') }
     case 'finalBoss': {
