@@ -1,7 +1,7 @@
 import { RocketIcon } from '@primer/octicons-react'
-import type { ProvenanceIndex } from '../../arc/provenance/types'
-import ArcGame from '../../components/ArcDashboard/Game/ArcGame'
-import { PopupDashlet, type PopupDashletProps } from '../../components/PopupDashlet'
+import type { ProvenanceIndex } from '../../../arc/provenance/types'
+import ArcGame from './ArcGame'
+import { PopupDashlet, type PopupDashletProps } from '../../PopupDashlet'
 
 export type PopupArcGameProps = Omit<PopupDashletProps, 'children' | 'title' | 'description'> & {
   index?: ProvenanceIndex

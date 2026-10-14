@@ -9,7 +9,7 @@ import { InvestigationMenu } from '../../components/ArcDashboard/InvestigationMe
 import { PopupGraphview } from '../../components/ArcDashboard/Provenance/PopupGraphview'
 import { TalinumStory } from '../TalinumStory'
 import { privateTalinumDataHubData, publicTalinumDataHubData, talinumArcJson, talinumRepository } from '../fixtures/talinumArc'
-import { PopupArcGame } from './PopupArcGame'
+import { PopupArcGame } from '../../components/ArcDashboard/Game/PopupArcGame'
 import './viewerDashboard.css'
 import './scrollingDashboard.css'
 

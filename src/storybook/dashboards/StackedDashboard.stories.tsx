@@ -7,7 +7,7 @@ import { ArcDetails } from '../../components/ArcDashboard/ArcDetails'
 import type { DashboardContentProps } from '../../components/ArcDashboard/dashboardTypes'
 import { InvestigationDashlets } from '../../components/ArcDashboard/InvestigationDashlets/InvestigationDashlets'
 import { PopupGraphview } from '../../components/ArcDashboard/Provenance/PopupGraphview'
-import { PopupArcGame } from './PopupArcGame'
+import { PopupArcGame } from '../../components/ArcDashboard/Game/PopupArcGame'
 import './stackedDashboard.css'
 
 function StackedDashboardLayout({ metadata, provenance, actions, ...props }: DashboardContentProps) {

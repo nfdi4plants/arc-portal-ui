@@ -16,9 +16,12 @@ const ArcViewer = lazy(() => import('../ArcViewer/ArcViewer'))
 
 export type { InvestigationDashletId } from './investigationDashletOptions'
 
-export function InvestigationDashlets({ metadata, arcJson, classNamePrefix, ids, interactive = false, collapsed, onToggleCollapsed, externalPopup }: {
+export function InvestigationDashlets({ metadata, arcJson, repositoryUrl, token, classNamePrefix, ids, interactive = false, collapsed, onToggleCollapsed, externalPopup }: {
   metadata: InvestigationMetadata
   arcJson: string
+  /** Lets the Webview resolve and download repository files. */
+  repositoryUrl?: string
+  token?: string
   classNamePrefix: string
   ids?: readonly InvestigationDashletId[]
   interactive?: boolean
@@ -71,7 +74,7 @@ export function InvestigationDashlets({ metadata, arcJson, classNamePrefix, ids,
       id: 'webview', title: investigationDashletTitles.webview,
       symbol: <BrowserIcon size={48} />,
       description: "Browse the ARC's files, metadata, and annotation tables.",
-      content: <Suspense fallback={<Text as="p" role="status">Loading ARC viewer…</Text>}><ArcViewer jsonString={arcJson} embedded /></Suspense>,
+      content: <Suspense fallback={<Text as="p" role="status">Loading ARC viewer…</Text>}><ArcViewer jsonString={arcJson} repositoryUrl={repositoryUrl} token={token} embedded /></Suspense>,
     },
   ]
 

@@ -7,7 +7,7 @@ import type { DashboardContentProps } from '../../components/ArcDashboard/dashbo
 import { InvestigationDashlets } from '../../components/ArcDashboard/InvestigationDashlets/InvestigationDashlets'
 import { investigationDetailIds } from '../../components/ArcDashboard/InvestigationDashlets/investigationDashletOptions'
 import { ViewerWorkspace } from '../../components/ArcDashboard/ViewerWorkspace/ViewerWorkspace'
-import { PopupArcGame } from './PopupArcGame'
+import { PopupArcGame } from '../../components/ArcDashboard/Game/PopupArcGame'
 import './viewerDashboard.css'
 import './splitDashboard.css'
 

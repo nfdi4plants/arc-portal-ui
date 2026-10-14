@@ -2,37 +2,14 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 import { ArcDashboardFrame } from '../../components/ArcDashboard/ArcDashboardFrame'
 import { TalinumStory } from '../TalinumStory'
 import { privateTalinumDataHubData, publicTalinumDataHubData, talinumArcJson, talinumRepository } from '../fixtures/talinumArc'
-import { GraphIcon } from '@primer/octicons-react'
-import { ArcDetails } from '../../components/ArcDashboard/ArcDetails'
-import type { DashboardContentProps } from '../../components/ArcDashboard/dashboardTypes'
-import { InvestigationDashlets } from '../../components/ArcDashboard/InvestigationDashlets/InvestigationDashlets'
-import { PopupGraphview } from '../../components/ArcDashboard/Provenance/PopupGraphview'
-import { PopupArcGame } from './PopupArcGame'
-import '../../components/ArcDashboard/Investigation/InvestigationDetails/investigationDetails.css'
-import './newDashboard.css'
-
-function NewDashboardLayout({ metadata, provenance, actions, ...props }: DashboardContentProps) {
-  return (
-    <main className="new-dashboard">
-      {actions && <div className="new-dashboard-actions">{actions}</div>}
-      <div className="new-dashboard-orbit">
-        <div className="new-dashboard-hub">
-          <ArcDetails {...props} metadata={metadata} />
-        </div>
-        <InvestigationDashlets metadata={metadata} arcJson={props.arcJson} classNamePrefix="new-dashboard" />
-        <PopupGraphview index={provenance} symbol={<GraphIcon size={48} />} label="Graphview dashlet" className="new-dashboard-tile new-dashboard-graphview" />
-        <PopupArcGame index={provenance} arcTitle={metadata.title} label="ARCade dashlet" className="new-dashboard-tile new-dashboard-game" />
-      </div>
-    </main>
-  )
-}
+import { NewDashboardContent } from '../../components/ArcDashboard/NewDashboard'
 
 const meta = {
   title: 'NewDashboard',
   component: ArcDashboardFrame,
   decorators: [(Story) => <TalinumStory>{() => <Story />}</TalinumStory>],
   argTypes: { content: { control: false, table: { disable: true } }, label: { table: { disable: true } }, fillHeight: { table: { disable: true } } },
-  args: { repository: talinumRepository, arcJson: talinumArcJson, content: NewDashboardLayout, label: 'NewDashboard', fillHeight: true },
+  args: { repository: talinumRepository, arcJson: talinumArcJson, content: NewDashboardContent, label: 'NewDashboard', fillHeight: true },
   parameters: {
     docs: {
       description: {
