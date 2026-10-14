@@ -30,7 +30,7 @@ function HubDashboardLayout({ metadata, provenance, actions, ...props }: Dashboa
 }
 
 const meta = {
-  title: 'HubDashboard',
+  title: 'Dashboard/HubDashboard',
   component: ArcDashboardFrame,
   decorators: [(Story) => <TalinumStory>{() => <Story />}</TalinumStory>],
   argTypes: { content: { control: false, table: { disable: true } }, label: { table: { disable: true } }, fillHeight: { table: { disable: true } } },

@@ -20,12 +20,18 @@ error, and retry states.
 
 ## Dashboard layout stories
 
-Run `npm run storybook` to explore the alternative ARC dashboards. The circular,
-stacked, combined, split, tabbed, hub, and scrolling layouts live in
-`src/storybook/dashboards` as story compositions, using the shared ARC header, investigation popup dashlets,
-Graphview, viewer workspace, and dashboard frame. Each layout includes examples
+Run `npm run storybook` and open **Dashboard → Main** to explore all ARC
+dashboard designs in one preview. Choose **ScrollingSplitDashboard** for the
+scrolling split variant, also available under **Dashboard → ScrollingSplitDashboard**.
+Scrolling, Split, and Tabbed appear first and
+present Graphview before Webview. The individual designs are grouped under
+Dashboard, with their layout compositions in `src/storybook/dashboards`, using
+the shared ARC header, investigation popup dashlets, Graphview, viewer workspace,
+and dashboard frame. Each layout includes examples
 with public, private, and unavailable DataHub data, using the bundled Talinum ARC.
 The application uses the classic ARC dashboard.
+Dashboard scroll areas use `overscroll-behavior: auto`: when a dashlet reaches
+its top or bottom, scrolling continues in the surrounding dashboard or page.
 
 ## Optional authentication
 

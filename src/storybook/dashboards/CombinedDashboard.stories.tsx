@@ -37,7 +37,7 @@ function CombinedDashboardLayout({ metadata, provenance, actions, ...props }: Da
 }
 
 const meta = {
-  title: 'CombinedDashboard',
+  title: 'Dashboard/CombinedDashboard',
   component: ArcDashboardFrame,
   decorators: [(Story) => <TalinumStory>{() => <Story />}</TalinumStory>],
   argTypes: { content: { control: false, table: { disable: true } }, label: { table: { disable: true } }, fillHeight: { table: { disable: true } } },

@@ -27,6 +27,17 @@
   max-width: calc(100dvw - 32px);
 }
 
+.arc-viewer [data-component="SplitPageLayout.Pane"],
+[data-component="Dialog"][data-position-regular="left"]:has([role="tree"][aria-label="File Tree"]) :is([data-component="ScrollableRegion"], [data-component="Dialog.Header"]) {
+  overscroll-behavior: auto;
+}
+
+/* Vertical scrolling belongs to the enclosing dashlet or drawer. */
+.arc-viewer [data-component="ScrollableRegion"],
+[data-component="Dialog"][data-position-regular="left"]:has([role="tree"][aria-label="File Tree"]) [data-component="Dialog.Body"] {
+  overscroll-behavior-x: auto;
+}
+
 .arc-viewer .position-sticky button[data-component="IconButton"][data-variant="danger"] {
   display: none !important;
 }

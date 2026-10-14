@@ -34,7 +34,7 @@ function StackedDashboardLayout({ metadata, provenance, actions, ...props }: Das
 }
 
 const meta = {
-  title: 'StackedDashboard',
+  title: 'Dashboard/StackedDashboard',
   component: ArcDashboardFrame,
   decorators: [(Story) => <TalinumStory>{() => <Story />}</TalinumStory>],
   argTypes: { content: { control: false, table: { disable: true } }, label: { table: { disable: true } }, fillHeight: { table: { disable: true } } },
