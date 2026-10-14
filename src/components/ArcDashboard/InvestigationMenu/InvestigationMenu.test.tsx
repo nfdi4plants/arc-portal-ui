@@ -20,12 +20,12 @@ describe('InvestigationMenu', () => {
     await user.click(investigation)
     expect(screen.getAllByRole('menuitem')).toHaveLength(8)
     expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([
-      'Description', 'Contacts', 'Organizations', 'Publications (2)', 'Assays (3)', 'Studies (2)', 'Runs (6)', 'Workflows (6)',
+      'Description', 'Contacts (12)', 'Organizations (4)', 'Publications (2)', 'Assays (3)', 'Studies (2)', 'Runs (6)', 'Workflows (6)',
     ])
-    await user.click(screen.getByRole('menuitem', { name: 'Contacts' }))
-    const popup = screen.getByRole('dialog', { name: 'Contacts' })
+    await user.click(screen.getByRole('menuitem', { name: 'Contacts (12)' }))
+    const popup = screen.getByRole('dialog', { name: 'Contacts (12)' })
     expect(within(popup).getAllByRole('listitem')).toHaveLength(12)
-    await user.click(within(popup).getByRole('button', { name: 'Shrink Contacts' }))
+    await user.click(within(popup).getByRole('button', { name: 'Shrink Contacts (12)' }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(investigation).toHaveFocus()
     for (const [name, count] of [['Studies', 2], ['Runs', 6], ['Workflows', 6]] as const) {

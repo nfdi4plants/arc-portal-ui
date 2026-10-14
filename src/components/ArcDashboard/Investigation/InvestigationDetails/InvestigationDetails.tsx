@@ -34,8 +34,8 @@ export function InvestigationDetails({ metadata }: InvestigationDetailsProps) {
         >
           <UnderlinePanels.Tab value="overview">Overview</UnderlinePanels.Tab>
           <UnderlinePanels.Tab value="description">Description</UnderlinePanels.Tab>
-          <UnderlinePanels.Tab value="contacts">Contacts</UnderlinePanels.Tab>
-          <UnderlinePanels.Tab value="organizations">Organizations</UnderlinePanels.Tab>
+          <UnderlinePanels.Tab value="contacts">Contacts ({metadata.contacts.length})</UnderlinePanels.Tab>
+          <UnderlinePanels.Tab value="organizations">Organizations ({metadata.organizations.length})</UnderlinePanels.Tab>
           <UnderlinePanels.Tab value="publications">Publications ({metadata.publications.length})</UnderlinePanels.Tab>
           <UnderlinePanels.Tab value="assays">Assays ({metadata.assays.length})</UnderlinePanels.Tab>
           <UnderlinePanels.Tab value="studies">Studies ({metadata.studies.length})</UnderlinePanels.Tab>

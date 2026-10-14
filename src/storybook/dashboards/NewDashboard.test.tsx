@@ -45,7 +45,7 @@ describe('NewDashboard', () => {
     await user.click(screen.getByRole('button', { name: 'Expand Description' }))
     expect(within(screen.getByRole('dialog', { name: 'Description' })).getByText(/^Drought tolerance/)).toBeVisible()
     await user.click(screen.getByRole('button', { name: 'Shrink Description' }))
-    for (const [name, count] of [['Contacts', 12], ['Organizations', 4], ['Publications (2)', 2], ['Assays (3)', 3], ['Studies (2)', 2], ['Runs (6)', 6], ['Workflows (6)', 6]] as const) {
+    for (const [name, count] of [['Contacts (12)', 12], ['Organizations (4)', 4], ['Publications (2)', 2], ['Assays (3)', 3], ['Studies (2)', 2], ['Runs (6)', 6], ['Workflows (6)', 6]] as const) {
       const dashlet = screen.getByRole('region', { name: `${name} dashlet` })
       expect(dashlet).toBeVisible()
       expect(within(dashlet).getByRole('img', { name: `${name} symbol` })).toBeVisible()

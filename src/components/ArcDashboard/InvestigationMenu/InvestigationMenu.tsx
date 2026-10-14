@@ -18,7 +18,7 @@ export function InvestigationMenu({ metadata, arcJson }: { metadata: Investigati
             {investigationDetailIds.map(id => (
               <ActionList.Item key={id} onSelect={() => setInvestigation(id)}>
                 {investigationDashletTitles[id]}
-                {(id === 'publications' || id === 'assays' || id === 'studies' || id === 'runs' || id === 'workflows') && ` (${metadata[id].length})`}
+                {(id === 'contacts' || id === 'organizations' || id === 'publications' || id === 'assays' || id === 'studies' || id === 'runs' || id === 'workflows') && ` (${metadata[id].length})`}
               </ActionList.Item>
             ))}
           </ActionList>
