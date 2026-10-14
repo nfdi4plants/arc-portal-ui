@@ -18,7 +18,7 @@ function NewDashboardLayout({ metadata, provenance, actions, ...props }: Dashboa
         <div className="new-dashboard-hub">
           <ArcDetails {...props} metadata={metadata} />
         </div>
-        <InvestigationDashlets metadata={metadata} arcJson={props.arcJson} classNamePrefix="new-dashboard" />
+        <InvestigationDashlets repository={props.repository} repositoryUrl={props.repositoryUrl} token={props.token} metadata={metadata} arcJson={props.arcJson} classNamePrefix="new-dashboard" />
         <PopupGraphview index={provenance} symbol={<GraphIcon size={48} />} label="Graphview dashlet" className="new-dashboard-tile new-dashboard-graphview" />
       </div>
     </main>

@@ -9,11 +9,21 @@ import { renderWithTheme } from '../../test/helpers'
 import { ArcDashboardFrame } from '../../components/ArcDashboard/ArcDashboardFrame'
 import story from './TabbedDashboard.stories'
 
-vi.mock('@nfdi4plants/arc-web-view', () => ({ WebViewer: () => <label>Search ARC files<input /></label> }))
+vi.mock('../../components/ArcDashboard/ArcViewer/fileSizes', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../components/ArcDashboard/ArcViewer/fileSizes')>(),
+  loadFileSizes: vi.fn(async () => new Map([['README.md', 2048]])),
+}))
+vi.mock('@nfdi4plants/arc-web-view', () => ({ WebViewer: () => <>
+  <label>Search ARC files<input /></label>
+  <table>
+    <thead><tr><th>Name</th><th>Path</th><th>File Size</th><th>Download</th></tr></thead>
+    <tbody><tr><th><span aria-label="File" />README.md</th><td>README.md</td><td /><td /></tr></tbody>
+  </table>
+</> }))
 async function openDashboard() {
   const store = createArcStore(sampleCrateSource())
   await store.load()
-  renderWithTheme(<ArcProvider store={store}><ArcDashboardFrame content={story.args.content} label={story.args.label} fillHeight={story.args.fillHeight} arcJson={crateJson} /></ArcProvider>)
+  renderWithTheme(<ArcProvider store={store}><ArcDashboardFrame content={story.args.content} label={story.args.label} fillHeight={story.args.fillHeight} repository={{ source: 'https://gitlab.example', projectPath: 'research/talinum' }} arcJson={crateJson} /></ArcProvider>)
   await screen.findByRole('textbox', { name: 'Search ARC files' }, { timeout: 5000 })
 }
 
@@ -21,6 +31,8 @@ describe('TabbedDashboard', () => {
   it('starts in Webview and preserves file input and the comparison ratio when switching tabs', async () => {
     await openDashboard()
     const user = userEvent.setup()
+    expect(await screen.findByRole('link', { name: 'Download README.md from GitLab' })).toHaveAttribute('href', 'https://gitlab.example/research/talinum/-/raw/HEAD/README.md?inline=false')
+    expect(await screen.findByRole('cell', { name: '2.0 KiB' })).toBeVisible()
     expect(screen.getByRole('tab', { name: 'Webview' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.queryByRole('region', { name: 'Provenance explorer' })).not.toBeInTheDocument()
     await user.type(screen.getByRole('textbox'), 'assays')

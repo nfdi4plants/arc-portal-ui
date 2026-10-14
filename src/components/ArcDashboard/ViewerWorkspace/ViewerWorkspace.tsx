@@ -8,7 +8,7 @@ export type ViewerWorkspaceMode = 'webview' | 'graphview' | 'compare'
 const clampShare = (share: number) => Math.max(20, Math.min(80, share))
 
 /** Keep the same viewers mounted in single-view and comparison modes. */
-export function ViewerWorkspace({ metadata, arcJson, provenance, mode = 'compare' }: Pick<DashboardContentProps, 'metadata' | 'arcJson' | 'provenance'> & { mode?: ViewerWorkspaceMode }) {
+export function ViewerWorkspace({ metadata, arcJson, provenance, repository, repositoryUrl, token, mode = 'compare' }: Pick<DashboardContentProps, 'metadata' | 'arcJson' | 'provenance' | 'repository' | 'repositoryUrl' | 'token'> & { mode?: ViewerWorkspaceMode }) {
   const [webviewShare, setWebviewShare] = useState(60)
   const [collapsed, setCollapsed] = useState<'webview' | 'graphview' | null>(null)
   const workspace = useRef<HTMLDivElement>(null)
@@ -30,7 +30,7 @@ export function ViewerWorkspace({ metadata, arcJson, provenance, mode = 'compare
       style={{ '--webview-share': `${webviewShare}fr`, '--graphview-share': `${100 - webviewShare}fr` } as CSSProperties}
     >
       <div id={webviewId} className="split-dashboard-pane" hidden={mode === 'graphview'}>
-        <InvestigationDashlets metadata={metadata} arcJson={arcJson} classNamePrefix="split-dashboard" ids={['webview']} interactive collapsed={mode === 'graphview' || effectiveCollapsed === 'webview'} onToggleCollapsed={compare ? () => togglePane('webview') : undefined} />
+        <InvestigationDashlets repository={repository} repositoryUrl={repositoryUrl} token={token} metadata={metadata} arcJson={arcJson} classNamePrefix="split-dashboard" ids={['webview']} interactive collapsed={mode === 'graphview' || effectiveCollapsed === 'webview'} onToggleCollapsed={compare ? () => togglePane('webview') : undefined} />
       </div>
       <div
         role="separator"
