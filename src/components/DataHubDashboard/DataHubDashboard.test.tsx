@@ -37,7 +37,8 @@ describe('paged dashboard', () => {
     expect(fetchProjects).toHaveBeenCalledTimes(strictMode ? 2 : 1)
     await act(async () => page.resolve(Success(arcPage([first], { perPage: 25, nextPage: 2, total: 26 }))))
     expect(await screen.findByRole('button', { name: 'Open First ARC' })).toBeVisible()
-    expect(screen.queryByRole('columnheader', { name: 'People' })).not.toBeInTheDocument()
+    expect(screen.getByRole('list', { name: 'ARCs' })).toBeVisible()
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
     expect(fetchProjects).toHaveBeenCalledTimes(strictMode ? 2 : 1)
   })
 
@@ -51,7 +52,7 @@ describe('paged dashboard', () => {
     setup({ fetchProjects })
     await screen.findByRole('button', { name: 'Open First ARC' })
     expect(fetchProjects.mock.calls[0][1]).toMatchObject({ page: 1, perPage: 25, orderBy: 'updated_at', sort: 'desc', visibility: 'public' })
-    await user.click(screen.getByRole('button', { name: 'Next' }))
+    await user.click(screen.getByRole('link', { name: 'Next Page' }))
     await screen.findByRole('button', { name: 'Open Second ARC' })
     expect(fetchProjects).toHaveBeenCalledTimes(2)
     await user.type(screen.getByRole('searchbox', { name: 'Search ARCs' }), 'plant')
@@ -62,8 +63,10 @@ describe('paged dashboard', () => {
     await user.click(screen.getByRole('button', { name: 'Only recently changed ARCs' }))
     await waitFor(() => expect(fetchProjects.mock.calls.at(-1)![1]?.lastActivityAfter).toBe('2026-09-14T12:00:00.000Z'))
     await screen.findByRole('button', { name: 'Open First ARC' })
-    await user.click(within(screen.getByRole('columnheader', { name: /Title/ })).getByRole('button'))
-    await waitFor(() => expect(fetchProjects.mock.calls.at(-1)![1]).toMatchObject({ orderBy: 'name', page: 1 }))
+    await user.click(screen.getByRole('link', { name: 'Next Page' }))
+    await screen.findByRole('button', { name: 'Open Second ARC' })
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Sort by' }), 'title-ASC')
+    await waitFor(() => expect(fetchProjects.mock.calls.at(-1)![1]).toMatchObject({ orderBy: 'name', sort: 'asc', page: 1 }))
     await screen.findByRole('button', { name: 'Open First ARC' })
     await user.click(screen.getByRole('button', { name: 'Other Hub: 3 ARCs' }))
     await waitFor(() => expect(fetchProjects.mock.calls.at(-1)![0]).toBe(otherHub.url))
@@ -80,7 +83,7 @@ describe('paged dashboard', () => {
     await screen.findByRole('button', { name: 'Open First ARC' })
     const selector = within(screen.getByRole('list', { name: 'Repositories' }))
     expect(selector.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true')
-    await user.click(screen.getByRole('button', { name: 'Next' }))
+    await user.click(screen.getByRole('link', { name: 'Next Page' }))
     await screen.findByRole('button', { name: 'Open Second ARC' })
     await user.click(selector.getByRole('button', { name: 'Your' }))
     await screen.findByRole('button', { name: 'Open First ARC' })
@@ -94,7 +97,7 @@ describe('paged dashboard', () => {
     await user.type(screen.getByRole('searchbox', { name: 'Search ARCs' }), 'plants')
     await user.click(screen.getByRole('button', { name: 'Search' }))
     await screen.findByRole('button', { name: 'Open First ARC' })
-    await user.click(screen.getByRole('button', { name: 'Next' }))
+    await user.click(screen.getByRole('link', { name: 'Next Page' }))
     await screen.findByRole('button', { name: 'Open Second ARC' })
     await user.click(selector.getByRole('button', { name: 'Most Starred' }))
     await screen.findByRole('button', { name: 'Open First ARC' })
@@ -103,8 +106,8 @@ describe('paged dashboard', () => {
     })
     expect(selector.getAllByRole('button', { pressed: true })).toHaveLength(1)
     expect(selector.getByRole('button', { name: 'Most Starred' })).toHaveAttribute('aria-pressed', 'true')
-    expect(within(screen.getByRole('columnheader', { name: 'Title' })).queryByRole('button')).not.toBeInTheDocument()
-    expect(screen.queryByRole('columnheader', { name: /Last activity/ })?.getAttribute('aria-sort')).toBeNull()
+    expect(screen.queryByRole('combobox', { name: 'Sort by' })).not.toBeInTheDocument()
+    expect(screen.getByText('Sorted by most starred')).toBeVisible()
     await user.click(selector.getByRole('button', { name: 'All' }))
     await screen.findByRole('button', { name: 'Open First ARC' })
     expect(fetchProjects.mock.calls.at(-1)![1]).toMatchObject({
@@ -209,14 +212,49 @@ describe('paged dashboard', () => {
   })
 
   it('keeps missing totals unknown and uses next-page metadata without scanning', async () => {
-    const fetchProjects = vi.fn<DashboardConfiguration['fetchProjects']>(async () =>
-      Success(arcPage([first], { perPage: 25, nextPage: 2, total: null })))
+    const fetchProjects = vi.fn<DashboardConfiguration['fetchProjects']>(async (_source, options) =>
+      Success(arcPage(options?.page === 2 ? [second] : [first], {
+        page: options?.page ?? 1, perPage: 25, nextPage: options?.page === 2 ? null : 2,
+        previousPage: options?.page === 2 ? 1 : null, total: null,
+      })))
+    const user = userEvent.setup()
     setup({ fetchProjects })
     await screen.findByRole('button', { name: 'Open First ARC' })
     expect(screen.getByRole('status')).toHaveTextContent('Showing 1 ARCs on this page')
-    expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled()
-    expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled()
+    const pagination = within(screen.getByRole('navigation', { name: 'ARC pages' }))
+    expect(pagination.getByRole('link', { name: 'Next Page' })).toBeVisible()
+    expect(pagination.getByText('Previous')).toHaveAttribute('aria-disabled', 'true')
+    expect(pagination.queryByRole('link', { name: 'Page 2' })).not.toBeInTheDocument()
     expect(fetchProjects).toHaveBeenCalledTimes(1)
+    await user.click(pagination.getByRole('link', { name: 'Next Page' }))
+    await screen.findByRole('button', { name: 'Open Second ARC' })
+    const lastPage = within(screen.getByRole('navigation', { name: 'ARC pages' }))
+    expect(lastPage.getByText('Next')).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByText('Page 2')).toBeVisible()
+    await user.click(lastPage.getByRole('link', { name: 'Previous Page' }))
+    await screen.findByRole('button', { name: 'Open First ARC' })
+    expect(fetchProjects).toHaveBeenCalledTimes(3)
+  })
+
+  it('uses Primer numbered pages when the DataHUB supplies a page count', async () => {
+    const fetchProjects = vi.fn<DashboardConfiguration['fetchProjects']>(async (_source, options) =>
+      Success(arcPage(options?.page === 3 ? [second] : [first], {
+        page: options?.page ?? 1, perPage: 25, total: 51, totalPages: 3,
+        nextPage: options?.page === 3 ? null : (options?.page ?? 1) + 1,
+        previousPage: (options?.page ?? 1) > 1 ? options!.page! - 1 : null,
+      })))
+    const user = userEvent.setup()
+    setup({ fetchProjects })
+    await screen.findByRole('button', { name: 'Open First ARC' })
+    const pagination = within(screen.getByRole('navigation', { name: 'ARC pages' }))
+    expect(pagination.getByRole('link', { name: 'Page 1' })).toHaveAttribute('aria-current', 'page')
+    await user.click(pagination.getByRole('link', { name: 'Page 3' }))
+    await screen.findByRole('button', { name: 'Open Second ARC' })
+    const lastPage = within(screen.getByRole('navigation', { name: 'ARC pages' }))
+    expect(lastPage.getByRole('link', { name: 'Page 3' })).toHaveAttribute('aria-current', 'page')
+    expect(lastPage.getByText('Next')).toHaveAttribute('aria-disabled', 'true')
+    expect(fetchProjects.mock.calls.at(-1)![1]).toMatchObject({ page: 3, perPage: 25 })
+    expect(fetchProjects).toHaveBeenCalledTimes(2)
   })
 
   it('retries failures and refreshes loaded resources on Update', async () => {
@@ -235,13 +273,27 @@ describe('paged dashboard', () => {
     expect(fetchGroups).toHaveBeenCalledTimes(4)
   })
 
-  it('preserves opening and external-link actions', async () => {
+  it('opens the dashboard from list content and keeps external links in the actions menu', async () => {
     const user = userEvent.setup()
     const { onArcClick } = setup({ fetchProjects: async () => Success(arcPage([first])) })
-    const external = await screen.findByRole('link', { name: 'View First ARC on PLANTdataHUB (official)' })
+    const open = await screen.findByRole('button', { name: 'Open First ARC' })
+    expect(screen.queryByRole('menuitem', { name: 'View on PLANTdataHUB (official)' })).not.toBeInTheDocument()
+    await user.click(within(open).getByText(first.description!))
+    expect(onArcClick).toHaveBeenCalledWith(first.web_url, first.name, first.id, plantdatahub)
+    onArcClick.mockClear()
+    open.focus()
+    await user.keyboard('{Enter}')
+    expect(onArcClick).toHaveBeenCalledOnce()
+    onArcClick.mockClear()
+    await user.keyboard(' ')
+    expect(onArcClick).toHaveBeenCalledOnce()
+    onArcClick.mockClear()
+    await user.click(screen.getByRole('button', { name: 'More actions for First ARC' }))
+    const external = await screen.findByRole('menuitem', { name: 'View on PLANTdataHUB (official)' })
     expect(external).toHaveAttribute('href', first.web_url)
     expect(external).toHaveAttribute('target', '_blank')
-    await user.click(screen.getByRole('button', { name: 'Open First ARC' }))
-    expect(onArcClick).toHaveBeenCalledWith(first.web_url, first.name, first.id, plantdatahub)
+    expect(external).toHaveAttribute('rel', 'noopener noreferrer')
+    await user.click(external)
+    expect(onArcClick).not.toHaveBeenCalled()
   })
 })

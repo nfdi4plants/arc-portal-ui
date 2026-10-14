@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
@@ -16,13 +17,23 @@ vi.mock('../../components/ArcDashboard/ArcViewer/fileSizes', async (importOrigin
   ...await importOriginal<typeof FileSizesModule>(),
   loadFileSizes: vi.fn(async () => new Map([['README.md', 2048]])),
 }))
-vi.mock('@nfdi4plants/arc-web-view', () => ({ WebViewer: () => <>
-  <label>Search ARC files<input /></label>
-  <table>
-    <thead><tr><th>Name</th><th>Path</th><th>File Size</th><th>Download</th></tr></thead>
-    <tbody><tr><th><span aria-label="File" />README.md</th><td>README.md</td><td /><td /></tr></tbody>
-  </table>
-</> }))
+vi.mock('@nfdi4plants/arc-web-view', () => ({ WebViewer: () => {
+  const [path, setPath] = useState('')
+  const folder = path === '' ? 'assays' : path === 'assays' ? 'GCqTOF_targets' : undefined
+  return <>
+    <label>Search ARC files<input /></label>
+    <nav aria-label="Breadcrumbs"><a href="#" onClick={() => setPath('')}>root</a></nav>
+    <p>Current folder: {path || 'root'}</p>
+    <table>
+      <thead><tr><th>Name</th><th>Path</th><th>File Size</th><th>Download</th></tr></thead>
+      <tbody>
+        {folder && <tr><th><span aria-label="Folder" /><a href="#" onClick={() => setPath(path ? `${path}/${folder}` : folder)}><span title={folder}>{folder}</span></a></th><td>{path ? `${path}/${folder}` : folder}</td><td /><td /></tr>}
+        <tr><th><span aria-label="File" />README.md</th><td>README.md</td><td /><td /></tr>
+      </tbody>
+    </table>
+  </>
+} }))
+
 
 async function openDashboard(content = story.args.content) {
   const store = createArcStore(sampleCrateSource())
@@ -46,13 +57,32 @@ describe.each([
     expect(screen.getByRole('region', { name: 'ARCade' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Expand ARCade' })).toBeVisible()
     const toolbar = screen.getByRole('navigation', { name: 'Investigation dashlets' })
-    expect(within(toolbar).getAllByRole('heading', { level: 2 }).map(heading => heading.textContent))
+    expect(within(toolbar).getAllByRole('button').map(button => button.getAttribute('aria-label')))
       .toEqual(['Description', 'Contacts (12)', 'Organizations (4)', 'Publications (2)', 'Assays (3)', 'Studies (2)', 'Runs (6)', 'Workflows (6)'])
     const user = userEvent.setup()
-    await user.click(within(toolbar).getByRole('button', { name: 'Expand Contacts (12)' }))
+    await user.click(within(toolbar).getByRole('button', { name: 'Contacts (12)' }))
     expect(within(screen.getByRole('dialog', { name: 'Contacts (12)' })).getAllByRole('listitem')).toHaveLength(12)
-    await user.click(screen.getByRole('button', { name: 'Shrink Contacts (12)' }))
+    await user.keyboard('{Escape}')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(within(toolbar).getByRole('button', { name: 'Contacts (12)' })).toHaveFocus()
+    await user.click(within(toolbar).getByRole('button', { name: 'Assays (3)' }))
+    expect(within(screen.getByRole('dialog', { name: 'Assays (3)' })).getAllByRole('listitem')).toHaveLength(3)
+    await user.click(screen.getByRole('textbox', { name: 'Search ARC files' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  }, 15000)
+
+  it('opens the selected assay folder, closes the dropdown, and restores a collapsed Webview', async () => {
+    await openDashboard(content)
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Collapse Webview' }))
+    await user.click(screen.getByRole('button', { name: 'Assays (3)' }))
+    await user.click(within(screen.getByRole('dialog', { name: 'Assays (3)' })).getByRole('button', { name: 'GCqTOF_targets' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(await screen.findByText('Current folder: assays/GCqTOF_targets')).toBeVisible()
+    // A second selection still works after the viewer has left its root folder.
+    await user.click(screen.getByRole('button', { name: 'Assays (3)' }))
+    await user.click(within(screen.getByRole('dialog', { name: 'Assays (3)' })).getByRole('button', { name: 'GCqTOF_targets' }))
+    expect(await screen.findByText('Current folder: assays/GCqTOF_targets')).toBeVisible()
   }, 15000)
 
   it('collapses either viewer, preserves file input, and can open a popup from a collapsed viewer', async () => {
