@@ -200,7 +200,8 @@ export function createMoveLayer(core: Core): MoveLayer {
 
   const buildList = (base: WeaponMoveset, slot: WeaponSlot, tier: 1 | 2): AttackMove[] => {
     const moves = base.moves(slot, tier).map((move) => (slot === 'light' ? light(move, true) : heavy(move)))
-    if (slot === 'light' && flags.tripleCombo) moves.push(light(finisherBase, true))
+    // A heavy weapon has no light string, so it gets no finisher either.
+    if (slot === 'light' && flags.tripleCombo && moves.length > 0) moves.push(light(finisherBase, true))
     return moves
   }
 

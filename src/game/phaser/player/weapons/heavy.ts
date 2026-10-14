@@ -6,7 +6,6 @@ import type { MeleeHit, Shot, Timing } from './kit'
 import {
   activeMs,
   burst,
-  dashLightTiming,
   fallMs,
   fireShot,
   groundBelow,
@@ -16,21 +15,18 @@ import {
   memoTier,
   move,
   overheadBox,
-  spawnArea,
   spawnMelee,
   spawnShockwaves,
   variantTiming,
 } from './kit'
 import { orbitVisual } from './orbit'
 import { UNGROUPED } from './scheduler'
-import { NO_UP } from './variants'
+import { NO_UP_HEAVY } from './variants'
 
-// The four heavy weapons. Each has one heavy move, plus a quick light move for the case that the
-// weapon sits in the light slot. The catalog never puts it there, so the fallback stays simple.
+// The four heavy weapons. The catalog puts them in the heavy slot only, so each one defines a
+// heavy move, an air heavy, a dash heavy and an up heavy and nothing for the light slot.
 
-const TIER2_LIGHT = 1.25
 const HEAVY_TAGS = ['heavy']
-const LIGHT_TAGS = ['light']
 
 const heavyTiming = (startupMs: number, activeMs: number, recoveryMs: number, cancelAfterMs: number, lunge = 0): Timing => ({
   startupMs,
@@ -39,14 +35,6 @@ const heavyTiming = (startupMs: number, activeMs: number, recoveryMs: number, ca
   cancelAfterMs,
   lunge,
   allowedInAir: false,
-})
-
-const lightTiming = (startupMs: number, activeMs: number, recoveryMs: number, cancelAfterMs: number): Timing => ({
-  startupMs,
-  activeMs,
-  recoveryMs,
-  cancelAfterMs,
-  allowedInAir: true,
 })
 
 // Centrifuge disc: flies out 160 units and comes back to the thrower. The return is a second
@@ -67,19 +55,17 @@ const disc = (damage: number, lifetimeMs: number, velocity: { x: number; y: numb
   tags,
 })
 
-function throwDisc(ctx: AttackContext, height: number, damage: number, returns: boolean): void {
+function throwDisc(ctx: AttackContext, height: number, damage: number): void {
   const feet = ctx.player.position()
   const dir = ctx.player.facing()
   const origin = { x: feet.x + dir * 12, y: feet.y + height }
-  const reach = returns ? DISC_REACH : 100
-  const outMs = (reach / DISC_SPEED) * 1000
-  fireShot(ctx, origin, disc(damage, outMs, { x: dir * DISC_SPEED, y: 0 }, returns ? ['heavy', 'projectile'] : LIGHT_TAGS))
-  if (!returns) return
+  const outMs = (DISC_REACH / DISC_SPEED) * 1000
+  fireShot(ctx, origin, disc(damage, outMs, { x: dir * DISC_SPEED, y: 0 }, ['heavy', 'projectile']))
   later(
     ctx,
     outMs,
     () => {
-      const turn = { x: origin.x + dir * reach, y: origin.y }
+      const turn = { x: origin.x + dir * DISC_REACH, y: origin.y }
       const hand = ctx.player.position()
       const target = { x: hand.x, y: hand.y + height }
       const back = aimedVelocity(turn, target, DISC_SPEED * 1.1, dir === 1 ? -1 : 1)
@@ -91,7 +77,7 @@ function throwDisc(ctx: AttackContext, height: number, damage: number, returns: 
 }
 
 // Disc variants. Spin Drop throws the disc straight down, and it splits into two that roll along
-// the floor. Ricochet flicks a small disc ahead that bounces back. Orbit keeps a disc circling.
+// the floor. Orbit keeps a disc circling.
 const DROP_SPEED = 520
 
 function spinDrop(tier: 1 | 2): AttackMove {
@@ -122,24 +108,6 @@ function spinDrop(tier: 1 | 2): AttackMove {
     },
     { damage: 16 },
   )
-}
-
-function ricochet(tier: 1 | 2): AttackMove {
-  const damage = 9 * (tier === 2 ? TIER2_LIGHT : 1)
-  const outMs = 220
-  return move('Ricochet', dashLightTiming(30, 40, 130), (ctx) => {
-    const feet = ctx.player.position()
-    const dir = ctx.player.facing()
-    const origin = { x: feet.x + dir * 12, y: feet.y - 26 }
-    // Faster than the dash, so the mage does not run into it.
-    fireShot(ctx, origin, { ...disc(damage, outMs, { x: dir * 720, y: 0 }, LIGHT_TAGS), pierce: tier === 2 ? 2 : 0 })
-    later(
-      ctx,
-      outMs,
-      () => fireShot(ctx, { x: origin.x + dir * 720 * (outMs / 1000), y: origin.y }, disc(damage * 0.6, 260, { x: -dir * 600, y: 0 }, LIGHT_TAGS)),
-      UNGROUPED,
-    )
-  })
 }
 
 const ORBIT_MS = 1000
@@ -174,15 +142,11 @@ function orbit(tier: 1 | 2): AttackMove {
 
 export const discMoveset: WeaponMoveset = {
   id: 'centrifugeDisc',
-  ...NO_UP,
+  ...NO_UP_HEAVY,
   airHeavy: memoTier(spinDrop),
-  dashLight: memoTier(ricochet),
   dashHeavy: memoTier(orbit),
   moves: memoMoves((slot, tier) => {
-    if (slot === 'light') {
-      const damage = 11 * (tier === 2 ? TIER2_LIGHT : 1)
-      return [move('Disc flick', lightTiming(90, 40, 170, 100), (ctx) => throwDisc(ctx, -26, damage, false))]
-    }
+    if (slot === 'light') return []
     // Tier 2 throws a high and a low disc at once.
     const heights = tier === 2 ? [-40, -12] : [-26]
     return [
@@ -190,7 +154,7 @@ export const discMoveset: WeaponMoveset = {
         'Disc throw',
         heavyTiming(200, 80, 300, 180),
         (ctx) => {
-          for (const height of heights) throwDisc(ctx, height, DISC_DAMAGE, true)
+          for (const height of heights) throwDisc(ctx, height, DISC_DAMAGE)
         },
         { damage: DISC_DAMAGE },
       ),
@@ -198,8 +162,8 @@ export const discMoveset: WeaponMoveset = {
   }),
 }
 
-// Beaker variants. Big Splash is the hardest landing of all. Bump is a short shove off the dash.
-// Pendulum swings up from the dash and launches. Uppercut launches straight up.
+// Beaker variants. Big Splash is the hardest landing of all. Pendulum swings up from the dash and
+// launches. Uppercut launches straight up.
 const SPLASH = { speed: 760 }
 
 function bigSplash(tier: 1 | 2): AttackMove {
@@ -237,11 +201,6 @@ function bigSplash(tier: 1 | 2): AttackMove {
   )
 }
 
-function bump(tier: 1 | 2): AttackMove {
-  const hit: MeleeHit = { x: 0, y: -40, w: 36, h: 32, damage: 12 * (tier === 2 ? TIER2_LIGHT : 1), knockback: { x: 260, y: -120 }, hitStopMs: 40, tags: LIGHT_TAGS }
-  return move('Bump', dashLightTiming(50, 70, 130), (ctx, self) => spawnMelee(ctx, activeMs(ctx, self), hit))
-}
-
 function pendulum(tier: 1 | 2): AttackMove {
   const hit: MeleeHit = { x: -6, y: -80, w: 64, h: 80, damage: tier === 2 ? 36 : 30, knockback: { x: 140, y: -520 }, hitStopMs: 90, tags: HEAVY_TAGS }
   return move(
@@ -270,23 +229,10 @@ function uppercut(tier: 1 | 2): AttackMove {
 export const beakerMoveset: WeaponMoveset = {
   id: 'beakerHammer',
   airHeavy: memoTier(bigSplash),
-  dashLight: memoTier(bump),
   dashHeavy: memoTier(pendulum),
   upHeavy: memoTier(uppercut),
   moves: memoMoves((slot, tier) => {
-    if (slot === 'light') {
-      const tap: MeleeHit = {
-        x: 2,
-        y: -40,
-        w: 40,
-        h: 30,
-        damage: 13 * (tier === 2 ? TIER2_LIGHT : 1),
-        knockback: { x: 160, y: -80 },
-        hitStopMs: 40,
-        tags: LIGHT_TAGS,
-      }
-      return [move('Beaker tap', lightTiming(100, 70, 180, 100), (ctx, self) => spawnMelee(ctx, activeMs(ctx, self), tap))]
-    }
+    if (slot === 'light') return []
     const smash: MeleeHit = {
       x: -6,
       y: -62,
@@ -373,8 +319,7 @@ function flameColumn(ctx: AttackContext, direction: Exclude<FlameDirection, 'for
 }
 
 // Bunsen variants. Flame Jet fires down, which slows the fall, and leaves a fire patch where the
-// mage lands. Fire Trail drops flames along the dash. Flare Burst rings the mage in fire. Chimney
-// sends a flame column up.
+// mage lands. Flare Burst rings the mage in fire. Chimney sends a flame column up.
 const JET = { speed: 160, maxMs: 450 }
 const FLARES = 8
 
@@ -407,26 +352,6 @@ function flameJet(tier: 1 | 2): AttackMove {
     (ctx) => flameColumn(ctx, 'down', jet, { x: 40, y: 120 }),
     { damage: jet.pulses * jet.damage },
   )
-}
-
-function fireTrail(tier: 1 | 2): AttackMove {
-  const damage = 5 * (tier === 2 ? TIER2_LIGHT : 1)
-  return move('Fire Trail', dashLightTiming(30, 120, 120), (ctx) => {
-    const drop = () => {
-      const feet = ctx.player.position()
-      spawnArea(ctx, { x: feet.x, y: feet.y - 8 }, {
-        art: 'flame',
-        shape: { kind: 'rect', x: -10, y: -8, w: 20, h: 16 },
-        damage,
-        knockback: { x: 20, y: -60 },
-        lifetimeMs: 300,
-        tags: ['light', 'fire'],
-      })
-    }
-    drop()
-    later(ctx, 40, drop)
-    later(ctx, 80, drop)
-  })
 }
 
 function flareBurst(tier: 1 | 2): AttackMove {
@@ -470,30 +395,23 @@ function flareBurst(tier: 1 | 2): AttackMove {
   )
 }
 
-const chimney = (pulses: number, tags: string[], scale: number) => (tier: 1 | 2): AttackMove => {
-  const column = { length: (tier === 2 ? 110 : 90) * scale, pulses, damage: tier === 2 ? 8 : 7, tags }
-  const timing = pulses > 1 ? variantTiming(160, 400, 220, 140) : variantTiming(90, 70, 180, 100)
+function chimney(tier: 1 | 2): AttackMove {
+  const column = { length: tier === 2 ? 110 : 90, pulses: 4, damage: tier === 2 ? 8 : 7, tags: HEAVY_TAGS }
   return move(
-    pulses > 1 ? 'Chimney' : 'Chimney puff',
-    timing,
+    'Chimney',
+    variantTiming(160, 400, 220, 140),
     (ctx) => flameColumn(ctx, 'up', column, { x: 30, y: -260 }),
-    pulses > 1 ? { damage: column.pulses * column.damage } : undefined,
+    { damage: column.pulses * column.damage },
   )
 }
 
 export const bunsenMoveset: WeaponMoveset = {
   id: 'bunsenStaff',
   airHeavy: memoTier(flameJet),
-  dashLight: memoTier(fireTrail),
   dashHeavy: memoTier(flareBurst),
-  // A forward flame turned overhead would not match the sprites, so the light gets a short column.
-  upLight: memoTier(chimney(1, LIGHT_TAGS, 0.6)),
-  upHeavy: memoTier(chimney(4, HEAVY_TAGS, 1)),
+  upHeavy: memoTier(chimney),
   moves: memoMoves((slot, tier) => {
-    if (slot === 'light') {
-      const puff = { length: 55, pulses: 1, damage: 9 * (tier === 2 ? TIER2_LIGHT : 1), tags: LIGHT_TAGS }
-      return [move('Flame puff', lightTiming(90, 70, 180, 100), (ctx) => flameCone(ctx, puff))]
-    }
+    if (slot === 'light') return []
     const cone = { length: tier === 2 ? 105 : 70, pulses: 4, damage: tier === 2 ? 8 : 7, tags: HEAVY_TAGS }
     // The extras of the heavy move read the total of the pulses, once per move.
     const declared = { damage: cone.pulses * cone.damage }
@@ -520,7 +438,7 @@ function reflectStance(ctx: AttackContext, durationMs: number): void {
 }
 
 // Petri variants. Shield Surf rides the shield down, turning shots back, and bashes on landing.
-// Shoulder Bash shoves off the dash. Shield Charge holds the shield forward through a long dash.
+// Shield Charge holds the shield forward through a long dash.
 // Lid Lift raises the shield overhead against shots from above, then bashes up.
 const SURF = { speed: 600 }
 
@@ -565,11 +483,6 @@ function shieldSurf(tier: 1 | 2): AttackMove {
     },
     { damage: bash.damage },
   )
-}
-
-function shoulderBash(tier: 1 | 2): AttackMove {
-  const hit: MeleeHit = { x: 2, y: -44, w: 30, h: 40, damage: 12 * (tier === 2 ? TIER2_LIGHT : 1), knockback: { x: 300, y: -60 }, hitStopMs: 40, tags: LIGHT_TAGS }
-  return move('Shoulder Bash', dashLightTiming(30, 90, 120), (ctx, self) => spawnMelee(ctx, activeMs(ctx, self), hit))
 }
 
 function shieldCharge(tier: 1 | 2): AttackMove {
@@ -618,23 +531,10 @@ function lidLift(tier: 1 | 2): AttackMove {
 export const petriMoveset: WeaponMoveset = {
   id: 'petriShield',
   airHeavy: memoTier(shieldSurf),
-  dashLight: memoTier(shoulderBash),
   dashHeavy: memoTier(shieldCharge),
   upHeavy: memoTier(lidLift),
   moves: memoMoves((slot, tier) => {
-    if (slot === 'light') {
-      const bash: MeleeHit = {
-        x: 4,
-        y: -42,
-        w: 34,
-        h: 38,
-        damage: 12 * (tier === 2 ? TIER2_LIGHT : 1),
-        knockback: { x: 240, y: -80 },
-        hitStopMs: 40,
-        tags: LIGHT_TAGS,
-      }
-      return [move('Shield bash', lightTiming(110, 70, 200, 110), (ctx, self) => spawnMelee(ctx, activeMs(ctx, self), bash))]
-    }
+    if (slot === 'light') return []
     const stanceMs = tier === 2 ? 700 : 500
     const bash: MeleeHit = {
       x: 0,

@@ -62,6 +62,11 @@ export interface AttackMove {
 // The moves a weapon has in one slot. For the light slot this is a combo string. Pressing light
 // again during the cancel window advances to the next move. The heavy slot usually has one move.
 //
+// Each weapon only defines the slot its card puts it in. A light weapon has moves, dashLight and
+// upLight, a heavy weapon has moves, airHeavy, dashHeavy and upHeavy, and moves() returns an empty
+// array for the other slot, which build.weapons never selects. The staff is in both slots and has
+// all of them.
+//
 // The variants are optional. Without them the player falls back to a plunge built from the heavy
 // move's damage (airHeavy), the first light move with keepsMomentum (dashLight), the heavy move
 // (dashHeavy), and the move with its hitboxes turned to point overhead (upLight, upHeavy).

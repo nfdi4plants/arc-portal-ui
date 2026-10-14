@@ -125,8 +125,7 @@ export function upHeavyOf(set: WeaponMoveset, tier: 1 | 2): AttackMove | null {
   return heavy ? cached(ups, heavy, upward) : null
 }
 
-// Upward overrides for the ranged weapons, which aim at the pointer instead.
-export const NO_UP: Pick<WeaponMoveset, 'upLight' | 'upHeavy'> = {
-  upLight: () => null,
-  upHeavy: () => null,
-}
+// Upward overrides for the ranged weapons, which aim at the pointer instead. A weapon only has the
+// up variant of its own slot, so the light weapons override upLight and the heavy ones upHeavy.
+export const NO_UP_LIGHT: Pick<WeaponMoveset, 'upLight'> = { upLight: () => null }
+export const NO_UP_HEAVY: Pick<WeaponMoveset, 'upHeavy'> = { upHeavy: () => null }

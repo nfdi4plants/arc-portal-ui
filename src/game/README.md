@@ -74,6 +74,8 @@ stage and read it through `RunContext`.
 Heavy pressed in the air plays the weapon's air heavy, mostly a plunge with a landing hit and a
 short landing lock. Attacks during a dash, or up to 80 ms after it, play the dash light (no lock) or the
 dash heavy. Attacks with up held play an overhead version, and ranged weapons keep aiming at the cursor.
+Each weapon only defines the variants of its card slot (light weapons: light, dash light, up light.
+Heavy weapons: heavy, air heavy, dash heavy, up heavy) and the staff has all of them.
 Each moveset defines its variants (`airHeavy`, `dashLight`, `dashHeavy`, `upLight`, `upHeavy`), the
 fallbacks live in `phaser/player/weapons/variants.ts`, and the attack machine in
 `phaser/player/attacks.ts` picks the variant, runs plunges until landing and applies locks.
