@@ -72,7 +72,7 @@ describe('ARC-Dashboard', () => {
       await user.click(screen.getByRole('button', { name: 'Open investigation details in popup' }))
       const details = within(popup.document.body)
       expect(details.getByRole('heading', { name: 'Facultative CAM in Talinum triangulare' })).toBeVisible()
-      expect(details.getAllByRole('tab')).toHaveLength(7)
+      expect(details.getAllByRole('tab')).toHaveLength(9)
       await user.click(details.getByRole('tab', { name: /^Contacts/ }))
       expect(within(details.getByRole('region', { name: /^Contacts/ })).getAllByRole('listitem')).toHaveLength(12)
       await user.click(details.getByRole('tab', { name: /^Publications/ }))
@@ -86,7 +86,7 @@ describe('ARC-Dashboard', () => {
   it('shows Overview labels with colons and opens Publications from its preview', async () => {
     const user = await renderDetails()
     const overview = screen.getByRole('region', { name: 'ARC overview' })
-    for (const label of ['Description', 'Contacts', 'Organizations', 'Publications', 'Assays', 'Studies']) {
+    for (const label of ['Description', 'Contacts', 'Organizations', 'Publications', 'Assays', 'Studies', 'Runs', 'Workflows']) {
       const row = within(overview).getByRole('button', { name: `View ${label.toLowerCase()}` })
       expect(within(row).getByText(`${label}:`)).toBeVisible()
     }
@@ -101,13 +101,13 @@ describe('ARC-Dashboard', () => {
   it.each([
     { tab: 'Assays', names: ['GCqTOF_targets', 'Agilent MassHunter data analysis', 'mRNASeq of Talinum leaf samples'] },
     { tab: 'Studies', names: ['Early genome draft of Talinum fruticosum', 'TalinumSamples-STRI'] },
-  ])('opens $tab from Overview, with names in separate rows and a plain tab label', async ({ tab, names }) => {
+  ])('opens $tab from Overview, with names in separate rows and a counted tab label', async ({ tab, names }) => {
     const user = await renderDetails()
     const preview = screen.getByRole('button', { name: `View ${tab.toLowerCase()}` })
     expect(within(preview).getByText(`Show more (${names.length})`)).toBeVisible()
     for (const name of names) expect(within(preview).queryByText(name)).not.toBeInTheDocument()
     await user.click(preview)
-    expect(screen.getByRole('tab', { name: tab })).toHaveAccessibleName(tab)
+    expect(screen.getByRole('tab', { name: `${tab} (${names.length})` })).toHaveAccessibleName(`${tab} (${names.length})`)
     const list = within(screen.getByRole('region', { name: tab })).getByRole('list')
     expect(within(list).getAllByRole('listitem').map(item => item.textContent)).toEqual(names)
     await user.click(screen.getByRole('tab', { name: 'Overview' }))
@@ -163,7 +163,7 @@ describe('ARC-Dashboard', () => {
     expect(within(investigationDetails).getByRole('region', { name: 'ARC overview' })).toBeVisible()
     expect(investigationDetails.parentElement).toHaveClass('dashlet')
     expect(arcWebView.parentElement).toHaveClass('dashlet')
-    expect(within(investigationDetails).getAllByRole('tab')).toHaveLength(7)
+    expect(within(investigationDetails).getAllByRole('tab')).toHaveLength(9)
     expect(dashboard.querySelector('.dashboard-window-bar')).not.toBeInTheDocument()
     expect(within(header).getByRole('heading', { level: 1, name: 'Facultative CAM in Talinum triangulare' })).toBeVisible()
     expect(within(header).queryByText('ARC', { exact: true })).not.toBeInTheDocument()
@@ -197,7 +197,7 @@ describe('ARC-Dashboard', () => {
     const publications = screen.getByRole('region', { name: /^Publications/ })
     expect(within(publications).queryByRole('heading', { name: /^Publications/ })).not.toBeInTheDocument()
     expect(within(publications).getByText('Publications associated with this ARC.')).toBeVisible()
-    expect(screen.getByRole('tab', { name: /^Publications/ })).toHaveAccessibleName('Publications')
+    expect(screen.getByRole('tab', { name: /^Publications/ })).toHaveAccessibleName('Publications (2)')
     expect(publications.closest('details')).toBeNull()
     expect(within(publications).getByRole('link', { name: /^Reversible Burst/ })).toHaveAttribute('href', 'https://doi.org/10.1104/pp.15.01076')
     expect(within(publications).getAllByRole('listitem')).toHaveLength(2)
@@ -223,7 +223,7 @@ describe('ARC-Dashboard', () => {
     expect(visibility.compareDocumentPosition(owner) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(within(metadata).queryByRole('list')).not.toBeInTheDocument()
     const tabs = screen.getAllByRole('tab')
-    expect(tabs.map(tab => tab.textContent)).toEqual(['Overview', 'Description', 'Contacts', 'Organizations', 'Publications', 'Assays', 'Studies'])
+    expect(tabs.map(tab => tab.textContent)).toEqual(['Overview', 'Description', 'Contacts', 'Organizations', 'Publications (2)', 'Assays (3)', 'Studies (2)', 'Runs (6)', 'Workflows (6)'])
     const organizationsTab = screen.getByRole('tab', { name: /^Organizations/ })
     expect(organizationsTab).toHaveAccessibleName('Organizations')
     expect(screen.queryByRole('region', { name: 'Organizations' })).not.toBeInTheDocument()

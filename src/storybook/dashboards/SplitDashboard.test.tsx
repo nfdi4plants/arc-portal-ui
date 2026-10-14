@@ -26,7 +26,7 @@ describe('SplitDashboard', () => {
     expect(screen.getByRole('separator')).toHaveAttribute('aria-valuenow', '60')
     const toolbar = screen.getByRole('navigation', { name: 'Investigation dashlets' })
     expect(within(toolbar).getAllByRole('heading', { level: 2 }).map(heading => heading.textContent))
-      .toEqual(['Description', 'Contacts', 'Organizations', 'Publications', 'Assays', 'Studies'])
+      .toEqual(['Description', 'Contacts', 'Organizations', 'Publications (2)', 'Assays (3)', 'Studies (2)', 'Runs (6)', 'Workflows (6)'])
     const user = userEvent.setup()
     await user.click(within(toolbar).getByRole('button', { name: 'Expand Contacts' }))
     expect(within(screen.getByRole('dialog', { name: 'Contacts' })).getAllByRole('listitem')).toHaveLength(12)

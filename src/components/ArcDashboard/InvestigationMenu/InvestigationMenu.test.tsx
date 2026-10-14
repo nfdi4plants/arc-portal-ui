@@ -18,15 +18,23 @@ describe('InvestigationMenu', () => {
     const user = userEvent.setup()
     const investigation = screen.getByRole('button', { name: 'Investigation' })
     await user.click(investigation)
-    expect(screen.getAllByRole('menuitem')).toHaveLength(6)
+    expect(screen.getAllByRole('menuitem')).toHaveLength(8)
+    expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([
+      'Description', 'Contacts', 'Organizations', 'Publications (2)', 'Assays (3)', 'Studies (2)', 'Runs (6)', 'Workflows (6)',
+    ])
     await user.click(screen.getByRole('menuitem', { name: 'Contacts' }))
     const popup = screen.getByRole('dialog', { name: 'Contacts' })
     expect(within(popup).getAllByRole('listitem')).toHaveLength(12)
     await user.click(within(popup).getByRole('button', { name: 'Shrink Contacts' }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(investigation).toHaveFocus()
-    await user.click(investigation)
-    await user.click(screen.getByRole('menuitem', { name: 'Studies' }))
-    expect(screen.getByRole('dialog', { name: 'Studies' })).toBeVisible()
+    for (const [name, count] of [['Studies', 2], ['Runs', 6], ['Workflows', 6]] as const) {
+      await user.click(investigation)
+      await user.click(screen.getByRole('menuitem', { name: `${name} (${count})` }))
+      const details = screen.getByRole('dialog', { name: `${name} (${count})` })
+      expect(within(details).getAllByRole('listitem')).toHaveLength(count)
+      await user.click(within(details).getByRole('button', { name: `Shrink ${name} (${count})` }))
+      expect(investigation).toHaveFocus()
+    }
   }, 15000)
 })

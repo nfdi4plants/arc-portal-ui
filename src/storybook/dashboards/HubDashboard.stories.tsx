@@ -20,8 +20,8 @@ function HubDashboardLayout({ metadata, provenance, actions, ...props }: Dashboa
         <div className="hub-dashboard-hub">
           <ArcDetails {...props} metadata={metadata} />
         </div>
-        <nav className="hub-dashboard-metadata hub-dashboard-right" aria-label="Publications, assays, and studies">
-          <InvestigationDashlets metadata={metadata} arcJson={props.arcJson} classNamePrefix="hub-dashboard" ids={['publications', 'assays', 'studies']} />
+        <nav className="hub-dashboard-metadata hub-dashboard-right" aria-label="Publications, assays, studies, runs, and workflows">
+          <InvestigationDashlets metadata={metadata} arcJson={props.arcJson} classNamePrefix="hub-dashboard" ids={['publications', 'assays', 'studies', 'runs', 'workflows']} />
         </nav>
       </div>
       <ViewerWorkspace metadata={metadata} provenance={provenance} arcJson={props.arcJson} />

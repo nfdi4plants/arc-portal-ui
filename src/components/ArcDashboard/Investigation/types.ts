@@ -39,4 +39,6 @@ export interface InvestigationMetadata {
   organizations: NamedEntity[]
   assays: NamedEntity[]
   studies: NamedEntity[]
+  runs: NamedEntity[]
+  workflows: NamedEntity[]
 }

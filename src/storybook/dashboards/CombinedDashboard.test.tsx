@@ -12,14 +12,14 @@ import story from './CombinedDashboard.stories'
 vi.mock('@nfdi4plants/arc-web-view', () => ({ WebViewer: () => <p>ARC files</p> }))
 
 describe('CombinedDashboard', () => {
-  it('groups the six cards into the requested rows and keeps both viewers interactive with popup controls', async () => {
+  it('groups the eight cards into the requested rows and keeps both viewers interactive with popup controls', async () => {
     const store = createArcStore(sampleCrateSource())
     await store.load()
     renderWithTheme(<ArcProvider store={store}><ArcDashboardFrame content={story.args.content} label={story.args.label} fillHeight={story.args.fillHeight} arcJson={crateJson} /></ArcProvider>)
     expect(screen.getByRole('heading', { level: 1, name: 'Facultative CAM in Talinum triangulare' })).toBeVisible()
     const rows = [
       { name: 'Description, contacts, and organizations', titles: ['Description', 'Contacts', 'Organizations'] },
-      { name: 'Publications, assays, and studies', titles: ['Publications', 'Assays', 'Studies'] },
+      { name: 'Publications, assays, studies, runs, and workflows', titles: ['Publications (2)', 'Assays (3)', 'Studies (2)', 'Runs (6)', 'Workflows (6)'] },
     ]
     for (const { name, titles } of rows) {
       const row = screen.getByRole('region', { name })
