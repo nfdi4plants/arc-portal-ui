@@ -1,8 +1,10 @@
 import Phaser from 'phaser'
 import type { SpriteRef } from '../../contracts/art'
-import type { Combatant, CombatWorld, HitEvent, KillerInfo } from '../../contracts/combat'
+import type { Combatant, CombatWorld, HitEvent, KillerInfo, StatusEffect } from '../../contracts/combat'
 import { DEPTH } from '../../contracts/constants'
 import type { PlayerHandle } from '../../contracts/player'
+import { addStatus, clearStatus, createStatus, statusTimeScale, tickStatus } from '../combat/status'
+import type { StatusState } from '../combat/status'
 import { applyRef } from './sprites'
 import { clamp } from './zones'
 
@@ -36,6 +38,7 @@ const CONTACT_COOLDOWN_MS = 800
 const CONTACT_ACTIVE_MS = 90
 const FLASH_MS = 70
 const DYING_MS = 220
+const FROZEN_TINT = 0x8fd0ff
 
 interface Slot extends Combatant {
   alive: boolean
@@ -46,6 +49,8 @@ interface Slot extends Combatant {
   contactMs: number
   flashMs: number
   dyingMs: number
+  // Freezes and slows. A frozen add stands still and does not hurt on contact.
+  status: StatusState
   sprite: Phaser.GameObjects.Sprite
 }
 
@@ -73,6 +78,7 @@ export function createAdds(deps: AddsDeps): Adds {
       contactMs: 0,
       flashMs: 0,
       dyingMs: 0,
+      status: createStatus(),
       sprite,
       hurtbox: () => box.setTo(slot.x - SIZE / 2, floorY - SIZE, SIZE, SIZE),
       facing: () => slot.face,
@@ -88,6 +94,9 @@ export function createAdds(deps: AddsDeps): Adds {
         slot.flashMs = FLASH_MS
         if (slot.hp <= 0) slot.dyingMs = DYING_MS
         return hit.damage
+      },
+      applyStatus(effect: StatusEffect) {
+        if (slot.hp > 0) addStatus(slot.status, effect, false)
       },
     }
     return slot
@@ -120,6 +129,7 @@ export function createAdds(deps: AddsDeps): Adds {
       slot.contactMs = CONTACT_COOLDOWN_MS / 2
       slot.flashMs = 0
       slot.dyingMs = 0
+      clearStatus(slot.status)
       slot.sprite.setPosition(slot.x, floorY).setVisible(true).setAlpha(1)
       combat.register(slot)
       return true
@@ -133,11 +143,13 @@ export function createAdds(deps: AddsDeps): Adds {
           if (slot.dyingMs <= 0) free(slot)
           continue
         }
+        tickStatus(slot.status, dtMs)
+        const scale = statusTimeScale(slot.status)
         const dx = player.position().x - slot.x
         slot.face = dx >= 0 ? 1 : -1
-        if (Math.abs(dx) > 6) slot.x = clamp(slot.x + slot.face * SPEED * (dtMs / 1000), deps.left + SIZE, deps.right - SIZE)
-        slot.contactMs = Math.max(0, slot.contactMs - dtMs)
-        if (slot.contactMs <= 0 && !player.isDead() && touchesPlayer(slot)) {
+        if (Math.abs(dx) > 6) slot.x = clamp(slot.x + slot.face * SPEED * scale * (dtMs / 1000), deps.left + SIZE, deps.right - SIZE)
+        slot.contactMs = Math.max(0, slot.contactMs - dtMs * scale)
+        if (scale > 0 && slot.contactMs <= 0 && !player.isDead() && touchesPlayer(slot)) {
           slot.contactMs = CONTACT_COOLDOWN_MS
           combat.spawnHitbox({
             owner: slot,
@@ -153,6 +165,7 @@ export function createAdds(deps: AddsDeps): Adds {
         }
         slot.flashMs = Math.max(0, slot.flashMs - dtMs)
         if (slot.flashMs > 0) slot.sprite.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL)
+        else if (slot.status.freezeMs > 0) slot.sprite.setTint(FROZEN_TINT).setTintMode(Phaser.TintModes.MULTIPLY)
         else slot.sprite.clearTint()
         slot.sprite.setPosition(slot.x, floorY)
       }

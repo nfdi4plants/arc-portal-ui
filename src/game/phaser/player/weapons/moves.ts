@@ -62,6 +62,8 @@ export function createMoveLayer(core: Core): MoveLayer {
       return real.spawnProjectile(shot, origin)
     },
     cancelOwnedBy: (owner) => real.cancelOwnedBy(owner),
+    addSlowZone: (zone) => real.addSlowZone(zone),
+    cancelShots: (team, area) => real.cancelShots(team, area),
     livingCombatants: (team) => real.livingCombatants(team),
     on: (event, listener) => real.on(event, listener),
     setDamageModifier: (modifier) => real.setDamageModifier(modifier),

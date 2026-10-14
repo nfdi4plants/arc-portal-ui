@@ -12,6 +12,21 @@ export type KillerInfo =
   | { kind: 'finalBoss'; title: string; phase: number }
   | { kind: 'hazard'; label: string }
 
+// Crowd control from the mage's abilities, applied straight to a combatant without a hit. Bosses
+// turn a freeze into a slow and take slows at half strength (combat/status.ts).
+export type StatusEffect = { kind: 'freeze'; ms: number } | { kind: 'slow'; ms: number; factor: number }
+
+// A box where projectiles of every team but `team` move at `factor` of their speed. Only
+// reflectable shots slow down: bombs, falling debris and ground waves pass at full speed.
+export interface SlowZone {
+  x: number
+  y: number
+  w: number
+  h: number
+  factor: number
+  team: Team
+}
+
 export interface Combatant {
   readonly id: string
   readonly team: Team
@@ -29,6 +44,8 @@ export interface Combatant {
   // nothing means hit.damage was taken unchanged.
   receiveHit(hit: HitEvent): number | void
   isDead(): boolean
+  // Combatants without it ignore freezes and slows.
+  applyStatus?(status: StatusEffect): void
 }
 
 export type HitShape =
@@ -86,6 +103,11 @@ export interface CombatWorld {
   spawnProjectile(spec: ProjectileSpec, origin: { x: number; y: number }): { cancel(): void }
   // Cancels every hitbox and projectile the combatant owns, for a boss that is beaten or changes phase.
   cancelOwnedBy(owner: Combatant): void
+  // Adds a slow zone until the returned function removes it. The world reads the object every
+  // step, so the caller may move it.
+  addSlowZone(zone: SlowZone): () => void
+  // Cancels the reflectable projectiles of `team` whose centre lies in the box. Returns how many.
+  cancelShots(team: Team, area: { x: number; y: number; w: number; h: number }): number
   // Registered combatants of a team that are alive, for effects that target or chain.
   livingCombatants(team: Team): readonly Combatant[]
   on(event: 'hit' | 'kill', listener: (event: HitEvent) => void): () => void

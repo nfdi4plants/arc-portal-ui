@@ -1,10 +1,11 @@
 import Phaser from 'phaser'
 import type { SpriteRef } from '../../contracts/art'
-import type { Combatant, CombatWorld, HitEvent } from '../../contracts/combat'
+import type { Combatant, CombatWorld, HitEvent, StatusEffect } from '../../contracts/combat'
 import { DEPTH, PALETTE } from '../../contracts/constants'
 import type { EnemyWeaponKind, MonsterSpec } from '../../contracts/content'
 import { SUMMONED_SUFFIX } from '../../model/content'
 import { MINION_ID_SUFFIX, applySpriteRef, monsterWeapon } from '../art'
+import { addStatus, clearStatus, createStatus, statusTimeScale, tickStatus } from '../combat/status'
 import { bodyOf, isOneWay } from '../player/oneWay'
 import { aimVelocity, lobFlightS, lobVelocity } from './aim'
 import type { Vec } from './aim'
@@ -76,7 +77,9 @@ let nextId = 1
 
 const NEUTRAL: StanceMods = { speed: 1, cooldown: 1, damageTaken: 1 }
 const ZERO: Vec = { x: 0, y: 0 }
-const TINT = { hit: 0xffffff, windup: 0xff7a3d, blink: 0xbfe9ff, aggressive: 0xff9d90, defensive: 0x93b4ff } as const
+const TINT = { hit: 0xffffff, windup: 0xff7a3d, blink: 0xbfe9ff, aggressive: 0xff9d90, defensive: 0x93b4ff, frozen: 0x8fd0ff, slowed: 0xc6e4f5 } as const
+// How fast a frozen mob brakes to a stop, world units per second squared.
+const FREEZE_BRAKE = 2400
 
 // A phantom's body is almost invisible. It shows fully while it attacks, briefly when it is hit and
 // halfway during the pause inspection, so the player can tell what they hit and what the panel means.
@@ -282,7 +285,11 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     stepMs: 0,
     airMs: 0,
     deathFrom: 1,
+    // The share of its own speed the mob runs at: 0 while frozen, below 1 while slowed.
+    timeScale: 1,
   }
+  // Freezes and slows from the mage's abilities.
+  const status = createStatus()
   let facing: 1 | -1 = 1
   let flipped = false
   let asleep = false
@@ -427,7 +434,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
   }
 
   function thinkGround(dt: number) {
-    const speed = stats.speed * mods.speed
+    const speed = stats.speed * mods.speed * st.timeScale
     if (st.stunMs > 0 || st.blinkMs > 0 || phase !== 'idle') {
       st.targetVx = 0
       return
@@ -543,7 +550,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
   }
 
   function thinkFlying(dt: number) {
-    const speed = stats.speed * mods.speed
+    const speed = stats.speed * mods.speed * st.timeScale
     const seconds = dt / 1000
     if (st.stunMs > 0 || st.blinkMs > 0) {
       body.setVelocity(approach(body.velocity.x, 0, 600 * seconds), approach(body.velocity.y, 0, 600 * seconds))
@@ -622,6 +629,13 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
       if (Math.abs(vx) > 5) facing = vx > 0 ? 1 : -1
     }
     body.setVelocity(approach(body.velocity.x, vx * slow, 900 * seconds), vy * slow)
+  }
+
+  // A frozen mob stops where it is. A flyer hangs in the air, a walker still falls.
+  function holdFrozen(dt: number) {
+    const brake = FREEZE_BRAKE * (dt / 1000)
+    body.velocity.x = approach(body.velocity.x, 0, brake)
+    if (flies) body.velocity.y = approach(body.velocity.y, 0, brake)
   }
 
   function applyGroundVelocity(dt: number) {
@@ -976,8 +990,10 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     const flicker = Math.floor(st.clockMs / 60) % 2 === 0
     let code = 0
     if (st.flashMs > 0) code = 1
+    else if (status.freezeMs > 0) code = 6
     else if ((phase === 'windup' || charge === 'windup') && flicker) code = 2
     else if (st.blinkMs > 0 && flicker) code = 3
+    else if (status.slowMs > 0) code = 7
     else if (stance) code = stance.aggressive ? 4 : 5
     if (code === tintCode) return
     tintCode = code
@@ -990,6 +1006,8 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     else if (code === 1) target.setTint(TINT.hit).setTintMode(Phaser.TintModes.FILL)
     else if (code === 2) target.setTint(TINT.windup).setTintMode(Phaser.TintModes.FILL)
     else if (code === 3) target.setTint(TINT.blink).setTintMode(Phaser.TintModes.FILL)
+    else if (code === 6) target.setTint(TINT.frozen).setTintMode(Phaser.TintModes.MULTIPLY)
+    else if (code === 7) target.setTint(TINT.slowed).setTintMode(Phaser.TintModes.MULTIPLY)
     else target.setTint(code === 4 ? TINT.aggressive : TINT.defensive).setTintMode(Phaser.TintModes.MULTIPLY)
   }
 
@@ -1083,6 +1101,8 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
 
   function phantomAlpha(): number {
     if (phase !== 'idle' || charge !== 'none' || swoop === 'dive' || st.blinkMs > 0) return 1
+    // A frozen phantom shows, so the player sees what the freeze caught.
+    if (status.freezeMs > 0) return PHANTOM_REVEAL_ALPHA
     if (highlight > 0 || raised) return PHANTOM_INSPECT_ALPHA
     if (st.revealMs > 0 || st.flashMs > 0) return PHANTOM_REVEAL_ALPHA
     return PHANTOM_ALPHA
@@ -1257,21 +1277,26 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
       return
     }
 
+    tickStatus(status, dt)
+    st.timeScale = statusTimeScale(status)
+    const frozen = st.timeScale <= 0
     if (stance && stepStance(stance, dt)) mods = stanceMods(stance)
-    if (passive === 'summoner' && aggro && !summoned) summon()
-    if (passive === 'blink') updateBlink(dt)
+    if (!frozen && passive === 'summoner' && aggro && !summoned) summon()
+    if (!frozen && passive === 'blink') updateBlink(dt)
     // Before updateAttack, so a bomb launched in this step stays where it is. The combat world
-    // moves its projectile for the first time on the next step.
+    // moves its projectile for the first time on the next step. Bombs in flight keep flying.
     updateBombs(dt)
-    if (armed) updateAttack(dt)
+    // A slow stretches windups, recoveries and cooldowns along with the walk.
+    if (armed && !frozen) updateAttack(dt * st.timeScale)
 
-    if (flies) thinkFlying(dt)
+    if (frozen) holdFrozen(dt)
+    else if (flies) thinkFlying(dt)
     else {
       thinkGround(dt)
       applyGroundVelocity(dt)
     }
 
-    if (st.staggerMs <= 0) touchPlayer(dt)
+    if (st.staggerMs <= 0 && !frozen) touchPlayer(dt)
     if (launched) checkLanding(dt)
     if (passive === 'chatter') updateChatter(dt)
     if (minions.length > 0) updateMinions(dt)
@@ -1291,6 +1316,8 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     if (dead) return
     if (next) {
       cancelAttacks()
+      clearStatus(status)
+      st.timeScale = 1
       hideDizzy()
       st.staggerMs = 0
       dropBubble()
@@ -1405,6 +1432,12 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
         }
       }
       return damage
+    },
+    // A freeze breaks the attack in progress. Bombs already thrown keep flying.
+    applyStatus(effect: StatusEffect) {
+      if (dead || asleep) return
+      addStatus(status, effect, false)
+      if (status.freezeMs > 0) interruptAttack()
     },
     update,
     setAsleep,

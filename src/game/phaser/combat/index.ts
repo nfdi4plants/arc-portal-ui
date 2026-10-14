@@ -1,6 +1,6 @@
 import type Phaser from 'phaser'
 import type { ScribbleArt } from '../../contracts/art'
-import type { Combatant, CombatWorld, HitboxSpec, HitEvent, HitShape, ProjectileSpec, Team } from '../../contracts/combat'
+import type { Combatant, CombatWorld, HitboxSpec, HitEvent, HitShape, ProjectileSpec, SlowZone, Team } from '../../contracts/combat'
 import { DEPTH, PALETTE } from '../../contracts/constants'
 import { placeholderArt } from '../placeholderArt'
 import { applyDamageModifier, type DamageModifier } from './damage'
@@ -10,6 +10,7 @@ import { createProjectilePool } from './projectilePool'
 
 export * from './damage'
 export * from './geometry'
+export * from './status'
 
 export interface CombatWorldOptions {
   // Defaults to placeholderArt.
@@ -58,6 +59,7 @@ export function createCombatWorld(scene: Phaser.Scene, options: CombatWorldOptio
   const killed = new WeakSet<Combatant>()
   const hitboxes: HitboxState[] = []
   const projectiles: ProjectileState[] = []
+  const slowZones: SlowZone[] = []
   const listeners: Record<'hit' | 'kill', Set<Listener>> = { hit: new Set(), kill: new Set() }
   const pool = createProjectilePool(scene, 1 / art.pixelsPerUnit)
   const feedback = createFeedback(scene, art)
@@ -151,6 +153,18 @@ export function createCombatWorld(scene: Phaser.Scene, options: CombatWorldOptio
     projectiles.length = kept
   }
 
+  // The time share a shot moves at: the strongest slow zone of another team over its centre.
+  function shotTimeScale(shot: ProjectileState): number {
+    if (slowZones.length === 0 || !shot.spec.reflectable) return 1
+    let scale = 1
+    for (const zone of slowZones) {
+      if (zone.team === shot.team) continue
+      if (shot.x < zone.x || shot.x > zone.x + zone.w || shot.y < zone.y || shot.y > zone.y + zone.h) continue
+      scale = Math.min(scale, zone.factor)
+    }
+    return scale
+  }
+
   // Attacks spawned while a step runs (from a hit listener, say) first act on the next step.
   function step(deltaMs: number) {
     const boxCount = hitboxes.length
@@ -167,13 +181,15 @@ export function createCombatWorld(scene: Phaser.Scene, options: CombatWorldOptio
     for (let i = 0; i < shotCount; i++) {
       const shot = projectiles[i]
       if (shot.done) continue
-      shot.x += shot.vx * seconds
-      shot.y += shot.vy * seconds
-      shot.vy += shot.spec.gravity * seconds
+      // A slowed shot runs on a slower clock, so its arc and its lifetime stretch with it.
+      const scale = shotTimeScale(shot)
+      shot.x += shot.vx * seconds * scale
+      shot.y += shot.vy * seconds * scale
+      shot.vy += shot.spec.gravity * seconds * scale
       placeProjectile(shot)
       reflectIfHit(shot, boxCount)
       strike(shot)
-      shot.ageMs += deltaMs
+      shot.ageMs += deltaMs * scale
       if (shot.ageMs >= shot.spec.lifetimeMs) shot.done = true
     }
 
@@ -219,6 +235,7 @@ export function createCombatWorld(scene: Phaser.Scene, options: CombatWorldOptio
     debugGraphics?.destroy()
     hitboxes.length = 0
     projectiles.length = 0
+    slowZones.length = 0
     combatants.clear()
     listeners.hit.clear()
     listeners.kill.clear()
@@ -293,6 +310,24 @@ export function createCombatWorld(scene: Phaser.Scene, options: CombatWorldOptio
         shot.done = true
         shot.sprite.setVisible(false)
       }
+    },
+    addSlowZone(zone) {
+      slowZones.push(zone)
+      return () => {
+        const index = slowZones.indexOf(zone)
+        if (index >= 0) slowZones.splice(index, 1)
+      }
+    },
+    cancelShots(team, area) {
+      let count = 0
+      for (const shot of projectiles) {
+        if (shot.done || shot.team !== team || !shot.spec.reflectable) continue
+        if (shot.x < area.x || shot.x > area.x + area.w || shot.y < area.y || shot.y > area.y + area.h) continue
+        shot.done = true
+        shot.sprite.setVisible(false)
+        count++
+      }
+      return count
     },
     livingCombatants(team) {
       living.length = 0
