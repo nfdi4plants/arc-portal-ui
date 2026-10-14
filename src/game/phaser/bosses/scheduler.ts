@@ -16,6 +16,12 @@ export function punishWindowMs(quality: number): number {
   return 600 + 900 * Math.min(1, Math.max(0, quality))
 }
 
+// A heavy attack in its wind-up or while it hits cannot be staggered. Hits on it still count, and
+// a stagger they earn starts once the attack is over. Light attacks stagger at once.
+export function canStagger(phase: 'none' | 'windup' | 'active' | 'recovery', heavy: boolean): boolean {
+  return !heavy || phase === 'none' || phase === 'recovery'
+}
+
 export interface SchedulableAttack {
   id: string
   heavy: boolean

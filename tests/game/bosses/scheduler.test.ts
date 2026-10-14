@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createRng } from '../../../src/game/contracts/rng'
 import {
+  canStagger,
   createScheduler,
   LIGHT_GAP_MS,
   MIN_WINDUP_MS,
@@ -103,5 +104,18 @@ describe('windupMs', () => {
     expect(windupMs(0)).toBe(MIN_WINDUP_MS)
     expect(windupMs(80)).toBe(80)
     expect(windupMs(900)).toBe(900)
+  })
+})
+
+describe('canStagger', () => {
+  it('lets a light attack be staggered at any point', () => {
+    for (const phase of ['none', 'windup', 'active', 'recovery'] as const) expect(canStagger(phase, false)).toBe(true)
+  })
+
+  it('holds a stagger back while a heavy attack winds up or hits', () => {
+    expect(canStagger('windup', true)).toBe(false)
+    expect(canStagger('active', true)).toBe(false)
+    expect(canStagger('recovery', true)).toBe(true)
+    expect(canStagger('none', true)).toBe(true)
   })
 })

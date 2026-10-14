@@ -9,7 +9,7 @@ import { createAdds } from './adds'
 import { ATTACK_KINDS, createRun, resetRun } from './attacks'
 import type { AttackEnv, BossBody } from './attacks'
 import type { Arena, BossDeps, BossHandle } from './index'
-import { createScheduler, OPENING_DELAY_MS, windupMs } from './scheduler'
+import { canStagger, createScheduler, OPENING_DELAY_MS, windupMs } from './scheduler'
 import { applyRef, setOriginOf, stillTexture } from './sprites'
 import { createTelegraphPool, createTextPool } from './telegraph'
 import { clamp, formatTell, highestWeakPoint, hitsWeakPoint } from './zones'
@@ -118,6 +118,8 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
   let tellIndex = 0
   let tellText: Phaser.GameObjects.Text | null = null
   let hitCount = 0
+  // A stagger earned during a heavy attack, started when that attack ends.
+  let staggerPending = false
   const hitTimes: number[] = new Array(STAGGER_HITS).fill(0)
   const listeners = new Set<(phase: number) => void>()
   const move = { hopping: false, hopMs: 0, fromX: 0, toX: 0, waitMs: 700, blinkInMs: 2500 }
@@ -316,6 +318,7 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
         run.phase = 'recovery'
         run.elapsedMs = 0
         releaseZones()
+        if (staggerPending) startStagger()
       }
     } else if (run.phase === 'recovery') {
       body.lean -= body.lean * Math.min(1, dtMs / 120)
@@ -431,6 +434,7 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
   }
 
   function startStagger() {
+    staggerPending = false
     staggerMs = cfg().staggerWindowMs
     hitCount = 0
     landFromHop()
@@ -445,6 +449,7 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
     killer = config.killerFor(phase)
     transitionMs = TRANSITION_MS
     staggerMs = 0
+    staggerPending = false
     hitCount = 0
     interrupt(true)
     combat.cancelOwnedBy(self)
@@ -464,6 +469,7 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
     state = 'dying'
     defeatMs = 0
     staggerMs = 0
+    staggerPending = false
     landFromHop()
     interrupt(true)
     combat.cancelOwnedBy(self)
@@ -503,7 +509,9 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
     hitTimes[hitCount % STAGGER_HITS] = clock
     hitCount++
     if (staggerMs > 0 || cfg().staggerWindowMs <= 0 || hitCount < STAGGER_HITS) return damage
-    if (clock - hitTimes[hitCount % STAGGER_HITS] <= STAGGER_WITHIN_MS) startStagger()
+    if (clock - hitTimes[hitCount % STAGGER_HITS] > STAGGER_WITHIN_MS) return damage
+    if (canStagger(run.phase, run.spec.heavy)) startStagger()
+    else staggerPending = true
     return damage
   }
 
