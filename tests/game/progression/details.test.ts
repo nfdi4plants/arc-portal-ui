@@ -41,7 +41,7 @@ describe('cardDetails', () => {
     expect(cardDetails(build, 'legendary.gitRevert')).toContain('Lands on ability slot 2 (E).')
   })
 
-  it('names the slot Second Wind lands on', () => {
+  it('names the slot Backup Restore lands on', () => {
     const build = applyCard(createBuild(), 'mechanic.fumeHood')
     expect(cardDetails(build, 'mechanic.secondWind')).toContain('Lands on ability slot 2 (E).')
   })

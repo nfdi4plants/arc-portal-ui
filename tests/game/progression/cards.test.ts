@@ -111,7 +111,7 @@ describe('ability cards', () => {
     for (const card of CARDS) if (card.description.startsWith('Takes an ability slot.')) expect(abilityCards).toContain(card)
   })
 
-  it('offers Second Wind at full HP and heals nothing on pick', () => {
+  it('offers Backup Restore (secondWind) at full HP and heals nothing on pick', () => {
     const build = createBuild()
     expect(canApply(build, 'mechanic.secondWind')).toBe(true)
     const picked = applyCard({ ...build, hp: 40 }, 'mechanic.secondWind')

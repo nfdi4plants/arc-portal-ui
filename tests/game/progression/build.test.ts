@@ -48,7 +48,7 @@ describe('input builds', () => {
   })
 })
 
-describe('Long Reach', () => {
+describe('Extended Scope (stat.longReach)', () => {
   it('is offered while a melee weapon is equipped and not with two shooting weapons', () => {
     const ranged = applyCard(applyCard(createBuild(), 'weapon.wand'), 'weapon.centrifugeDisc')
     expect(canApply(createBuild(), 'stat.longReach')).toBe(true)

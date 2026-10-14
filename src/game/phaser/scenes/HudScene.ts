@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import { PALETTE, SCENE } from '../../contracts/constants'
 import type { Action } from '../../contracts/input'
 import { bindingLabel } from '../../model/input'
-import { xpForNextLevel } from '../../model/progression'
+import { CARDS, xpForNextLevel } from '../../model/progression'
 import { applySpriteRef, coinArt } from '../art'
 import type { View } from '../view'
 import type { MonsterSpec } from '../../contracts/content'
@@ -29,8 +29,11 @@ const STAGGER_STEPS = 60
 const STAGGER_FLASH_MS = 180
 const STAGGER_LOCKED_COLOR = 0x8c8c8c
 
+// The card's display name, which can differ from its id.
 function slotName(id: string | null): string {
-  return id ? id.replace(/([A-Z])/g, ' $1').toLowerCase() : ''
+  if (!id) return ''
+  const card = CARDS.find((entry) => entry.id === `mechanic.${id}` || entry.id === `legendary.${id}`)
+  return (card?.name ?? id).toLowerCase()
 }
 
 // What a spent once-per-boss slot waits for, shown over the slot.
