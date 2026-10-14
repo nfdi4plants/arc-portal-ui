@@ -163,6 +163,41 @@
 .arc-portal-embedded { padding: 0; max-width: none; width: 100%; flex-shrink: 0; }
 .arc-portal-embedded .arc-viewer { padding: 0; border: 0; }
 
+.gitlab-download-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  color: var(--fgColor-muted, #59636e);
+}
+.gitlab-download-icon:hover { background: var(--bgColor-muted, #f6f8fa); }
+.gitlab-download-icon:focus-visible { outline: 2px solid var(--focus-outlineColor, #0969da); outline-offset: 2px; }
+
+.arc-viewer table td:has(.gitlab-download-icon) {
+  text-align: center !important;
+  vertical-align: middle;
+}
+.arc-viewer table td > .gitlab-download-icon {
+  justify-content: center;
+}
+
+.arc-viewer table th.gitlab-download-heading,
+.arc-viewer table th.gitlab-download-heading > * {
+  text-align: center !important;
+  justify-content: center;
+}
+
+.folder-item-count {
+  display: inline-block;
+  margin-inline-start: 8px;
+  color: var(--fgColor-muted, #59636e);
+  font-size: 12px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
 .dashlet .arc-portal-embedded [data-component="SplitPageLayout.Content"] > [data-width] > [data-component="Stack"] {
   padding-inline: var(--dashlet-content-padding);
   padding-bottom: var(--dashlet-content-padding);

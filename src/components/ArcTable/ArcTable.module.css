@@ -15,3 +15,4 @@
 .muted { color: var(--fgColor-muted); }
 .changed { display: flex; flex-direction: column; gap: 2px; }
 .by { font-size: 12px; color: var(--fgColor-muted); }
+.pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; }

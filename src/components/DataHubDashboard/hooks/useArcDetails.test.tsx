@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useArcDetails } from './useArcDetails.ts'
 import { deferred, fakeDataHubFetchers } from '../../../test/helpers.tsx'
 import { Failure, Success } from '../../../types/result.ts'
@@ -32,7 +32,29 @@ const commit: GitLabCommit = { author_name: 'Jane Doe', committed_date: '2026-10
 
 const connection: DataHubConnection = { hub: hubA }
 
+afterEach(() => vi.useRealTimers())
+
 describe('useArcDetails', () => {
+  it.each([false, true])('loads each detail endpoint once per mount and stays idle (StrictMode: %s)', async strictMode => {
+    const fetchContributors = vi.fn<DataHubFetchers['fetchContributors']>(async () => Success([jane]))
+    const fetchLatestCommit = vi.fn<DataHubFetchers['fetchLatestCommit']>(async () => Success(commit))
+    const fetchers = fakeDataHubFetchers({ fetchContributors, fetchLatestCommit })
+    const arcs = [arc(1, 'a'), arc(2, 'a')]
+    const sessions = new Map([['a', connection]])
+    const { result, rerender } = renderHook(({ arcs, sessions }) => useArcDetails(arcs, sessions, fetchers), {
+      initialProps: { arcs, sessions }, reactStrictMode: strictMode,
+    })
+    await waitFor(() => expect(result.current.details.size).toBe(2))
+    rerender({ arcs: [...arcs], sessions: new Map(sessions) })
+    vi.useFakeTimers()
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_000) })
+    for (const fetcher of [fetchContributors, fetchLatestCommit]) {
+      for (const projectId of [1, 2]) {
+        expect(fetcher.mock.calls.filter(([, id]) => id === projectId)).toHaveLength(strictMode ? 2 : 1)
+      }
+    }
+  })
+
   it('routes contributor and commit lookups by DataHUB URL, project id and token', async () => {
     const fetchContributors = vi.fn<DataHubFetchers['fetchContributors']>(async () => Success([jane]))
     const fetchLatestCommit = vi.fn<DataHubFetchers['fetchLatestCommit']>(async () => Success(commit))

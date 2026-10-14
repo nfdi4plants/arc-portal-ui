@@ -89,7 +89,7 @@ Import APIs from `src/api/gitlab/index.ts`. DTOs and options live in
 
 ```ts
 import {
-  getTopStarredProjects, searchProjects, listProjects, getProject,
+  getTopStarredProjects, searchProjects, listProjects, getProject, getProjectCount,
   getCurrentUser, listGroups, listAllGroups, getGroupProjects,
 } from './src/api/gitlab/index.ts'
 
@@ -105,6 +105,7 @@ if (featured.success === true) {
 // Anonymous search remains public; supplying a runtime token expands access.
 const matches = await searchProjects(source, 'plant growth', { page: 1, perPage: 10 })
 const active = await listProjects(source, { archived: false, visibility: 'public' })
+const count = await getProjectCount(source) // Result<number>, public repositories including archives
 const arc = await getProject(source, 'group/subgroup/arc-name')
 const user = await getCurrentUser(source, { token: runtimeToken })
 const publicGroups = await listAllGroups(source, { visibility: 'public' })
@@ -134,6 +135,12 @@ empty `X-Next-Page` marks the end. If CORS hides pagination headers, a full page
 enables Next, which may lead to an empty final page with Previous still available.
 `listAllGroups` accumulates every catalogue page into `Result<GitLabGroup[]>`.
 
+`getProjectCount` and `getGroupProjectCount` return `Result<number | null>`
+from one small request using `X-Total`. Counts are capped at 10,000; hidden
+pagination headers leave a nonempty count unknown. Neither operation scans
+project pages. Hub counts include every accessible repository; group counts
+include descendants and exclude shared projects.
+
 The API supports an explicit `fetchCall` transport for callers and tests,
 defaulting to native fetch. Project search uses the
 [Projects API](https://docs.gitlab.com/api/projects/), matching names, paths, and
@@ -143,32 +150,34 @@ descriptions, rather than GitLab's authenticated global search endpoint.
 
 Components keep implementation, styles, and tests under `src/components/`.
 
-- `DataHubDashboard` accepts `fetchTopStarred`, `fetchSearch`, optional `signedIn`,
-  and optional `organisations` callbacks.
+- `DataHubDashboard` accepts `onArcClick` and an optional test clock. Wrap it in
+  `DashboardConfigurationProvider` and `AuthenticationProvider`.
+- `DashboardConfigurationProvider` captures readonly hub definitions and fetch
+  callbacks once per mount. Runtime tokens come from authentication separately.
+- `useDataHubs` loads hub totals; `useGroups` loads accessible and member groups;
+  `useGroupProjectCount` runs inside My groups bars; `useProjectsPage` loads only
+  the selected hub or group's current page.
 - `TopStarredArcs` accepts `FetchArcs`; `ArcSearch` accepts `SearchArcs`. Both
   resolve to `Result<ArcPage>`; options include `page`, `perPage`, and `signal`.
 - `OrganisationBrowser` accepts `fetchPublicGroups(signal)`, nullable
   `fetchMembershipGroups(signal)`, and `fetchGroupProjects(groupId, options)`.
 - `ArcList` renders projects with an accessible list label.
-- `AuthenticationProvider` shares session and login actions; Navbar opens
-  Authentication without routing or gating the dashboard.
+- `AuthenticationProvider` shares session and login actions. The navbar remains
+  available while initial saved logins settle, before the dashboard mounts.
+  Later session changes refresh only resources belonging to that hub.
 
-App supplies memoized callbacks binding source and credentials. Keep callback
-identities stable to avoid restarting requests on unrelated renders.
-`useResult` and `useProjectPage` share request, cancellation, and retry logic.
+The project table defaults to the official hub and requests 25 rows per page.
+Search and sorting run on the server; recent activity filtering is available
+for hub browsing. Group browsing includes subgroups. Contributor and commit
+lookups are not part of dashboard loading.
 
-Tests can supply successful, delayed, or failed Results directly:
+All groups provides local search and paging, with favorites persisted in this
+browser under `arc-portal-favorite-groups`. It never requests group counts.
+My groups retains its mounted count rows through searches and tab changes.
+Update explicitly refreshes loaded resources; unrelated renders remain idle.
 
-```tsx
-import { Success, Failure } from './src/types/result.ts'
-import type { FetchArcs, SearchArcs } from './src/types/arc.ts'
-
-const fetchTopStarred = vi.fn<FetchArcs>().mockResolvedValue(Success(mockPage))
-const fetchSearch = vi.fn<SearchArcs>()
-  .mockResolvedValueOnce(Failure('Service unavailable'))
-  .mockResolvedValueOnce(Success(mockPage))
-render(<DataHubDashboard fetchTopStarred={fetchTopStarred} fetchSearch={fetchSearch} />)
-```
+Tests inject successful, delayed, or failed Results through the configuration
+provider. `useResult` and `useProjectPage` share cancellation and retry logic.
 
 ## Checks
 

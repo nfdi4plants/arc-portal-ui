@@ -53,6 +53,7 @@ export interface ListProjectsOptions extends GitLabRequestOptions {
   sort?: 'asc' | 'desc'
   visibility?: 'public' | 'internal' | 'private'
   archived?: boolean
+  lastActivityAfter?: string
 }
 
 export interface GitLabPage<T> {
@@ -89,7 +90,5 @@ export interface ListGroupsOptions extends GitLabRequestOptions {
   visibility?: 'public' | 'internal' | 'private'
 }
 
-export interface GroupProjectsOptions extends GitLabRequestOptions {
-  page?: number
-  perPage?: number
-}
+export type GroupProjectsOptions = Pick<ListProjectsOptions,
+  'token' | 'signal' | 'fetchCall' | 'page' | 'perPage' | 'search' | 'orderBy' | 'sort' | 'visibility'>

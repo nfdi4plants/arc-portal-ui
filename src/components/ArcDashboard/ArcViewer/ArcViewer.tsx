@@ -1,7 +1,10 @@
+import {ARC} from '@nfdi4plants/arctrl'
+import {loadFileSizes, type FileSizes} from './fileSizes'
+import {attachGitlabDownloads} from './gitlabDownloads'
 import '@primer/primitives/dist/css/functional/themes/light.css'
 import '@primer/css/dist/primer.css'
 import {WebViewer} from '@nfdi4plants/arc-web-view'
-import {Component, useCallback, useContext, useEffect, useRef, useState, type ReactNode} from 'react'
+import {Component, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode} from 'react'
 import { PopupDashletModeContext } from '../../PopupDashlet/PopupDashletContext'
 import './arcViewer.css'
 
@@ -29,21 +32,42 @@ class ViewerErrorBoundary extends Component<{children: ReactNode}, {failed: bool
   }
 }
 
-function ExpandedWebViewer({ provideJson }: { provideJson: () => Promise<string> }) {
+function ExpandedWebViewer({ provideJson, repositoryUrl, json, token }: { provideJson: () => Promise<string>; repositoryUrl?: string; json: string; token?: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const initialized = useRef(false);
   const popupMode = useContext(PopupDashletModeContext);
   const popupExpanded = popupMode === undefined ? undefined : popupMode === 'expanded';
+  const paths = useMemo(() => {
+    if (!repositoryUrl) return []
+    try { return Array.from(ARC.fromROCrateJsonString(json).FileSystem.Tree.ToFilePaths(true)) }
+    catch { return [] } // The viewer displays parsing errors.
+  }, [json, repositoryUrl])
+  const [sizeResult, setSizeResult] = useState<{repository: string; sizes: FileSizes; complete: boolean; error?: string} | null>(null)
+  useEffect(() => {
+    if (!repositoryUrl) return
+    const controller = new AbortController()
+    queueMicrotask(() => { if (!controller.signal.aborted) setSizeResult(null) })
+    void loadFileSizes(repositoryUrl, controller.signal, token, sizes => {
+      if (!controller.signal.aborted) setSizeResult({repository: repositoryUrl, sizes, complete: false})
+    }).then(sizes => {
+      if (!controller.signal.aborted) setSizeResult({repository: repositoryUrl, sizes, complete: true})
+    }).catch(error => {
+      if (!controller.signal.aborted) setSizeResult({repository: repositoryUrl, sizes: new Map(), complete: true, error: error instanceof Error ? error.message : 'Could not load file sizes.'})
+    })
+    return () => controller.abort()
+  }, [repositoryUrl, token])
+
 
   useEffect(() => {
     const container = containerRef.current;
     // WebViewer uses a dialog below Primer's wide breakpoint (1400px).
     // It has no initial-sidebar prop, so activate its own toggle once ready.
     if (!container) return;
+    const viewerDocument = container.ownerDocument;
     const findToggle = () => [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => {
       const label = button.getAttribute('aria-label') ??
         (button.getAttribute('aria-labelledby') ?? '').split(/\s+/)
-          .map((id) => document.getElementById(id)?.textContent ?? '').join(' ');
+          .map((id) => viewerDocument.getElementById(id)?.textContent ?? '').join(' ');
       return label.trim() === 'Expand sidebar';
     });
     if (popupExpanded === false) {
@@ -55,7 +79,7 @@ function ExpandedWebViewer({ provideJson }: { provideJson: () => Promise<string>
       return;
     }
     if (initialized.current) return;
-    const desktop = window.matchMedia('(min-width: 1400px)');
+    const desktop = (viewerDocument.defaultView ?? window).matchMedia('(min-width: 1400px)');
 
     const openSidebar = () => {
       if (initialized.current || !desktop.matches) return;
@@ -75,16 +99,28 @@ function ExpandedWebViewer({ provideJson }: { provideJson: () => Promise<string>
     };
   }, [popupExpanded, popupMode]);
 
-  return <div ref={containerRef} className="viewer-content"><WebViewer jsonString={provideJson} /></div>;
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container || !repositoryUrl) return
+    const update = () => attachGitlabDownloads(container, repositoryUrl, paths, sizeResult?.repository === repositoryUrl ? sizeResult.sizes : undefined, !sizeResult || sizeResult.repository !== repositoryUrl || !sizeResult.complete)
+    const observer = new MutationObserver(update)
+    observer.observe(container, {childList: true, subtree: true})
+    update()
+    return () => observer.disconnect()
+  }, [repositoryUrl, paths, sizeResult])
+
+  return <>{sizeResult?.error && <p role="status">{sizeResult.error}</p>}<div ref={containerRef} className="viewer-content"><WebViewer jsonString={provideJson} /></div></>;
 }
 
 
 export interface ArcViewerProps {
   jsonString?: string
   embedded?: boolean
+  repositoryUrl?: string
+  token?: string
 }
 
-function ArcViewer({ jsonString, embedded = false }: ArcViewerProps) {
+function ArcViewer({ jsonString, embedded = false, repositoryUrl, token }: ArcViewerProps) {
   const [document, setDocument] = useState<{name: string; json: string} | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -118,16 +154,14 @@ function ArcViewer({ jsonString, embedded = false }: ArcViewerProps) {
     <>
       {!embedded && <header className="portal-header">
         <div>
-          <h1>ARC web viewer</h1>
-          <p>Explore an Annotated Research Context and its metadata.</p>
-          <a href={defaultArcUrl} download>Download source ARC JSON</a>
+          <h1>Files</h1>
         </div>
       </header>}
       {!jsonString && error && <p className="portal-error" role="alert">{error}</p>}
       {arcJson ? (
         <section aria-label="ARC contents" className="arc-viewer">
           <ViewerErrorBoundary key={arcJson}>
-            <ExpandedWebViewer provideJson={provideJson} />
+            <ExpandedWebViewer provideJson={provideJson} repositoryUrl={repositoryUrl} json={arcJson} token={token} />
           </ViewerErrorBoundary>
         </section>
       ) : (

@@ -40,7 +40,7 @@ describe('NewDashboard', () => {
     expect(within(hub).getByRole('link', { name: 'v1.0' })).toHaveAttribute('href', 'https://gitlab.example/releases/v1.0')
     expect(within(hub).getByRole('link', { name: 'ARC owner' })).toBeVisible()
     expect(within(hub).getByRole('img', { name: 'Public ARC' })).toBeVisible()
-    expect(within(hub).getByText('Archive size: 2 KiB')).toBeVisible()
+    expect(within(hub).getByText('ARC size: 2 KiB')).toBeVisible()
 
     await user.click(screen.getByRole('button', { name: 'Expand Description' }))
     expect(within(screen.getByRole('dialog', { name: 'Description' })).getByText(/^Drought tolerance/)).toBeVisible()

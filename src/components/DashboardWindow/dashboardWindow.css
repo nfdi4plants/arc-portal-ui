@@ -33,6 +33,14 @@
   font-weight: 600;
 }
 
+.dashboard-window-actions {
+  justify-content: flex-end;
+  padding: 4px 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .dashboard-component {
   padding: 0;
   overflow: hidden;
