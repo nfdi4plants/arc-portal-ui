@@ -42,9 +42,14 @@ export const rollOffer: RollOffer = (build, rng) => {
   const legendary = legendaryChance(build)
   for (let slot = 0; slot < build.offerSize; slot++) {
     const start = STEP_DOWN.indexOf(rollRarity(rng.next(), legendary))
+    // The last slot of an offer that is all weapons so far takes something else, so a player
+    // happy with their weapons always has a card to pick.
+    const needsOther = slot === build.offerSize - 1 && offer.length > 0 && offer.every((card) => card.kind === 'weapon')
     let candidates: PowerUpCard[] = []
     for (const rarity of STEP_DOWN.slice(start)) {
-      candidates = CARDS_BY_RARITY[rarity].filter((card) => !offer.includes(card) && canApply(build, card.id))
+      candidates = CARDS_BY_RARITY[rarity].filter(
+        (card) => !offer.includes(card) && canApply(build, card.id) && !(needsOther && card.kind === 'weapon'),
+      )
       if (candidates.length > 0) break
     }
     // A slot with nothing left to offer is skipped, and later slots still roll.

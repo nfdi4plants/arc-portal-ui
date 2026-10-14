@@ -86,4 +86,12 @@ describe('rollOffer', () => {
     }
     expect(runsWithOne).toBeGreaterThan(600)
   })
+
+  it('always offers at least one card that is not a weapon', () => {
+    const rng = createRng('not-only-weapons')
+    for (let i = 0; i < 20000; i++) {
+      const offer = rollOffer(createBuild(), rng)
+      expect(offer.some((card) => card.kind !== 'weapon')).toBe(true)
+    }
+  })
 })
