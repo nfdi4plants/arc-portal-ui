@@ -234,10 +234,11 @@ export const beakerMoveset: WeaponMoveset = {
   upHeavy: memoTier(uppercut),
   moves: memoMoves((slot, tier) => {
     if (slot === 'light') return []
+    // The beaker head lands about 60 units ahead of the feet at the strike (tier 2).
     const smash: MeleeHit = {
       x: -6,
       y: -62,
-      w: 60,
+      w: 64,
       h: 62,
       damage: tier === 2 ? 30 : 28,
       knockback: { x: 240, y: -280 },

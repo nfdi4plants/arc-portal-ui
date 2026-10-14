@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { HitboxSpec, HitShape } from '../../../src/game/contracts/combat'
 import type { AttackContext, AttackMove, AttackVariant, WeaponMoveset } from '../../../src/game/contracts/player'
 import type { PlayerWeaponId } from '../../../src/game/contracts/progression'
@@ -6,14 +6,24 @@ import { WEAPON_DEFS } from '../../../src/game/phaser/art/playerWeapons'
 import { overlaps, resolveShape } from '../../../src/game/phaser/combat/geometry'
 import type { AttackPhase } from '../../../src/game/phaser/player/attacks'
 import { staffMoveset } from '../../../src/game/phaser/player/staffMoveset'
+import { beakerMoveset, bunsenMoveset, petriMoveset } from '../../../src/game/phaser/player/weapons/heavy'
 import { MELEE_BODY_HALF_WIDTH, MELEE_MARGIN, forgivingShape } from '../../../src/game/phaser/player/weapons/helpers'
+import { bindScheduler } from '../../../src/game/phaser/player/weapons/kit'
 import { scalpelMoveset, whipMoveset } from '../../../src/game/phaser/player/weapons/light'
-import { weaponPose } from '../../../src/game/phaser/player/weaponPose'
-import type { WeaponPose } from '../../../src/game/phaser/player/weaponPose'
+import { createScheduler } from '../../../src/game/phaser/player/weapons/scheduler'
+import { holdOf, weaponPose } from '../../../src/game/phaser/player/weaponPose'
+import type { WeaponHold, WeaponPose } from '../../../src/game/phaser/player/weaponPose'
+
+// The flame cone draws sprites, which a test without a scene cannot.
+vi.mock('../../../src/game/phaser/player/weapons/flame', () => ({ flameVisual: () => ({ show() {} }) }))
 
 // The boxes a move spawns, as the move layer hands them to the combat world (with forgivingShape).
+// Delayed hits (the shield bash, the later flame pulses) are included.
 function boxesOf(move: AttackMove, tier: 1 | 2, hook: 'onActive' | 'onLand' = 'onActive'): HitShape[] {
   const spawned: HitboxSpec[] = []
+  const scene = { physics: { overlapRect: () => [] } }
+  const scheduler = createScheduler()
+  const unbind = bindScheduler(scene as unknown as AttackContext['scene'], scheduler)
   const player = {
     position: () => ({ x: 0, y: 0 }),
     facing: () => 1,
@@ -22,7 +32,8 @@ function boxesOf(move: AttackMove, tier: 1 | 2, hook: 'onActive' | 'onLand' = 'o
     isDead: () => false,
   }
   const ctx = {
-    scene: { physics: { overlapRect: () => [] } },
+    scene,
+    art: { projectile: () => ({ textureKey: 't', animKey: 'a' }) },
     combat: {
       spawnHitbox: (spec: HitboxSpec) => {
         spawned.push(spec)
@@ -37,6 +48,8 @@ function boxesOf(move: AttackMove, tier: 1 | 2, hook: 'onActive' | 'onLand' = 'o
     held: new Set(),
   } as unknown as AttackContext
   move[hook]?.(ctx)
+  for (let i = 0; i < 5; i++) scheduler.update(5000)
+  unbind()
   return spawned.map((spec) => forgivingShape(spec.shape))
 }
 
@@ -64,17 +77,23 @@ function covered(shapes: HitShape[], point: { x: number; y: number }, facing: 1 
   return shapes.some((shape) => overlaps(resolveShape(shape, { x: 0, y: 0 }, facing), probe))
 }
 
-function poseOf(heavy: boolean, variant: AttackVariant, phase: AttackPhase = 'active', plunge = false, spinMs = 0): WeaponPose {
-  return weaponPose({ heavy, variant, plunge, spin: false }, phase, spinMs, { x: 0, y: 0, angle: 0, poke: 0 })
+function poseOf(heavy: boolean, variant: AttackVariant, phase: AttackPhase = 'active', plunge = false, spinMs = 0, hold: WeaponHold = 'swing'): WeaponPose {
+  return weaponPose({ heavy, variant, plunge, spin: false, hold }, phase, spinMs, { x: 0, y: 0, angle: 0, poke: 0, visible: true })
 }
 
 // The newest smear copy, which sits a quarter (light) or a fifth (heavy) of the way back to the
 // wind-up pose on the first active frame.
-function smearPose(heavy: boolean): WeaponPose {
-  const strike = poseOf(heavy, 'ground')
-  const windup = poseOf(heavy, 'ground', 'startup')
+function smearPose(heavy: boolean, hold: WeaponHold = 'swing'): WeaponPose {
+  const strike = poseOf(heavy, 'ground', 'active', false, 0, hold)
+  const windup = poseOf(heavy, 'ground', 'startup', false, 0, hold)
   const t = heavy ? 1 / 5 : 1 / 4
-  return { x: strike.x + (windup.x - strike.x) * t, y: strike.y, angle: strike.angle + (windup.angle - strike.angle) * t, poke: 1 }
+  return {
+    x: strike.x + (windup.x - strike.x) * t,
+    y: strike.y + (windup.y - strike.y) * t,
+    angle: strike.angle + (windup.angle - strike.angle) * t,
+    poke: 1,
+    visible: true,
+  }
 }
 
 function expectCovers(id: PlayerWeaponId, shapes: HitShape[], poses: WeaponPose[], tier: 1 | 2, floor = true) {
@@ -150,6 +169,21 @@ describe('melee hitboxes cover the drawn weapon', () => {
       const plunge = staffMoveset.airHeavy!(tier)!
       expectCovers('staff', boxesOf(plunge, tier), [poseOf(true, 'air', 'active', true)], tier, false)
     })
+  }
+
+  // The heavy weapons that strike in melee, drawn in the heavy slot with their own hold.
+  const MELEE_HEAVIES: [PlayerWeaponId, WeaponMoveset][] = [
+    ['beakerHammer', beakerMoveset],
+    ['bunsenStaff', bunsenMoveset],
+    ['petriShield', petriMoveset],
+  ]
+  for (const [id, set] of MELEE_HEAVIES) {
+    for (const tier of TIERS) {
+      it(`${id} tier ${tier}: the heavy move at the strike and its newest smear`, () => {
+        const hold = holdOf(id)
+        expectCovers(id, boxesOf(set.moves('heavy', tier)[0], tier), [poseOf(true, 'ground', 'active', false, 0, hold), smearPose(true, hold)], tier)
+      })
+    }
   }
 
   it('hits a small mob standing right in front of the mage with a light jab', () => {

@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import type { ScribbleArt } from '../../contracts/art'
+import type { ScribbleArt, SpriteRef } from '../../contracts/art'
 import type { CombatWorld, HitEvent } from '../../contracts/combat'
 import { DEPTH, MAGE_FRAME, MAGE_TEXTURE, PALETTE, PLAYER_HEIGHT } from '../../contracts/constants'
 import type { Action, InputFrame } from '../../contracts/input'
@@ -14,8 +14,8 @@ import type { AttackPhase } from './attacks'
 import { createControls, lungeVelocity } from './controls'
 import { bodyOf, isOneWay } from './oneWay'
 import { staffMoveset } from './staffMoveset'
-import { weaponPose } from './weaponPose'
-import type { PosedAttack, WeaponPose } from './weaponPose'
+import { heldSlot, holdOf, weaponPose } from './weaponPose'
+import type { PosedAttack, WeaponHold, WeaponPose } from './weaponPose'
 import { airHeavyOf, dashHeavyOf, dashLightOf, upHeavyOf, upLightOf } from './weapons/variants'
 
 export const PLAYER_HURTBOX = { width: 18, height: 42 }
@@ -40,6 +40,7 @@ const SMEAR_LIGHT_COUNT = 3
 const SMEAR_FADE_MS = 90
 // Weapons that shoot. Their moves get no smear, only their projectile art.
 const RANGED_WEAPONS: ReadonlySet<PlayerWeaponId> = new Set(['wand', 'pipettePistol', 'centrifugeDisc'])
+const WEAPON_SLOTS: readonly WeaponSlot[] = ['light', 'heavy']
 
 export interface PlayerDeps {
   combat: CombatWorld
@@ -161,15 +162,27 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
   const smears = Array.from({ length: SMEAR_ALPHA.length }, () =>
     scene.add.image(0, 0, MAGE_TEXTURE).setOrigin(0.5, 1).setTint(PALETTE.cream).setVisible(false),
   )
-  const showWeapon = () => {
-    const { id, tier } = build.weapons.light
-    if (weaponShown === `${id}:${tier}`) return
-    weaponShown = `${id}:${tier}`
-    applySpriteRef(weapon, deps.art.playerWeapon(scene, id, tier))
+  // The art and hold of both slots, looked up when the build changes. A heavy move swaps the
+  // sprite to the heavy weapon and back, so the render loop only compares texture keys.
+  const weaponRefs: Record<WeaponSlot, SpriteRef | null> = { light: null, heavy: null }
+  const weaponHolds: Record<WeaponSlot, WeaponHold> = { light: 'swing', heavy: 'swing' }
+  const showWeapon = (slot: WeaponSlot) => {
+    const ref = weaponRefs[slot]
+    if (!ref || weaponShown === ref.textureKey) return
+    weaponShown = ref.textureKey
+    applySpriteRef(weapon, ref)
     weaponScaleX = Math.abs(weapon.scaleX)
     for (const smear of smears) smear.setTexture(weapon.texture.key, weapon.frame.name).setScale(weapon.scaleX, weapon.scaleY)
   }
-  showWeapon()
+  const readWeapons = () => {
+    for (const slot of WEAPON_SLOTS) {
+      const { id, tier } = build.weapons[slot]
+      weaponRefs[slot] = deps.art.playerWeapon(scene, id, tier)
+      weaponHolds[slot] = holdOf(id)
+    }
+  }
+  readWeapons()
+  showWeapon('light')
   const container = scene.add.container(x, y, [...smears, weapon, mage]).setDepth(DEPTH.player)
 
   // A fixed pool for the dash smear, reused in turn.
@@ -444,8 +457,8 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
     }
   }
 
-  const pose: WeaponPose = { x: 0, y: 0, angle: 0, poke: 0 }
-  const posed: PosedAttack = { heavy: false, variant: 'ground', plunge: false, spin: false }
+  const pose: WeaponPose = { x: 0, y: 0, angle: 0, poke: 0, visible: true }
+  const posed: PosedAttack = { heavy: false, variant: 'ground', plunge: false, spin: false, hold: 'swing' }
   const onRender = (_time: number, delta: number) => {
     if (destroyed) return
     container.setPosition(body.center.x, body.bottom)
@@ -478,6 +491,7 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
       posed.variant = attack.variant
       posed.plunge = attack.move.plunge !== undefined
       posed.spin = attack.move.spin === true
+      posed.hold = weaponHolds[attack.slot]
     }
     // The move's own clock stops in hit-stop, so a spin stops with it.
     const { poke } = weaponPose(attack ? posed : null, phase, attacks.moveElapsedMs(), pose)
@@ -486,6 +500,8 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
     mage.setScale(baseScale * squashX * motor.facing, baseScale * squashY * breathe)
     mage.setRotation(lean + (poke > 0 && !up ? poke * 0.08 * motor.facing : 0))
 
+    showWeapon(heldSlot(attack))
+    weapon.setVisible(pose.visible)
     weapon.setPosition(motor.facing * pose.x, pose.y + bob)
     weapon.scaleX = weaponScaleX * motor.facing
     weapon.setRotation(pose.angle * motor.facing)
@@ -560,7 +576,8 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
       build = next
       hp = Math.min(next.hp, next.stats.maxHp)
       readBuild()
-      showWeapon()
+      readWeapons()
+      showWeapon(heldSlot(attacks.current()))
     },
     hp: () => hp,
     grantShield() {

@@ -107,7 +107,7 @@ const TABLE: Record<PlayerWeaponId, Entry> = {
   },
   beakerHammer: {
     slot: 'heavy',
-    rows: [[row('Beaker smash', [28, 9], 700, 54)], [row('Beaker smash', [30, 13], 700, 54)]],
+    rows: [[row('Beaker smash', [28, 9], 700, 58)], [row('Beaker smash', [30, 13], 700, 58)]],
     notes: ['Overhead smash with ground waves', 'Harder smash, bigger waves'],
   },
   bunsenStaff: {
