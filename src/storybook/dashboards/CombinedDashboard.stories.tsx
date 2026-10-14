@@ -6,6 +6,7 @@ import { ArcDetails } from '../../components/ArcDashboard/ArcDetails'
 import type { DashboardContentProps } from '../../components/ArcDashboard/dashboardTypes'
 import { InvestigationDashlets } from '../../components/ArcDashboard/InvestigationDashlets/InvestigationDashlets'
 import { PopupGraphview } from '../../components/ArcDashboard/Provenance/PopupGraphview'
+import { PopupArcGame } from '../../components/ArcDashboard/Game/PopupArcGame'
 import './combinedDashboard.css'
 
 function CombinedDashboardLayout({ metadata, provenance, actions, ...props }: DashboardContentProps) {
@@ -25,12 +26,15 @@ function CombinedDashboardLayout({ metadata, provenance, actions, ...props }: Da
           </div>
           <InvestigationDashlets repository={props.repository} repositoryUrl={props.repositoryUrl} token={props.token} metadata={metadata} arcJson={props.arcJson} classNamePrefix="combined-dashboard" ids={['webview']} interactive />
         </div>
-        <PopupGraphview
-          index={provenance}
-          label="Graphview"
-          className="combined-dashboard-graphview"
-          expandOnClick={false}
-        />
+        <div className="combined-dashboard-bottom">
+          <PopupGraphview
+            index={provenance}
+            label="Graphview"
+            className="combined-dashboard-graphview"
+            expandOnClick={false}
+          />
+          <PopupArcGame index={provenance} arcTitle={metadata.title} className="combined-dashboard-game" />
+        </div>
       </div>
     </main>
   )
@@ -45,7 +49,7 @@ const meta = {
   parameters: {
     docs: {
       description: {
-        component: 'The ARC header and two overlapping card rows occupy one third of the parent width. Together with Webview, the upper area occupies half of the parent height; Graphview fills the width below. Narrow card rows scroll horizontally. Uses the bundled Talinum ARC without DataHub requests.',
+        component: 'The ARC header and two overlapping card rows occupy one third of the parent width. Together with Webview, the upper area occupies half of the parent height; Graphview fills the width below, next to a compact ARCade tile that expands into the game. Narrow card rows scroll horizontally. Uses the bundled Talinum ARC without DataHub requests.',
       },
     },
   },

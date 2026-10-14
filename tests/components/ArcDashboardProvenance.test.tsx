@@ -1,4 +1,6 @@
 import { screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import '../../src/test/nativeDialog'
 import { beforeEach, expect, it, vi } from 'vitest'
 import ArcDashboard from '../../src/components/ArcDashboard/ArcDashboard'
 import { renderWithTheme } from '../../src/test/helpers'
@@ -16,6 +18,7 @@ it('shows the provenance of the loaded ARC on the ARC dashboard', async () => {
     <ArcDashboard name="Selected ARC" url="https://datahub.example/lab/arc" source="https://datahub.example" projectId={42} onBack={vi.fn()} />,
   )
 
+  await userEvent.click(await screen.findByRole('button', { name: 'Expand Graphview' }))
   const explorer = within(await screen.findByRole('region', { name: 'Provenance explorer' }))
   expect(await explorer.findByRole('button', { name: (name) => name.startsWith('GCqTOF_targets,') })).toBeInTheDocument()
 })

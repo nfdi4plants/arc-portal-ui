@@ -55,6 +55,8 @@ describe('CircularDashboard', () => {
       await user.click(screen.getByRole('button', { name: `Shrink ${name}` }))
     }
     expect(within(dashboard).queryByRole('tab')).not.toBeInTheDocument()
+    expect(within(dashboard).getByRole('region', { name: 'ARCade dashlet' })).toBeInTheDocument()
+    expect(within(dashboard).getByRole('button', { name: 'Expand ARCade' })).toBeVisible()
     expect(within(dashboard).queryByRole('region', { name: 'ARC overview' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Expand Webview' }))
     expect(await screen.findByText('ARC contents preview', {}, { timeout: 5000 })).toBeVisible()

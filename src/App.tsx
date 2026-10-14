@@ -48,6 +48,7 @@ function Portal() {
       ) : pageState.type === "arc-dashboard" ? (
         <ArcDashboard name={pageState.data.name} url={pageState.data.url}
           content={ScrollingDashboardContent}
+          fillHeight={false}
           source={pageState.data.dataHub.url} projectId={pageState.data.projectId} token={tokens[pageState.data.dataHub.id]}
           onBack={() => setPageState({ type: "datahub-dashboard" })} />
       ) :

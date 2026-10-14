@@ -32,7 +32,7 @@ describe('TabbedDashboard', () => {
   it('starts in Graphview and preserves file input and the comparison ratio when switching tabs', async () => {
     await openDashboard()
     const user = userEvent.setup()
-    expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['Graphview', 'Webview', 'Compare'])
+    expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['Graphview', 'Webview', 'Compare', 'ARCade'])
     expect(screen.getByRole('tab', { name: 'Graphview' })).toHaveAttribute('aria-selected', 'true')
     await user.click(screen.getByRole('tab', { name: 'Webview' }))
     const search = await screen.findByRole('textbox', { name: 'Search ARC files' }, { timeout: 5000 })
@@ -54,6 +54,19 @@ describe('TabbedDashboard', () => {
     expect(screen.getByRole('separator')).toHaveAttribute('aria-valuenow', '45')
   }, 15000)
 
+  it('shows the ARCade game in its own tab and keeps the viewers mounted', async () => {
+    await openDashboard()
+    const user = userEvent.setup()
+    expect(screen.getByRole('region', { name: 'ARCade', hidden: true })).not.toBeVisible()
+    await user.click(screen.getByRole('tab', { name: 'Webview' }))
+    await user.type(await screen.findByRole('textbox', { name: 'Search ARC files' }, { timeout: 5000 }), 'assays')
+    await user.click(screen.getByRole('tab', { name: 'ARCade' }))
+    expect(screen.getByRole('region', { name: 'ARCade' })).toBeVisible()
+    expect(screen.getByLabelText('Search ARC files')).not.toBeVisible()
+    await user.click(screen.getByRole('tab', { name: 'Webview' }))
+    expect(screen.getByRole('textbox')).toHaveValue('assays')
+  }, 15000)
+
   it('supports keyboard tab navigation', async () => {
     await openDashboard()
     const user = userEvent.setup()
@@ -62,7 +75,7 @@ describe('TabbedDashboard', () => {
     expect(screen.getByRole('tab', { name: 'Webview' })).toHaveFocus()
     expect(screen.getByRole('tab', { name: 'Webview' })).toHaveAttribute('aria-selected', 'true')
     await user.keyboard('{End}')
-    expect(screen.getByRole('tab', { name: 'Compare' })).toHaveFocus()
+    expect(screen.getByRole('tab', { name: 'ARCade' })).toHaveFocus()
     await user.keyboard('{Home}')
     expect(screen.getByRole('tab', { name: 'Graphview' })).toHaveFocus()
   }, 15000)

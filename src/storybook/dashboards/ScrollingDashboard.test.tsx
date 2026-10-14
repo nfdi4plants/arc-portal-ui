@@ -68,7 +68,7 @@ describe('ScrollingDashboard', () => {
     await openDashboard()
     const user = userEvent.setup()
     expect(within(screen.getByRole('navigation', { name: 'Viewer navigation' })).getAllByRole('button').map(button => button.textContent))
-      .toEqual(['Investigation', 'Jump to Graphview', 'Jump to Webview'])
+      .toEqual(['Investigation', 'Jump to Graphview', 'Jump to Webview', 'Jump to ARCade'])
     const webview = screen.getByRole('region', { name: 'Webview section' })
     const graphview = screen.getByRole('region', { name: 'Graphview section' })
     expect(screen.getAllByRole('region', { name: /^(Graphview|Webview) section$/ }).map(section => section.getAttribute('aria-label')))
@@ -86,6 +86,14 @@ describe('ScrollingDashboard', () => {
     expect(webview).toHaveFocus()
     expect(screen.getByRole('textbox')).toHaveValue('assays')
     expect(screen.getByRole('button', { name: 'Investigation' })).toBeVisible()
+    expect(within(screen.getByRole('region', { name: 'ARCade section' })).getByRole('region', { name: 'ARCade' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Jump to ARCade' })).toBeVisible()
+    const game = screen.getByRole('region', { name: 'ARCade section' })
+    game.scrollIntoView = vi.fn()
+    await user.click(screen.getByRole('button', { name: 'Jump to ARCade' }))
+    expect(game.scrollIntoView).toHaveBeenCalledWith({ block: 'start', behavior: 'smooth' })
+    expect(game).toHaveFocus()
+    expect(screen.getByRole('textbox')).toHaveValue('assays')
   }, 15000)
 
   it('expands each viewer and restores it with its contents intact', async () => {

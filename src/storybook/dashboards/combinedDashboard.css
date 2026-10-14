@@ -134,3 +134,15 @@
 
 .combined-dashboard-row > .combined-dashboard-tile:nth-child(4) { grid-column: 10 / span 4; }
 .combined-dashboard-row > .combined-dashboard-tile:nth-child(5) { grid-column: 13 / span 4; }
+
+.combined-dashboard-bottom {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 1fr);
+  min-height: 0;
+  gap: 16px;
+}
+
+.combined-dashboard-game {
+  min-width: 0;
+  min-height: 0;
+}

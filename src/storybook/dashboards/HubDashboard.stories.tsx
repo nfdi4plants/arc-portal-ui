@@ -6,6 +6,7 @@ import { ArcDetails } from '../../components/ArcDashboard/ArcDetails'
 import type { DashboardContentProps } from '../../components/ArcDashboard/dashboardTypes'
 import { InvestigationDashlets } from '../../components/ArcDashboard/InvestigationDashlets/InvestigationDashlets'
 import { ViewerWorkspace } from '../../components/ArcDashboard/ViewerWorkspace/ViewerWorkspace'
+import { PopupArcGame } from '../../components/ArcDashboard/Game/PopupArcGame'
 import '../../components/ArcDashboard/viewerDashboard.css'
 import './hubDashboard.css'
 
@@ -23,6 +24,9 @@ function HubDashboardLayout({ metadata, provenance, actions, ...props }: Dashboa
         <nav className="hub-dashboard-metadata hub-dashboard-right" aria-label="Publications, assays, studies, runs, and workflows">
           <InvestigationDashlets repository={props.repository} repositoryUrl={props.repositoryUrl} token={props.token} metadata={metadata} arcJson={props.arcJson} classNamePrefix="hub-dashboard" ids={['publications', 'assays', 'studies', 'runs', 'workflows']} />
         </nav>
+        <div className="hub-dashboard-metadata hub-dashboard-game">
+          <PopupArcGame index={provenance} arcTitle={metadata.title} className="hub-dashboard-tile" />
+        </div>
       </div>
       <ViewerWorkspace repository={props.repository} repositoryUrl={props.repositoryUrl} token={props.token} metadata={metadata} provenance={provenance} arcJson={props.arcJson} />
     </main>
@@ -38,7 +42,7 @@ const meta = {
   parameters: {
     docs: {
       description: {
-        component: 'A compact circular ARC header between two stacks of investigation popup cards. Full-width Webview and Graphview fill the remaining height with a resizable 60/40 split. On narrow screens, the metadata cards move below the circle. Uses the bundled Talinum ARC without DataHub requests.',
+        component: 'A compact circular ARC header between two stacks of investigation popup cards. Full-width Webview and Graphview fill the remaining height with a resizable 60/40 split. A compact ARCade card below the circle expands into the game. On narrow screens, the metadata cards move below the circle. Uses the bundled Talinum ARC without DataHub requests.',
       },
     },
   },

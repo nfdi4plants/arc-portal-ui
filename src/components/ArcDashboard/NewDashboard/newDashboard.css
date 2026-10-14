@@ -102,6 +102,7 @@
   .new-dashboard-workflows { grid-area: 4 / 4; }
   .new-dashboard-webview { grid-area: 4 / 2; }
   .new-dashboard-graphview { grid-area: 4 / 3; }
+  .new-dashboard-game { grid-area: 1 / 4; }
 }
 
 @container new-dashboard (max-width: 600px) {

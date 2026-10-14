@@ -61,9 +61,10 @@ it('opens the scrolling dashboard with investigation submenus and returns to dis
   const dashboard = screen.getByRole('main')
   expect(dashboard).toHaveClass('scrolling-dashboard')
   expect(within(dashboard).getAllByRole('region', { name: / section$/ }).map(region => region.getAttribute('aria-label')))
-    .toEqual(['Graphview section', 'Webview section'])
+    .toEqual(['Graphview section', 'Webview section', 'ARCade section'])
+  expect(screen.getByRole('region', { name: 'ARC-Dashboard' })).not.toHaveAttribute('data-fill-height')
   expect(within(screen.getByRole('navigation', { name: 'Viewer navigation' })).getAllByRole('button').map(button => button.textContent))
-    .toEqual(['Investigation', 'Jump to Graphview', 'Jump to Webview'])
+    .toEqual(['Investigation', 'Jump to Graphview', 'Jump to Webview', 'Jump to ARCade'])
 
   await user.click(screen.getByRole('button', { name: 'Investigation' }))
   await user.click(screen.getByRole('menuitem', { name: 'Contacts (12)' }))

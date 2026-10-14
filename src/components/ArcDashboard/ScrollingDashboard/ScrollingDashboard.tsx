@@ -2,6 +2,7 @@ import { Button } from '@primer/react'
 import { useRef } from 'react'
 import { ArcDetails } from '../ArcDetails'
 import type { DashboardContentProps } from '../dashboardTypes'
+import { PopupArcGame } from '../Game/PopupArcGame'
 import { InvestigationDashlets } from '../InvestigationDashlets/InvestigationDashlets'
 import { InvestigationMenu } from '../InvestigationMenu/InvestigationMenu'
 import { PopupGraphview } from '../Provenance/PopupGraphview'
@@ -12,6 +13,7 @@ export function ScrollingDashboardContent({ metadata, provenance, actions, ...pr
   const header = useRef<HTMLElement>(null)
   const webview = useRef<HTMLElement>(null)
   const graphview = useRef<HTMLElement>(null)
+  const game = useRef<HTMLElement>(null)
   const jumpTo = (section: HTMLElement | null) => {
     if (!section) return
     section.style.scrollMarginTop = `${(header.current?.getBoundingClientRect().height ?? 0) + 16}px`
@@ -28,6 +30,7 @@ export function ScrollingDashboardContent({ metadata, provenance, actions, ...pr
           <InvestigationMenu metadata={metadata} arcJson={props.arcJson} variant="primary" presentation="submenu" />
           <Button onClick={() => jumpTo(graphview.current)}>Jump to Graphview</Button>
           <Button onClick={() => jumpTo(webview.current)}>Jump to Webview</Button>
+          {provenance && <Button onClick={() => jumpTo(game.current)}>Jump to ARCade</Button>}
         </nav>
       </header>
       <section ref={graphview} tabIndex={-1} aria-label="Graphview section" className="scrolling-dashboard-viewer">
@@ -36,6 +39,9 @@ export function ScrollingDashboardContent({ metadata, provenance, actions, ...pr
       <section ref={webview} tabIndex={-1} aria-label="Webview section" className="scrolling-dashboard-viewer">
         <InvestigationDashlets repository={props.repository} repositoryUrl={props.repositoryUrl} token={props.token} metadata={metadata} arcJson={props.arcJson} classNamePrefix="scrolling-dashboard" ids={['webview']} interactive />
       </section>
+      {provenance && <section ref={game} tabIndex={-1} aria-label="ARCade section" className="scrolling-dashboard-viewer scrolling-dashboard-game">
+        <PopupArcGame index={provenance} arcTitle={metadata.title} />
+      </section>}
     </main>
   )
 }
