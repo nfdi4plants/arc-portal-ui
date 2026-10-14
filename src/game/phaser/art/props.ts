@@ -114,6 +114,55 @@ export function coinArt(scene: Phaser.Scene): SpriteRef {
   })
 }
 
+export const TRADER_WIDTH = 72
+export const TRADER_HEIGHT = 72
+
+// The FAIR trader behind a market stall: a striped awning, a counter with a "FAIR trade" sign,
+// a coin pile, a card and a flask on top. The sprite stands on the bottom centre of the stall.
+export function traderArt(scene: Phaser.Scene): SpriteRef {
+  const w = TRADER_WIDTH
+  const h = TRADER_HEIGHT
+  const mid = w / 2
+  const awning = { ...wood, tint: CREAM }
+  return spriteFrom(scene, {
+    key: 'scribble:trader',
+    width: w,
+    height: h,
+    anchors: { weapon: { x: 0, y: -h / 2 }, head: { x: 0, y: -h + 6 } },
+    draw(pen) {
+      // Poles behind everything.
+      pen.rect(5, 12, 3, h - 13, { ...wood, weight: 0.8, rough: 0.4 })
+      pen.rect(w - 8, 12, 3, h - 13, { ...wood, weight: 0.8, rough: 0.4 })
+      // The trader: robe, head, hat and a big moustache.
+      pen.poly([[mid - 11, 50], [mid - 8, 36], [mid + 8, 36], [mid + 11, 50]], { tint: '#9ad8c9', hatch: '#22c3a6', gap: 2.2, weight: 1, rough: 0.5 })
+      pen.poly([[mid - 3, 36], [mid, 41], [mid + 3, 36]], { tint: YELLOW, weight: 0.7, rough: 0.3 })
+      pen.ellipse(mid, 29, 14, 14, { tint: '#f6d7b8', weight: 1, rough: 0.4 })
+      pen.ellipse(mid, 23, 22, 4.5, { tint: '#7a5a3a', hatch: '#5a3f26', weight: 0.9, rough: 0.4 })
+      pen.poly([[mid - 6, 22.5], [mid - 5, 15], [mid + 5, 15], [mid + 6, 22.5]], { tint: '#7a5a3a', hatch: '#5a3f26', fill: 'cross-hatch', gap: 2, weight: 0.9, rough: 0.4 })
+      pen.line(mid - 5.6, 21, mid + 5.6, 21, { line: YELLOW, weight: 1.1, rough: 0.2 })
+      pen.dot(mid - 2.6, 28.4, 0.9)
+      pen.dot(mid + 2.6, 28.4, 0.9)
+      pen.curve([[mid - 5, 32.6], [mid - 2.4, 31.4], [mid, 32], [mid + 2.4, 31.4], [mid + 5, 32.6]], { weight: 1.1, rough: 0.2 })
+      pen.arc(mid, 33.4, 4, 2.4, 0.2, Math.PI - 0.2, false, { weight: 0.6, rough: 0.2 })
+      // Hands on the counter.
+      pen.ellipse(mid - 9, 47, 4, 3, { tint: '#f6d7b8', weight: 0.7, rough: 0.3 })
+      pen.ellipse(mid + 9, 47, 4, 3, { tint: '#f6d7b8', weight: 0.7, rough: 0.3 })
+      // Striped awning with a scalloped edge.
+      pen.poly([[1, 4], [w - 1, 4], [w - 1, 14], [1, 14]], { ...awning, weight: 1.1, rough: 0.5 })
+      for (let x = 1; x < w - 2; x += 14) pen.rect(x, 4, 7, 10, { tint: '#22c3a6', line: 'none' })
+      for (let x = 1; x < w - 2; x += 7) pen.arc(x + 3.5, 14, 7, 5, 0, Math.PI, false, { weight: 0.8, rough: 0.3 })
+      // Counter and its sign.
+      pen.rect(7, 47, w - 14, h - 48, { ...wood, weight: 1.1, rough: 0.5 })
+      pen.rect(13, 53, w - 26, 13, { tint: '#fffdf6', weight: 0.9, rough: 0.4 })
+      pen.text(['FAIR trade'], mid, 59.6, 7.4, w - 30, -0.03, NAVY)
+      // Goods on top: a coin pile, a card and a flask.
+      for (let i = 0; i < 3; i++) pen.ellipse(15 + i * 1.2, 45.4 - i * 1.6, 6, 2.6, { ...gold, weight: 0.6, rough: 0.2 })
+      pen.poly([[w - 22, 46], [w - 21, 38], [w - 15, 38.6], [w - 16, 46.6]], { tint: '#dbe8fd', hatch: BLUE, gap: 1.6, weight: 0.7, rough: 0.3 })
+      pen.poly([[w - 12, 46], [w - 13.5, 42], [w - 11.6, 38.5], [w - 11.6, 36.5], [w - 9.4, 36.5], [w - 9.4, 38.5], [w - 7.5, 42], [w - 9, 46]], { tint: '#dcf1e2', hatch: '#2da44e', gap: 1.4, weight: 0.7, rough: 0.3 })
+    },
+  })
+}
+
 export const CARD_WIDTH = 100
 export const CARD_HEIGHT = 136
 

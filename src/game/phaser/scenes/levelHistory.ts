@@ -18,6 +18,9 @@ export interface LevelUpRecord {
   offered: OfferedCard[]
   // Where the XP that triggered the level came from, for example "earned in assays/RNASeq · illumina".
   source: string
+  // Set for a card bought at the FAIR trade store. Such an entry gained no level, `level` is the
+  // level it was bought at.
+  price?: number
 }
 
 export interface SourceStage {
@@ -35,6 +38,13 @@ export function sourceText(stage: SourceStage, plan: RunPlan, bossLabel: string)
   return 'earned at the end of the run'
 }
 
+// Where a store purchase was made: the trader stands in the arena of the boss just beaten.
+export function storeSourceText(plan: RunPlan, index: number, bossLabel: string): string {
+  const segment = plan.segments[index]
+  const step = segment ? ` after ${segment.processName}` : ''
+  return `bought at the FAIR trade store, boss ${bossLabel}${step}`
+}
+
 // Entries stay in level order whatever order they arrive in.
 export function appendLevelUp(history: readonly LevelUpRecord[], record: LevelUpRecord): LevelUpRecord[] {
   const next = [...history, record]
@@ -50,6 +60,10 @@ export interface HistoryRow {
 }
 
 export function historyRow(record: LevelUpRecord): HistoryRow {
+  if (record.price !== undefined) {
+    const rarity = record.rarity ? ` (${record.rarity})` : ''
+    return { title: `Bought · ${record.cardName ?? record.cardId}${rarity} · ${record.price} coins`, source: record.source, also: null }
+  }
   const title = record.cardName ? `Lv ${record.level} · ${record.cardName}${record.rarity ? ` (${record.rarity})` : ''}` : `Lv ${record.level} · no card on offer`
   const also = record.offered.length > 0 ? `also offered: ${record.offered.map((card) => card.name).join(', ')}` : null
   return { title, source: record.source, also }

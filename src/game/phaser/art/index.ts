@@ -18,7 +18,7 @@ export { monsterWeapon } from './monster'
 export { carrier } from './carrier'
 export type { MonsterWeaponRef } from './monster'
 export { prewarmTelegraphs, releaseTelegraphs } from './telegraph'
-export { CARD_HEIGHT, CARD_WIDTH, COIN_SIZE, RARITY_COLOR, cardArt, coinArt, doorArt, glowTexture, shieldFragmentArt } from './props'
+export { CARD_HEIGHT, CARD_WIDTH, COIN_SIZE, RARITY_COLOR, TRADER_HEIGHT, TRADER_WIDTH, cardArt, coinArt, doorArt, glowTexture, shieldFragmentArt, traderArt } from './props'
 export type { BossArt, PartRef } from './parts'
 
 // Puts a sprite on the texture of `ref`, standing on its origin (bottom centre), sized in world

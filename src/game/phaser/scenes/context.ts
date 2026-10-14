@@ -23,6 +23,9 @@ export interface GameplayControl {
   resumeFromPause(): void
   // Null skips a level whose offer was empty.
   chooseCard(cardId: string | null): void
+  // The FAIR trade store of node boss `index`. buyCard is false when the purchase did not happen.
+  buyCard(index: number, cardId: string): boolean
+  closeStore(): void
   setBindings(bindings: Bindings): void
 }
 
@@ -32,7 +35,7 @@ export interface HudControl {
 }
 
 const GAMEPLAY_SCENES = [SCENE.stretch, SCENE.boss, SCENE.finalBoss]
-const RUN_SCENES = [...GAMEPLAY_SCENES, SCENE.hud, SCENE.levelUp, SCENE.death, SCENE.victory]
+const RUN_SCENES = [...GAMEPLAY_SCENES, SCENE.hud, SCENE.levelUp, SCENE.store, SCENE.death, SCENE.victory]
 
 // Shared by every scene of one game. It holds the run and switches the scenes when the run
 // moves on to the next stage.
@@ -107,6 +110,14 @@ export class RunContext {
     this.sceneOp('stop', SCENE.levelUp)
   }
 
+  openStore(index: number): void {
+    this.sceneOp('start', SCENE.store, { index })
+  }
+
+  closeStore(): void {
+    this.sceneOp('stop', SCENE.store)
+  }
+
   private enter(stage: RunStage): void {
     const scenes = this.game?.scene
     if (!scenes) return
@@ -116,6 +127,7 @@ export class RunContext {
       case 'finalBoss': {
         this.stopGameplay(scenes)
         this.sceneOp('stop', SCENE.levelUp)
+        this.sceneOp('stop', SCENE.store)
         const key = stage.kind === 'stretch' ? SCENE.stretch : stage.kind === 'boss' ? SCENE.boss : SCENE.finalBoss
         this.sceneOp('start', key, stage.kind === 'finalBoss' ? {} : { index: stage.index })
         break
@@ -124,6 +136,7 @@ export class RunContext {
         this.stopGameplay(scenes)
         this.sceneOp('stop', SCENE.hud)
         this.sceneOp('stop', SCENE.levelUp)
+        this.sceneOp('stop', SCENE.store)
         this.sceneOp('start', SCENE.victory)
         break
       case 'dead':
@@ -131,6 +144,7 @@ export class RunContext {
         for (const key of GAMEPLAY_SCENES) if (scenes.isActive(key)) this.sceneOp('pause', key)
         this.sceneOp('stop', SCENE.hud)
         this.sceneOp('stop', SCENE.levelUp)
+        this.sceneOp('stop', SCENE.store)
         this.sceneOp('start', SCENE.death, { killer: stage.killer })
         break
     }

@@ -58,7 +58,7 @@ src/game/
     player/weapons/ the other weapons, mechanics, legendaries and abilities (the loadout)
     mobs/          mob AI, passives, pickups and speech bubbles
     bosses/        node bosses, the final boss, telegraphs and safe zones
-    scenes/        Boot, Stretch, Boss, FinalBoss, Hud, LevelUp, Death and Victory, the run flow
+    scenes/        Boot, Stretch, Boss, FinalBoss, Hud, LevelUp, Store, Death and Victory, the run flow
                    (RunDirector, RunContext) and the level generator
     dev/           Storybook sandboxes
     config.ts      the Phaser game config that the game and the sandboxes share
@@ -154,6 +154,45 @@ the next. `defeatBoss` recharges it, and so does entering the final boss. The HU
 and writes "after boss" over it. Every slot shows its key, its name and, while it cools down, the
 seconds left.
 
+## Coins and the FAIR trade store
+
+Mobs sometimes drop coins (`mobCoinDrop` in `model/progression/coins.ts`): 40% of them drop one,
+a large mob one more, and from the second step on there is a growing chance of one more, up to 3.
+A phantom drops a single coin 20% of the time and a summoned minion none. The count is rolled from a
+fork of the mob's rng when it spawns, so it does not depend on the fight. A node boss always drops
+`6 + 2 * segment index` plus 0 to 2. Coins pop out of the body, bob like shield fragments and fly to
+the mage within 3 tiles (`phaser/mobs/pickups.ts`, pooled). `RunDirector.coins` keeps the count for
+the whole run, a pit costs none, and the HUD shows it under the right end of the hp bar.
+
+After a node boss, never the final boss, the FAIR trader puts up a stall next to the portal in the
+arena (`traderArt` in `phaser/art/props.ts`). Near the stall the prompt shows the key of the `up`
+action (W by default). Pressing it holds the world and opens `StoreScene`. The pause key, a move key
+or the Leave button close it again, and the portal works as before.
+
+The stock is 4 cards drawn like a level-up offer (`rollStock` in `model/progression/store.ts`, with
+the same canApply rules and at least one card that is not a weapon), but with a fixed 3% legendary
+chance per card that does not touch the level-up pity. It is rolled on the first visit and stays
+the same when the player leaves and comes back. A purchase applies the card and nothing else: no
+level, no XP, no max hp and no heal. A card the coins do not cover shows its price in red, and a card
+an earlier purchase made useless (the last free ability slot, say) reads "no use now". Purchases
+appear in the level-up provenance as "Bought · card (rarity) · price coins".
+
+| Rarity | Price |
+|---|---|
+| common | 5 |
+| uncommon | 10 |
+| rare | 20 |
+| legendary | 45 |
+
+A first stretch of about 8 mobs and its boss pay about 11 to 13 coins, so a trader visit buys one
+or two commons or one uncommon, and a rare takes saving over two visits.
+
+The trader greets the player in the store's speech bubble, reacts to a purchase, a missing coin or a
+useless card, and says goodbye in a bubble over the stall (`TRADER_LINES` in
+`model/progression/trader.ts`). Every line names a FAIR principle (Findable, Accessible,
+Interoperable, Reusable), most of them with a nod to ARCs: RO-Crate, git versioning, validation, the
+DataHUB, ontology terms. `createLinePicker` never says the same line twice in a row.
+
 ## Running the sandboxes
 
 Start Storybook with `npm run storybook` (port 6006) and open these stories:
@@ -189,6 +228,11 @@ Click the canvas to give it keyboard focus.
 | XP per level (`20 + 10 * (level - 1)`), hp per level, stat caps, card effects | `model/progression/build.ts` |
 | Card texts and rarities | `model/progression/catalog.ts` |
 | Rarity odds | `model/progression/offer.ts` |
+| Coin drops of mobs and bosses | `model/progression/coins.ts` (`COIN_DROP`) |
+| Store prices, stock size and legendary chance | `model/progression/store.ts` (`PRICES`, `STOCK_SIZE`, `STORE_LEGENDARY_CHANCE`) |
+| Trader lines | `model/progression/trader.ts` (`TRADER_LINES`) |
+| Coin pop, bob and magnet | `phaser/mobs/pickups.ts` |
+| Trader distance to the portal, trade reach, goodbye time | `phaser/scenes/BossScene.ts` |
 | Staff timing and damage | `phaser/player/staffMoveset.ts` |
 | Other weapons | `phaser/player/weapons/light.ts`, `phaser/player/weapons/heavy.ts` |
 | Weapon numbers on the level-up screen (follow the movesets, a test compares them) | `model/progression/weaponStats.ts` |
