@@ -1,6 +1,7 @@
 import {ARC} from '@nfdi4plants/arctrl'
 import {loadFileSizes, type FileSizes} from './fileSizes'
 import {attachGitlabDownloads} from './gitlabDownloads'
+import {navigateToFolder} from './navigateToFolder'
 import '@primer/primitives/dist/css/functional/themes/light.css'
 import '@primer/css/dist/primer.css'
 import {WebViewer} from '@nfdi4plants/arc-web-view'
@@ -32,8 +33,11 @@ class ViewerErrorBoundary extends Component<{children: ReactNode}, {failed: bool
   }
 }
 
-function ExpandedWebViewer({ provideJson, repositoryUrl, json, token }: { provideJson: () => Promise<string>; repositoryUrl?: string; json: string; token?: string }) {
+function ExpandedWebViewer({ provideJson, repositoryUrl, json, token, folderRequest }: { provideJson: () => Promise<string>; repositoryUrl?: string; json: string; token?: string; folderRequest?: { path: string } }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (containerRef.current && folderRequest) return navigateToFolder(containerRef.current, folderRequest.path)
+  }, [folderRequest, json])
   const initialized = useRef(false);
   const popupMode = useContext(PopupDashletModeContext);
   const popupExpanded = popupMode === undefined ? undefined : popupMode === 'expanded';
@@ -122,13 +126,14 @@ function ExpandedWebViewer({ provideJson, repositoryUrl, json, token }: { provid
 
 
 export interface ArcViewerProps {
+  folderRequest?: { path: string }
   jsonString?: string
   embedded?: boolean
   repositoryUrl?: string
   token?: string
 }
 
-function ArcViewer({ jsonString, embedded = false, repositoryUrl, token }: ArcViewerProps) {
+function ArcViewer({ jsonString, embedded = false, repositoryUrl, token, folderRequest }: ArcViewerProps) {
   const [document, setDocument] = useState<{name: string; json: string} | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -169,7 +174,7 @@ function ArcViewer({ jsonString, embedded = false, repositoryUrl, token }: ArcVi
       {arcJson ? (
         <section aria-label="ARC contents" className="arc-viewer">
           <ViewerErrorBoundary key={arcJson}>
-            <ExpandedWebViewer provideJson={provideJson} repositoryUrl={repositoryUrl} json={arcJson} token={token} />
+            <ExpandedWebViewer provideJson={provideJson} repositoryUrl={repositoryUrl} json={arcJson} token={token} folderRequest={folderRequest} />
           </ViewerErrorBoundary>
         </section>
       ) : (
