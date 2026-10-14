@@ -29,7 +29,9 @@ Dashboard, with their layout compositions in `src/storybook/dashboards`, using
 the shared ARC header, investigation popup dashlets, Graphview, viewer workspace,
 and dashboard frame. Each layout includes examples
 with public, private, and unavailable DataHub data, using the bundled Talinum ARC.
-The application uses the classic ARC dashboard.
+The application uses ScrollingDashboard, sharing its layout with the Storybook example.
+In ScrollingDashboard, Investigation opens entity submenus beside the category
+menu. The classic dashboard's pop-out controls open separate browser windows.
 Dashboard scroll areas use `overscroll-behavior: auto`: when a dashlet reaches
 its top or bottom, scrolling continues in the surrounding dashboard or page.
 

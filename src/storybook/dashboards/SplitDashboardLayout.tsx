@@ -3,9 +3,9 @@ import type { DashboardContentProps } from '../../components/ArcDashboard/dashbo
 import { InvestigationDashlets } from '../../components/ArcDashboard/InvestigationDashlets/InvestigationDashlets'
 import { investigationDetailIds } from '../../components/ArcDashboard/InvestigationDashlets/investigationDashletOptions'
 import { ViewerWorkspace } from '../../components/ArcDashboard/ViewerWorkspace/ViewerWorkspace'
-import './viewerDashboard.css'
+import '../../components/ArcDashboard/viewerDashboard.css'
 import './splitDashboard.css'
-import './scrollingDashboard.css'
+import '../../components/ArcDashboard/ScrollingDashboard/scrollingDashboard.css'
 
 export function SplitDashboardLayout({ metadata, provenance, actions, scrolling = false, ...props }: DashboardContentProps & { scrolling?: boolean }) {
   const header = (

@@ -6,7 +6,7 @@ import { ArcDetails } from '../../components/ArcDashboard/ArcDetails'
 import type { DashboardContentProps } from '../../components/ArcDashboard/dashboardTypes'
 import { InvestigationDashlets } from '../../components/ArcDashboard/InvestigationDashlets/InvestigationDashlets'
 import { ViewerWorkspace } from '../../components/ArcDashboard/ViewerWorkspace/ViewerWorkspace'
-import './viewerDashboard.css'
+import '../../components/ArcDashboard/viewerDashboard.css'
 import './hubDashboard.css'
 
 function HubDashboardLayout({ metadata, provenance, actions, ...props }: DashboardContentProps) {

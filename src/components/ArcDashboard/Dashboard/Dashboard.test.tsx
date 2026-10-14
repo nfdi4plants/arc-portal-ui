@@ -50,7 +50,7 @@ describe('ARC-Dashboard', () => {
     vi.spyOn(window, 'open').mockReturnValue(popup)
     vi.spyOn(popup, 'focus').mockImplementation(() => {})
     try {
-      await user.click(screen.getByRole('button', { name: 'Open ARC viewer in popup' }))
+      await user.click(screen.getByRole('button', { name: 'Pop out ARC viewer' }))
       expect(window.open).toHaveBeenCalledWith('', 'arc-viewer-popup', expect.any(String))
       const viewer = within(popup.document.body)
       expect(viewer.getByRole('heading', { name: 'Facultative CAM in Talinum triangulare' })).toBeVisible()
@@ -69,7 +69,7 @@ describe('ARC-Dashboard', () => {
     vi.spyOn(window, 'open').mockReturnValue(popup)
     vi.spyOn(popup, 'focus').mockImplementation(() => {})
     try {
-      await user.click(screen.getByRole('button', { name: 'Open investigation details in popup' }))
+      await user.click(screen.getByRole('button', { name: 'Pop out investigation details' }))
       const details = within(popup.document.body)
       expect(details.getByRole('heading', { name: 'Facultative CAM in Talinum triangulare' })).toBeVisible()
       expect(details.getAllByRole('tab')).toHaveLength(9)

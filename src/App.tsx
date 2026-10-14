@@ -9,6 +9,7 @@ import { AuthenticationProvider } from './auth/AuthenticationProvider.tsx'
 import { useAuthentication } from './auth/context.ts'
 import { Navbar } from './components/Navbar/Navbar.tsx'
 import ArcDashboard from './components/ArcDashboard/ArcDashboard.tsx'
+import { ScrollingDashboardContent } from './components/ArcDashboard/ScrollingDashboard/ScrollingDashboard.tsx'
 import type { GitLabInstance } from './types/gitlab.ts'
 
 
@@ -46,6 +47,7 @@ function Portal() {
         </main>
       ) : pageState.type === "arc-dashboard" ? (
         <ArcDashboard name={pageState.data.name} url={pageState.data.url}
+          content={ScrollingDashboardContent}
           source={pageState.data.dataHub.url} projectId={pageState.data.projectId} token={tokens[pageState.data.dataHub.id]}
           onBack={() => setPageState({ type: "datahub-dashboard" })} />
       ) :

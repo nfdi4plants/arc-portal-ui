@@ -7,7 +7,7 @@ import { ArcDetails } from '../../components/ArcDashboard/ArcDetails'
 import type { DashboardContentProps } from '../../components/ArcDashboard/dashboardTypes'
 import { InvestigationMenu } from '../../components/ArcDashboard/InvestigationMenu/InvestigationMenu'
 import { ViewerWorkspace, type ViewerWorkspaceMode } from '../../components/ArcDashboard/ViewerWorkspace/ViewerWorkspace'
-import './viewerDashboard.css'
+import '../../components/ArcDashboard/viewerDashboard.css'
 import './tabbedDashboard.css'
 
 const views: { id: ViewerWorkspaceMode; title: string }[] = [

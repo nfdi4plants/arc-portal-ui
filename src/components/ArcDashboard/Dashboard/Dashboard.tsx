@@ -1,7 +1,7 @@
 import { ScreenFullIcon } from '@primer/octicons-react'
 import { dataHubRepositoryUrl } from '../../../api/gitlab'
-import { openInvestigationPopup } from '../Investigation/InvestigationDetails/InvestigationPopup'
-import { openArcViewerPopup } from '../ArcViewer/ArcViewerPopup'
+import { openInvestigationPopOut } from '../Investigation/InvestigationDetails/InvestigationPopOut'
+import { openArcViewerPopOut } from '../ArcViewer/ArcViewerPopOut'
 import { IconButton, Text } from '@primer/react'
 import { lazy, Suspense } from 'react'
 import { Dashlet } from '../../DashboardWindow'
@@ -25,15 +25,15 @@ export function DashboardContent({ metadata, provenance, actions, ...props }: Da
       <ArcDetails {...props} metadata={metadata} />
       <Dashlet label="Investigation details" actions={
         <IconButton icon={ScreenFullIcon} size="small" variant="invisible"
-          aria-label="Open investigation details in popup"
-          onClick={() => openInvestigationPopup(metadata)} />
+          aria-label="Pop out investigation details"
+          onClick={() => openInvestigationPopOut(metadata)} />
       }>
         <InvestigationDetails metadata={metadata} />
       </Dashlet>
       <Dashlet label="ArcWebView" actions={
         <IconButton icon={ScreenFullIcon} size="small" variant="invisible"
-          aria-label="Open ARC viewer in popup"
-          onClick={() => openArcViewerPopup(props.arcJson, metadata.title, repositoryUrl, props.token)} />
+          aria-label="Pop out ARC viewer"
+          onClick={() => openArcViewerPopOut(props.arcJson, metadata.title, repositoryUrl, props.token)} />
       }>
         <Suspense fallback={<Text as="p" role="status">Loading ARC viewer…</Text>}>
           <ArcViewer jsonString={props.arcJson} repositoryUrl={repositoryUrl} token={props.token} embedded />

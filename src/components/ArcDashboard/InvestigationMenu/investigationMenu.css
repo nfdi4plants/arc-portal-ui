@@ -2,3 +2,20 @@
 .investigation-menu-popups { position: absolute; top: 0; left: 0; width: 100%; }
 .investigation-menu-popups > .popup-dashlet { height: 0; }
 .investigation-menu-popups .popup-dashlet-panel:not([data-expanded]) { display: none; }
+
+.investigation-categories-overlay,
+.investigation-entities-overlay {
+  --investigation-parent-width: clamp(140px, calc(100dvw - 230px), 200px);
+  min-width: 0;
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  overscroll-behavior: auto;
+}
+.investigation-categories-overlay { width: var(--investigation-parent-width); }
+.investigation-entities-overlay { width: clamp(136px, calc(100dvw - var(--investigation-parent-width) - 56px), 360px); }
+.investigation-categories-overlay [data-component="ActionList.Item.Label"],
+.investigation-entities-overlay [data-component="ActionList.Item.Label"] {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.investigation-entities-overlay [data-component="ActionList.Description"] { overflow-wrap: anywhere; }

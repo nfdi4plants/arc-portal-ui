@@ -10,7 +10,7 @@ import { PopupGraphview } from '../../components/ArcDashboard/Provenance/PopupGr
 import '../../components/ArcDashboard/Investigation/InvestigationDetails/investigationDetails.css'
 import './newDashboard.css'
 
-function NewDashboardLayout({ metadata, provenance, actions, ...props }: DashboardContentProps) {
+function CircularDashboardLayout({ metadata, provenance, actions, ...props }: DashboardContentProps) {
   return (
     <main className="new-dashboard">
       {actions && <div className="new-dashboard-actions">{actions}</div>}
@@ -26,11 +26,11 @@ function NewDashboardLayout({ metadata, provenance, actions, ...props }: Dashboa
 }
 
 const meta = {
-  title: 'Dashboard/NewDashboard',
+  title: 'Dashboard/CircularDashboard',
   component: ArcDashboardFrame,
   decorators: [(Story) => <TalinumStory>{() => <Story />}</TalinumStory>],
   argTypes: { content: { control: false, table: { disable: true } }, label: { table: { disable: true } }, fillHeight: { table: { disable: true } } },
-  args: { repository: talinumRepository, arcJson: talinumArcJson, content: NewDashboardLayout, label: 'NewDashboard', fillHeight: true },
+  args: { repository: talinumRepository, arcJson: talinumArcJson, content: CircularDashboardLayout, label: 'CircularDashboard', fillHeight: true },
   parameters: {
     docs: {
       description: {
