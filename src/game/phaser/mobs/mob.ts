@@ -84,6 +84,8 @@ const DIVE_FACTOR = 2.6
 const DIVE_MS = 900
 const STEPS_PER_PROBE = 3
 const RANGED_RECOVER_MS = 250
+// World units a mob must be inside the view edge before it may start an attack.
+const ON_SCREEN_MARGIN = 12
 
 type MeleeKind = keyof typeof MELEE
 type RangedKind = keyof typeof RANGED
@@ -610,10 +612,20 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
       return
     }
     if (st.attackCdMs > 0 || st.stunMs > 0 || lockedByBody()) return
-    if (!(aggro || passive === 'patrol') || !inReach()) return
+    if (!(aggro || passive === 'patrol') || !inReach() || !onScreen()) return
     faceTarget()
     phase = 'windup'
     st.phaseMs = windupMs()
+  }
+
+  // Mobs stay awake well beyond the screen edge, and ranged weapons reach further than a small
+  // view is wide. An attack only starts while the mob's centre is inside the camera view, so the
+  // player always sees who throws.
+  function onScreen(): boolean {
+    const view = scene.cameras.main.worldView
+    const x = cx()
+    const y = cy()
+    return x > view.x + ON_SCREEN_MARGIN && x < view.right - ON_SCREEN_MARGIN && y > view.y && y < view.bottom
   }
 
   function fire() {
