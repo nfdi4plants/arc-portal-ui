@@ -146,7 +146,7 @@ Components keep implementation, styles, and tests under `src/components/`.
 - `DashboardConfigurationProvider` captures readonly hub definitions and fetch
   callbacks once per mount. Runtime tokens come from authentication separately.
 - `useDataHubs` loads hub totals; `useGroups` loads accessible and member groups;
-  `useGroupProjectCount` runs inside My groups bars; `useProjectsPage` loads only
+  `useGroupProjectCount` runs inside My groups rows; `useProjectsPage` loads only
   the selected hub or group's current page.
 - `TopStarredArcs` accepts `FetchArcs`; `ArcSearch` accepts `SearchArcs`. Both
   resolve to `Result<ArcPage>`; options include `page`, `perPage`, and `signal`.
@@ -164,7 +164,9 @@ lookups are not part of dashboard loading.
 
 All groups provides local search and paging, with favorites persisted in this
 browser under `arc-portal-favorite-groups`. It never requests group counts.
-My groups retains its mounted count rows through searches and tab changes.
+The Groups card uses a Primer Select to switch lists and CounterLabels for member
+group repository counts. Favorites stay first without sorting by count.
+My groups retains its mounted count rows through searches and list changes.
 Update explicitly refreshes loaded resources; unrelated renders remain idle.
 
 Tests inject successful, delayed, or failed Results through the configuration
