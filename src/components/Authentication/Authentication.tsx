@@ -19,8 +19,8 @@ export default function Authentication({ current, setCurrent, onClose, returnFoc
   const tokenUrl = new URL(`${current.url.replace(/\/+$/, '')}/-/user_settings/personal_access_tokens`)
   tokenUrl.search = new URLSearchParams({
     name: 'arc-portal',
-    description: 'ARC portal. Read your user profile and browse repositories and organisations you can access.',
-    scopes: 'read_user,read_api',
+    description: 'ARC portal. Browse repositories and organisations you can access, and star or unstar repositories.',
+    scopes: 'api',
   }).toString()
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -39,7 +39,7 @@ export default function Authentication({ current, setCurrent, onClose, returnFoc
   return <Dialog title="Login to GitLab" onClose={onClose} width="large" height="auto"
     initialFocusRef={inputRef} returnFocusRef={returnFocusRef}>
     <form onSubmit={submit} className={styles.form}>
-      <Text as="p">Public ARCs are available without login. Sign in to browse repositories and organisations you can access.</Text>
+      <Text as="p">Public ARCs are available without login. Sign in to browse repositories and organisations you can access, and star repositories.</Text>
       <DataHubSelect availableDataHubs={availableDataHubs} current={current} setCurrent={dataHub => {
         cancelLogin(current.id)
         setToken('')
@@ -53,6 +53,7 @@ export default function Authentication({ current, setCurrent, onClose, returnFoc
         <FormControl.Caption>Login is remembered for this instance in this browser until you log out.</FormControl.Caption>
       </FormControl>
       <Link href={tokenUrl.href} target="_blank" rel="noopener noreferrer">Generate a GitLab Personal Access Token</Link>
+      <Text as="p">Use the <code>api</code> scope to star and unstar repositories. Tokens with <code>read_api</code> can still browse repositories.</Text>
       {error && <Banner variant="critical" role="alert">
         <Banner.Title as="h3">Unable to log in</Banner.Title>
         <Banner.Description>{error}</Banner.Description>

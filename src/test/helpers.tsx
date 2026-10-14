@@ -114,6 +114,8 @@ export function fakeDashboardConfiguration(overrides: Partial<DashboardConfigura
     fetchGroupProjectCount: async () => Success(2),
     fetchProjects: async () => Success(arcPage([gitLabProjectFull()], { perPage: 25 })),
     fetchGroupProjects: async () => Success(arcPage([gitLabProjectFull()], { perPage: 25 })),
+    fetchStarredProjectIds: async () => Success([]),
+    setProjectStarred: async (_source, projectId, starred) => Success(gitLabProjectFull({ id: projectId, star_count: starred ? 43 : 42 })),
     ...overrides,
   }
 }

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { getProject, getTopStarredProjects, listAllProjects, listMemberProjectIds, listProjects, searchProjects } from './index.ts'
+import { getProject, getTopStarredProjects, listAllProjects, listMemberProjectIds, listProjects, searchProjects,
+  listStarredProjectIds, setProjectStarred } from './index.ts'
 import { Success, Failure } from '../../types/result.ts'
 import { project, projectResponse } from '../../test/helpers.tsx'
 
@@ -41,6 +42,38 @@ describe('GitLab projects API', () => {
     expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get('PRIVATE-TOKEN')).toBe('runtime-token')
     expect(fetchMock.mock.calls[0][1]?.method ?? 'GET').toBe('GET')
     expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('requests the current user’s starred repositories with paging and search', async () => {
+    await listProjects(source, { fetchCall: fetchMock, token: 'runtime-token', starred: true, search: 'plants', page: 2, perPage: 25 })
+    expect(Object.fromEntries(requestedUrl().searchParams)).toEqual({
+      starred: 'true', search: 'plants', page: '2', per_page: '25',
+    })
+    expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get('PRIVATE-TOKEN')).toBe('runtime-token')
+  })
+
+  it('loads starred IDs across pages with the current user’s token', async () => {
+    fetchMock.mockImplementation(async input => new URL(String(input)).searchParams.get('page') === '1'
+      ? Response.json([{ id: 7 }], { headers: { 'X-Next-Page': '2' } })
+      : Response.json([{ id: 8 }], { headers: { 'X-Next-Page': '' } }))
+    expect(await listStarredProjectIds(source, { fetchCall: fetchMock, token: 'runtime-token' })).toEqual(Success([7, 8]))
+    expect(Object.fromEntries(requestedUrl().searchParams)).toEqual({ starred: 'true', simple: 'true', per_page: '100', page: '2' })
+    expect(fetchMock.mock.calls.every(([, init]) => new Headers(init?.headers).get('PRIVATE-TOKEN') === 'runtime-token')).toBe(true)
+  })
+
+  it.each([true, false])('posts the authenticated star change (starred: %s) and returns the updated count', async starred => {
+    const updated = project({ star_count: starred ? 43 : 41 })
+    fetchMock.mockResolvedValue(Response.json(updated))
+    expect(await setProjectStarred(source, 1, starred, { fetchCall: fetchMock, token: 'runtime-token' })).toEqual(Success(updated))
+    expect(requestedUrl().pathname).toBe(`/api/v4/projects/1/${starred ? 'star' : 'unstar'}`)
+    expect(fetchMock.mock.calls[0][1]?.method).toBe('POST')
+    expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get('PRIVATE-TOKEN')).toBe('runtime-token')
+  })
+
+  it('rejects anonymous star requests without sending them', async () => {
+    expect(await setProjectStarred(source, 1, true, { fetchCall: fetchMock })).toEqual(Failure('Log in to star repositories.'))
+    expect(await listStarredProjectIds(source, { fetchCall: fetchMock })).toEqual(Failure('Log in to see your starred repositories.'))
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('requests public projects in descending star order, including archives, even after login', async () => {

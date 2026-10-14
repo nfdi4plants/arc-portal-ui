@@ -39,6 +39,33 @@ async function openLogin(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('optional login in the portal', () => {
+  it('updates stars for the signed-in account and clears that state on logout', async () => {
+    localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify({ [defaultDataHub.id]: 'api-token' }))
+    const transport = fetchCall.getMockImplementation()!
+    fetchCall.mockImplementation(async (input, init) => {
+      const url = new URL(String(input))
+      if (url.pathname === '/api/v4/projects/1/star') {
+        return Response.json(gitLabProjectFull({ star_count: 43 }))
+      }
+      if (url.searchParams.get('starred') === 'true') return projectResponse([], { 'X-Next-Page': '' })
+      return transport(input, init)
+    })
+    const user = userEvent.setup()
+    render(<App />)
+    const star = await screen.findByRole('button', { name: `Star ${officialHost} ARC (42 stars)` })
+    await waitFor(() => expect(star).toBeEnabled())
+    await user.click(star)
+    expect(await screen.findByRole('button', { name: `Unstar ${officialHost} ARC (43 stars)` })).toBeEnabled()
+    const request = fetchCall.mock.calls.find(([input]) => new URL(String(input)).pathname === '/api/v4/projects/1/star')!
+    expect(request[1]?.method).toBe('POST')
+    expect(new Headers(request[1]?.headers).get('PRIVATE-TOKEN')).toBe('api-token')
+    const menu = await openAccountMenu(user)
+    await user.click(menu.getByRole('button', { name: 'Logout' }))
+    const anonymousStar = await screen.findByRole('button', { name: `Star ${officialHost} ARC (42 stars)` })
+    expect(anonymousStar).toBeDisabled()
+    expect(anonymousStar).toHaveAttribute('aria-pressed', 'false')
+  })
+
   it('uses the selected ARC DataHUB token when downloading its RO-Crate', async () => {
     const otherHub = availableDataHubs.find(hub => hub.id === 'plantmicrobe')!
     localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify({
@@ -71,7 +98,7 @@ describe('optional login in the portal', () => {
     expect(dialog.getByRole('button', { name: 'Login' })).toBeDisabled()
     const tokenLink = new URL(dialog.getByRole('link', { name: 'Generate a GitLab Personal Access Token' }).getAttribute('href')!)
     expect(tokenLink.searchParams.get('name')).toBe('arc-portal')
-    expect(tokenLink.searchParams.get('scopes')).toBe('read_user,read_api')
+    expect(tokenLink.searchParams.get('scopes')).toBe('api')
     await user.type(dialog.getByLabelText('Personal access token'), ' runtime-token {Enter}')
     expect(await screen.findByRole('button', { name: 'Account menu' })).toBeVisible()
     expect(screen.queryByRole('dialog', { name: 'Login to GitLab' })).not.toBeInTheDocument()

@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react'
-import { getGroupProjectCount, getGroupProjects, getProjectCount, listAllGroups, listProjects } from '../../api/gitlab/index.ts'
+import { getGroupProjectCount, getGroupProjects, getProjectCount, listAllGroups, listProjects,
+  listStarredProjectIds, setProjectStarred } from '../../api/gitlab/index.ts'
 import { availableDataHubs } from '../../config/gitlab.ts'
 import type { GitLabGroup, GitLabInstance } from '../../types/gitlab.ts'
 
@@ -11,6 +12,8 @@ export interface DashboardConfiguration {
   readonly fetchGroupProjectCount: typeof getGroupProjectCount
   readonly fetchProjects: typeof listProjects
   readonly fetchGroupProjects: typeof getGroupProjects
+  readonly fetchStarredProjectIds: typeof listStarredProjectIds
+  readonly setProjectStarred: typeof setProjectStarred
 }
 
 export const defaultDashboardConfiguration: DashboardConfiguration = {
@@ -20,6 +23,8 @@ export const defaultDashboardConfiguration: DashboardConfiguration = {
   fetchGroupProjectCount: getGroupProjectCount,
   fetchProjects: listProjects,
   fetchGroupProjects: getGroupProjects,
+  fetchStarredProjectIds: listStarredProjectIds,
+  setProjectStarred,
 }
 
 export interface DashboardGroup {
