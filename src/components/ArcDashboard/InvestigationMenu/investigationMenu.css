@@ -19,3 +19,15 @@
   overflow-wrap: anywhere;
 }
 .investigation-entities-overlay [data-component="ActionList.Description"] { overflow-wrap: anywhere; }
+.investigation-categories-overlay [data-component="ActionList.Item.Label"] {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.investigation-category-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.investigation-category-title { min-width: 0; }
+.investigation-category-label [data-component="CounterLabel"] { flex-shrink: 0; margin-left: auto; }

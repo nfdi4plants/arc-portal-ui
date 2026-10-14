@@ -1,4 +1,5 @@
 import { screen, within } from '@testing-library/react'
+import { useState } from 'react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import '../../test/nativeDialog'
@@ -10,7 +11,21 @@ import { ArcDashboardFrame } from '../../components/ArcDashboard/ArcDashboardFra
 import story from './ScrollingDashboard.stories'
 import { selectInvestigationMetadata } from '../../components/ArcDashboard/Investigation/selectInvestigationMetadata'
 
-vi.mock('@nfdi4plants/arc-web-view', () => ({ WebViewer: () => <label>Search ARC files<input /></label> }))
+vi.mock('@nfdi4plants/arc-web-view', () => ({ WebViewer: () => {
+  const [path, setPath] = useState('')
+  const folders: Record<string, string[]> = {
+    '': ['assays', 'studies', 'runs', 'workflows'],
+    assays: ['GCqTOF_targets'], studies: ['TalinumGenomeDraft'], runs: ['deseq2'], workflows: ['deseq2'],
+  }
+  return <>
+    <label>Search ARC files<input /></label>
+    <nav aria-label="Breadcrumbs"><a href="#" onClick={() => setPath('')}>root</a></nav>
+    <p>Current folder: {path || 'root'}</p>
+    <table><tbody>{(folders[path] ?? []).map(folder => <tr key={folder}><td>
+      <a href="#" onClick={() => setPath(path ? `${path}/${folder}` : folder)}><span title={folder}>{folder}</span></a>
+    </td></tr>)}</tbody></table>
+  </>
+} }))
 
 async function openDashboard() {
   const store = createArcStore(sampleCrateSource())
@@ -45,14 +60,15 @@ describe('ScrollingDashboard', () => {
         expect(submenu).toHaveTextContent(metadata.publications[0].doi!)
       }
     }
-    await user.click(within(screen.getByRole('menu', { name: 'Workflows (6)' })).getAllByRole('menuitem')[0])
+    await user.click(within(parent).getByRole('menuitem', { name: 'Organizations (4)' }))
+    await user.click(within(screen.getByRole('menu', { name: 'Organizations (4)' })).getAllByRole('menuitem')[0])
     await user.keyboard('{ArrowLeft}')
-    expect(screen.queryByRole('menu', { name: 'Workflows (6)' })).not.toBeInTheDocument()
-    expect(within(parent).getByRole('menuitem', { name: 'Workflows (6)' })).toHaveFocus()
+    expect(screen.queryByRole('menu', { name: 'Organizations (4)' })).not.toBeInTheDocument()
+    expect(within(parent).getByRole('menuitem', { name: 'Organizations (4)' })).toHaveFocus()
     await user.keyboard('{ArrowRight}')
-    const workflows = await screen.findByRole('menu', { name: 'Workflows (6)' })
-    expect(workflows).toBeVisible()
-    await user.click(within(workflows).getAllByRole('menuitem')[0])
+    const organizations = await screen.findByRole('menu', { name: 'Organizations (4)' })
+    expect(organizations).toBeVisible()
+    await user.click(within(organizations).getAllByRole('menuitem')[0])
     await user.keyboard('{Escape}')
     expect(parent).toBeVisible()
     await user.click(within(parent).getByRole('menuitem', { name: 'Description' }))
@@ -62,6 +78,28 @@ describe('ScrollingDashboard', () => {
     await user.keyboard('{Escape}{Escape}')
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
     expect(investigation).toHaveFocus()
+  }, 15000)
+
+  it('opens selected assay, study, run and workflow folders in Webview and closes both menus', async () => {
+    const metadata = await openDashboard()
+    const user = userEvent.setup()
+    const webview = screen.getByRole('region', { name: 'Webview section' })
+    webview.scrollIntoView = vi.fn()
+    await user.type(screen.getByRole('textbox'), 'saved search')
+    for (const [category, id] of [
+      ['Assays', 'assays'], ['Studies', 'studies'], ['Runs', 'runs'], ['Workflows', 'workflows'], ['Assays', 'assays'], ['Assays', 'assays'],
+    ] as const) {
+      await user.click(screen.getByRole('button', { name: 'Investigation' }))
+      const title = `${category} (${metadata[id].length})`
+      await user.click(screen.getByRole('menuitem', { name: title }))
+      await user.click(within(screen.getByRole('menu', { name: title })).getByRole('menuitem', { name: metadata[id][0].name }))
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(await screen.findByText(`Current folder: ${id}/${metadata[id][0].identifier}`)).toBeVisible()
+      expect(webview.scrollIntoView).toHaveBeenLastCalledWith({ block: 'start', behavior: 'smooth' })
+      expect(screen.getByRole('textbox')).toHaveValue('saved search')
+    }
+    expect(screen.getByRole('region', { name: 'Provenance explorer' })).toBeVisible()
   }, 15000)
 
   it('jumps and moves focus between the viewers while preserving file input', async () => {

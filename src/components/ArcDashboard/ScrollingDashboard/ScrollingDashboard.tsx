@@ -1,5 +1,5 @@
 import { Button } from '@primer/react'
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { ArcDetails } from '../ArcDetails'
 import type { DashboardContentProps } from '../dashboardTypes'
 import { PopupArcGame } from '../Game/PopupArcGame'
@@ -10,6 +10,7 @@ import '../viewerDashboard.css'
 import './scrollingDashboard.css'
 
 export function ScrollingDashboardContent({ metadata, provenance, actions, ...props }: DashboardContentProps) {
+  const [folderRequest, setFolderRequest] = useState<{ path: string }>()
   const header = useRef<HTMLElement>(null)
   const webview = useRef<HTMLElement>(null)
   const graphview = useRef<HTMLElement>(null)
@@ -27,7 +28,10 @@ export function ScrollingDashboardContent({ metadata, provenance, actions, ...pr
         {actions && <div className="viewer-dashboard-actions">{actions}</div>}
         <ArcDetails {...props} metadata={metadata} />
         <nav className="scrolling-dashboard-navigation" aria-label="Viewer navigation">
-          <InvestigationMenu metadata={metadata} arcJson={props.arcJson} variant="primary" presentation="submenu" />
+          <InvestigationMenu metadata={metadata} arcJson={props.arcJson} variant="primary" presentation="submenu" onNavigateFolder={path => {
+            setFolderRequest({ path })
+            jumpTo(webview.current)
+          }} />
           <Button onClick={() => jumpTo(graphview.current)}>Jump to Graphview</Button>
           <Button onClick={() => jumpTo(webview.current)}>Jump to Webview</Button>
           {provenance && <Button onClick={() => jumpTo(game.current)}>Jump to ARCade</Button>}
@@ -37,7 +41,7 @@ export function ScrollingDashboardContent({ metadata, provenance, actions, ...pr
         <PopupGraphview index={provenance} label="Graphview" className="scrolling-dashboard-graphview" expandOnClick={false} />
       </section>
       <section ref={webview} tabIndex={-1} aria-label="Webview section" className="scrolling-dashboard-viewer">
-        <InvestigationDashlets repository={props.repository} repositoryUrl={props.repositoryUrl} token={props.token} metadata={metadata} arcJson={props.arcJson} classNamePrefix="scrolling-dashboard" ids={['webview']} interactive />
+        <InvestigationDashlets folderRequest={folderRequest} repository={props.repository} repositoryUrl={props.repositoryUrl} token={props.token} metadata={metadata} arcJson={props.arcJson} classNamePrefix="scrolling-dashboard" ids={['webview']} interactive />
       </section>
       {provenance && <section ref={game} tabIndex={-1} aria-label="ARCade section" className="scrolling-dashboard-viewer scrolling-dashboard-game">
         <PopupArcGame index={provenance} arcTitle={metadata.title} />
