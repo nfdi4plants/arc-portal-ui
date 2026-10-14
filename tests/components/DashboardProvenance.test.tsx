@@ -32,7 +32,7 @@ it('keeps the place in the provenance dashlet when the dashboard renders again',
   expect(crumbs()).toHaveLength(2)
 })
 
-it('offers the ARC Mage run for the loaded ARC on the dashboard', async () => {
+it('offers the ARCade run for the loaded ARC on the dashboard', async () => {
   const store = createArcStore(sampleCrateSource())
   await store.load()
   renderWithTheme(
@@ -41,7 +41,7 @@ it('offers the ARC Mage run for the loaded ARC on the dashboard', async () => {
     </ArcProvider>,
   )
   // The test window has no fine pointer, so the dashlet shows the planned path with the keyboard notice.
-  const game = within(await screen.findByRole('region', { name: 'ARC Mage' }))
+  const game = within(await screen.findByRole('region', { name: 'ARCade' }))
   const steps = within(await game.findByRole('region', { name: 'Annotations per step' })).getAllByRole('listitem')
   expect(steps.length).toBeGreaterThan(0)
 })

@@ -167,7 +167,7 @@ export class ArtGalleryScene extends Phaser.Scene {
   }
 
   private header(y: number): number {
-    this.text(4, y, 'ARC Mage art gallery', 14, 0).setColor('#2b2620')
+    this.text(4, y, 'ARCade art gallery', 14, 0).setColor('#2b2620')
     this.text(4, y + 18, 'Wheel or arrow keys scroll, shift+wheel scrolls sideways.', 8, 0)
 
     const specs = Array.from({ length: 36 }, (_, i) =>

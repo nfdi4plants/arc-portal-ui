@@ -1,6 +1,6 @@
-# ARC Mage
+# ARCade
 
-ARC Mage is a 2D side-scrolling action platformer that runs inside the ARC dashboard
+ARCade is a 2D side-scrolling action platformer that runs inside the ARC dashboard
 (`ArcGameDashlet` in `src/components/ArcDashboard/Game/`). The mage walks one input to output path
 through an ARC's provenance. Every ISA annotation on the way is a mob and every node after a step is
 a boss. The final boss is the ARC itself. A well-annotated path gives more XP and bosses whose
