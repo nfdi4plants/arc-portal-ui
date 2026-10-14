@@ -8,6 +8,10 @@ export const ATTACK_BUFFER_MS = 150
 export const PLUNGE_MAX_MS = 2000
 // How long after its active phase started a move still waits for the landing that fires onLand.
 export const LANDING_WINDOW_MS = 1500
+// How long after a plunge lands its hits (the landing ring) may still bounce the player.
+export const BOUNCE_LANDING_WINDOW_MS = 120
+// The recovery that is left after a bounce, already cancellable.
+export const BOUNCE_RECOVERY_MS = 100
 
 export interface AttackHooks {
   movesFor(slot: WeaponSlot): AttackMove[]
@@ -52,6 +56,10 @@ export interface AttackMachine {
   moveElapsedMs(): number
   // Ends the move, its lock and a landing it still waits for. For hits, teleports and cancels.
   cancel(): void
+  // The player's own hit landed. True once per air heavy while its plunge falls or just after it
+  // landed: the plunge ends, the landing lock and the pending landing drop, the recovery becomes
+  // short and cancellable. The caller then bounces the player.
+  onOwnHit(): boolean
 }
 
 // Runs startup, active and recovery for one move at a time. All durations are divided by
@@ -74,6 +82,10 @@ export function createAttackMachine(hooks: AttackHooks): AttackMachine {
   let landing: AttackMove | null = null
   let landingSlot: WeaponSlot = 'heavy'
   let landingMs = 0
+  // An air heavy that may still bounce the player. The window is Infinity during the fall and
+  // counts down after the landing.
+  let bounceReady = false
+  let bounceWindowMs = Infinity
 
   const scaled = (ms: number) => ms / attackSpeed
 
@@ -86,6 +98,7 @@ export function createAttackMachine(hooks: AttackHooks): AttackMachine {
     landing = null
     if (!landed) return
     lock(landed.landingLockMs)
+    if (bounceReady) bounceWindowMs = BOUNCE_LANDING_WINDOW_MS
     hooks.onLand?.(landingSlot, landed)
   }
 
@@ -109,6 +122,8 @@ export function createAttackMachine(hooks: AttackHooks): AttackMachine {
         if (elapsed < scaled(current.startupMs)) return
         elapsed -= scaled(current.startupMs)
         phase = 'active'
+        bounceReady = info?.variant === 'air'
+        bounceWindowMs = Infinity
         if (current.onLand || current.plunge || current.landingLockMs) {
           landing = current
           landingSlot = slot
@@ -170,6 +185,7 @@ export function createAttackMachine(hooks: AttackHooks): AttackMachine {
     elapsed = 0
     moveMs = 0
     landing = null
+    bounceReady = false
     hooks.onStart(slot, comboIndex, move, kind)
     advance(grounded)
     return true
@@ -181,6 +197,7 @@ export function createAttackMachine(hooks: AttackHooks): AttackMachine {
     finish()
     landing = null
     lockMs = 0
+    bounceReady = false
   }
 
   return {
@@ -198,11 +215,17 @@ export function createAttackMachine(hooks: AttackHooks): AttackMachine {
       if (dashing && phase === 'idle') landing = null
 
       if (lockMs > 0) lockMs = Math.max(0, lockMs - dtMs)
+      if (bounceReady && bounceWindowMs !== Infinity) {
+        bounceWindowMs -= dtMs
+        if (bounceWindowMs <= 0) bounceReady = false
+      }
       if (phase !== 'idle') {
         elapsed += dtMs
         moveMs += dtMs
         advance(env.grounded)
       }
+      // A fall that ended without a landing (timeout) can no longer bounce.
+      if (bounceReady && bounceWindowMs === Infinity && phase !== 'active') bounceReady = false
 
       // A falling plunge lands inside advance. Every other move waits for its landing here.
       if (landing && !(phase === 'active' && move === landing && landing.plunge)) {
@@ -234,5 +257,17 @@ export function createAttackMachine(hooks: AttackHooks): AttackMachine {
     lockRemainingMs: () => lockMs,
     moveElapsedMs: () => moveMs,
     cancel,
+    onOwnHit() {
+      if (!bounceReady || !move) return false
+      bounceReady = false
+      landing = null
+      lockMs = 0
+      if (phase === 'active') {
+        phase = 'recovery'
+        elapsed = 0
+      }
+      elapsed = Math.max(elapsed, scaled(move.cancelAfterMs), scaled(move.recoveryMs) - BOUNCE_RECOVERY_MS)
+      return true
+    },
   }
 }

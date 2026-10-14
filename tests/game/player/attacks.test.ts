@@ -291,3 +291,58 @@ describe('attack variants', () => {
     expect(machine.lockRemainingMs()).toBe(0)
   })
 })
+
+describe('plunge bounce', () => {
+  const air = move('air', 100, { plunge: { speed: 700 }, landingLockMs: 220, onLand: () => {} })
+  const all: Variants = { air }
+
+  function plunging() {
+    const run = setup(100, 1, all, false)
+    run.env.grounded = false
+    run.press(HEAVY)
+    run.wait(200)
+    return run
+  }
+
+  it('ends the plunge on a hit, drops the landing and cancels at once', () => {
+    const { env, machine, landed, wait } = plunging()
+    expect(machine.phase()).toBe('active')
+    expect(machine.onOwnHit()).toBe(true)
+    expect(machine.phase()).toBe('recovery')
+    expect(machine.canCancel()).toBe(true)
+    expect(machine.lockRemainingMs()).toBe(0)
+    env.grounded = true
+    wait(20)
+    expect(landed).toEqual([])
+    expect(machine.lockRemainingMs()).toBe(0)
+  })
+
+  it('lets a landing hit cancel the landing lock', () => {
+    const { env, machine, landed, wait } = plunging()
+    env.grounded = true
+    wait(10)
+    expect(landed).toEqual(['air'])
+    expect(machine.lockRemainingMs()).toBe(220)
+    expect(machine.onOwnHit()).toBe(true)
+    expect(machine.lockRemainingMs()).toBe(0)
+    expect(machine.canCancel()).toBe(true)
+  })
+
+  it('bounces once per attack', () => {
+    const { machine } = plunging()
+    expect(machine.onOwnHit()).toBe(true)
+    expect(machine.onOwnHit()).toBe(false)
+  })
+
+  it('does not bounce for hits long after the landing or outside an air heavy', () => {
+    const late = plunging()
+    late.env.grounded = true
+    late.wait(300)
+    expect(late.machine.onOwnHit()).toBe(false)
+    const ground = setup(100)
+    ground.press(HEAVY)
+    ground.wait(60)
+    expect(ground.machine.onOwnHit()).toBe(false)
+  })
+})
+

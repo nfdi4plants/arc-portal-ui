@@ -82,7 +82,9 @@ by a phantom" and tells the player to fill in the missing value. Key P in the Mo
 ## Attack variants
 
 Heavy pressed in the air plays the weapon's air heavy, mostly a plunge with a landing hit and a
-short landing lock. Attacks during a dash, or up to 80 ms after it, play the dash light (no lock) or the
+short landing lock. The first hit of an air heavy (the fall or the landing ring) ends the plunge and
+bounces the mage up at 55% of the jump speed (about 30% of the jump height), free to steer and cancel at once.
+Attacks during a dash, or up to 80 ms after it, play the dash light (no lock) or the
 dash heavy. Attacks with up held play an overhead version, and ranged weapons keep aiming at the cursor.
 Each weapon only defines the variants of its card slot (light weapons: light, dash light, up light.
 Heavy weapons: heavy, air heavy, dash heavy, up heavy) and the staff has all of them.

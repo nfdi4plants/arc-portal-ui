@@ -5,7 +5,7 @@ import { DEPTH, MAGE_FRAME, MAGE_TEXTURE, PALETTE, PLAYER_HEIGHT } from '../../c
 import type { Action, InputFrame } from '../../contracts/input'
 import type { AbilityHandler, AttackContext, PlayerEvents, PlayerHandle, WeaponMoveset } from '../../contracts/player'
 import type { PlayerBuild, PlayerWeaponId, WeaponSlot } from '../../contracts/progression'
-import { EMPTY_MOTOR_INPUT, MOTOR, availableJump, canDash, createMotorState, runSpeed, stepMotor } from '../../model/input/motor'
+import { EMPTY_MOTOR_INPUT, JUMP_VELOCITY, MOTOR, availableJump, canDash, createMotorState, runSpeed, stepMotor } from '../../model/input/motor'
 import type { MotorEnv, MotorInput, MotorState } from '../../model/input/motor'
 import type { InputLayer } from '../input/InputLayer'
 import { applySpriteRef } from '../art'
@@ -31,6 +31,9 @@ const DASH_ATTACK_GRACE_MS = 80
 const HOVER_FALL_SPEED = 30
 // An up heavy in the air rises a little instead of plunging.
 const RISING_HOP_SPEED = 260
+// The bounce after an air heavy hit launches at this share of a jump's speed. Height scales with
+// the square, so the peak is 0.55^2 = about 30% of a full jump (3.5 tiles), roughly 1 tile.
+export const PLUNGE_BOUNCE_FACTOR = 0.55
 const NO_HELD: ReadonlySet<string> = new Set()
 // The swing smear: alpha of each copy, newest first. Light moves use the first three.
 const SMEAR_ALPHA = [0.25, 0.17, 0.1, 0.05]
@@ -290,10 +293,7 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
     return mergedFrame
   }
 
-  // A lock reads as a short squash and a puff of dust at the feet.
-  const showLock = () => {
-    squashX = Math.max(squashX, 1.12)
-    squashY = Math.min(squashY, 0.9)
+  const puffDust = () => {
     if (!dust) {
       const sprite = scene.add.sprite(0, 0, MAGE_TEXTURE).setDepth(DEPTH.fx).setVisible(false)
       sprite.on(Phaser.Animations.Events.ANIMATION_COMPLETE, () => sprite.setVisible(false))
@@ -304,6 +304,13 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
       .setScale(0.8 / deps.art.pixelsPerUnit)
       .setVisible(true)
       .play({ key: deps.art.fx(scene, 'dust'), repeat: 0 })
+  }
+
+  // A lock reads as a short squash and a puff of dust at the feet.
+  const showLock = () => {
+    squashX = Math.max(squashX, 1.12)
+    squashY = Math.min(squashY, 0.9)
+    puffDust()
   }
 
   const onStep = (deltaSeconds: number) => {
@@ -652,6 +659,7 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
     destroy() {
       if (destroyed) return
       destroyed = true
+      stopBounceListener()
       world.off('worldstep', onStep)
       scene.events.off('postupdate', onRender)
       for (const collider of colliders) collider.destroy()
@@ -662,6 +670,18 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
       container.destroy()
     },
   }
+
+  // The first hit of an air heavy throws the mage back up, so the plunge does not end inside the
+  // enemy. Secondary hits belong to a stand-in attacker and never get here. setVelocity writes the
+  // motor, so a bounce during hit-stop applies when the freeze ends.
+  const stopBounceListener = deps.combat.on('hit', (event) => {
+    if (event.attacker !== handle || destroyed || !attacks.onOwnHit()) return
+    handle.setVelocity(motor.vx, -JUMP_VELOCITY * PLUNGE_BOUNCE_FACTOR)
+    motor.jumpHeld = false
+    squashX = 0.82
+    squashY = 1.2
+    puffDust()
+  })
 
   deps.combat.register(handle)
   scene.events.once('shutdown', handle.destroy)
