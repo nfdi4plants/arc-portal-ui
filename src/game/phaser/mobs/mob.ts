@@ -58,6 +58,7 @@ import {
   MINION_HP_SHARE,
   PATROL_RADIUS,
   PROJECTILE_KNOCKBACK,
+  PROVOKE_MS,
   RANGED,
   SQUASH_MS,
   STAGGER_RECOVER_MS,
@@ -241,6 +242,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     blinkCy: 0,
     chatterMs: 0,
     staggerMs: 0,
+    provokedMs: 0,
     squashMs: 0,
     tiltDir: 1,
     squashAmount: 0,
@@ -318,7 +320,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     st.dx = st.px - cx()
     const dyc = st.pcy - cy()
     const range = stats.aggroRange * (aggro ? AGGRO_RELEASE : 1)
-    aggro = !player.isDead() && st.dx * st.dx + dyc * dyc <= range * range
+    aggro = !player.isDead() && (st.provokedMs > 0 || st.dx * st.dx + dyc * dyc <= range * range)
   }
 
   // True when the walker has to stop or turn at the edge ahead of it. The probes refresh every few steps.
@@ -1144,6 +1146,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     st.stunMs = Math.max(0, st.stunMs - dt)
     st.flashMs = Math.max(0, st.flashMs - dt)
     st.staggerMs = Math.max(0, st.staggerMs - dt)
+    st.provokedMs = Math.max(0, st.provokedMs - dt)
     st.squashMs = Math.max(0, st.squashMs - dt)
 
     if (dead) {
@@ -1271,6 +1274,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
       })
       st.flashMs = HIT_FLASH_MS
       st.revealMs = PHANTOM_REVEAL_MS
+      st.provokedMs = PROVOKE_MS
       st.stunMs = Math.max(HIT_STUN_MS, reaction.staggerMs)
       st.squashMs = SQUASH_MS
       st.squashAmount = reaction.staggerMs > 0 ? 1 : 0.5
