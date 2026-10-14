@@ -283,7 +283,8 @@ it('keeps exactly one live game under StrictMode', async () => {
 })
 
 it('shows a compact title card in a small box', async () => {
-  vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({ width: 280, height: 200 } as DOMRect)
+  vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(280)
+  vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(200)
   try {
     renderWithTheme(<ArcGameDashlet index={index} arcTitle="Talinum" />)
 

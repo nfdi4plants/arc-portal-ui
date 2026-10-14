@@ -70,7 +70,10 @@ function useBox(ref: RefObject<HTMLElement | null>): Box | null {
     const element = ref.current
     if (!element) return
     const measure = () => {
-      const { width, height } = element.getBoundingClientRect()
+      // Layout size, so a popup that opens by scaling up from its tile is measured at its final size.
+      // getBoundingClientRect would include the transform, and a transform never fires the observer.
+      const width = element.offsetWidth
+      const height = element.offsetHeight
       if (width === 0 || height === 0) return
       const em = parseFloat(getComputedStyle(element).fontSize) || 16
       const stacked = width < height || width < SIDE_BY_SIDE_MIN_EM * em
