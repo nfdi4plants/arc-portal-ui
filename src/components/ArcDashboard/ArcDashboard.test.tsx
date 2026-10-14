@@ -26,11 +26,14 @@ describe('ArcDashboard', () => {
     renderWithTheme(<ArcDashboard name="Selected ARC" url="https://datahub.example/lab/arc"
       source="https://datahub.example" projectId={42} onBack={onBack} />)
 
-    expect(screen.getByText('Loading…')).toBeVisible()
+    expect(screen.getByRole('status')).toHaveTextContent('Loading ARC…')
+    expect(screen.queryByText('Help me on my adventure!')).not.toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'ARC-Dashboard' })).not.toBeInTheDocument()
     expect(screen.queryByText('ARC viewer')).not.toBeInTheDocument()
     await act(async () => pending.resolve(new Response(crateJson)))
     expect(screen.getByRole('heading', { level: 1, name: 'Facultative CAM in Talinum triangulare' })).toBeVisible()
+    expect(screen.getByText('Help me on my adventure!')).toBeVisible()
+    expect(screen.queryByText('Loading ARC…')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Expand Description' })).toBeVisible()
     expect(screen.getByRole('link', { name: 'Selected ARC' })).toHaveAttribute('href', 'https://datahub.example/lab/arc')
     await user.click(screen.getByRole('button', { name: 'Expand Webview' }))

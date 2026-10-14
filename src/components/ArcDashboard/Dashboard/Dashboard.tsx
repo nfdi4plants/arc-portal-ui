@@ -2,10 +2,11 @@ import { ScreenFullIcon } from '@primer/octicons-react'
 import { dataHubRepositoryUrl } from '../../../api/gitlab'
 import { openInvestigationPopOut } from '../Investigation/InvestigationDetails/InvestigationPopOut'
 import { openArcViewerPopOut } from '../ArcViewer/ArcViewerPopOut'
-import { IconButton, Text } from '@primer/react'
+import { IconButton } from '@primer/react'
 import { lazy, Suspense } from 'react'
 import { Dashlet } from '../../DashboardWindow'
 import { ArcDashboardFrame } from '../ArcDashboardFrame'
+import { ArcMageLoading } from '../ArcMage'
 import { ArcDetails } from '../ArcDetails'
 import { ArcGameDashlet } from '../Game'
 import { InvestigationDetails } from '../Investigation/InvestigationDetails'
@@ -36,7 +37,7 @@ export function DashboardContent({ metadata, provenance, actions, ...props }: Da
           aria-label="Pop out ARC viewer"
           onClick={() => openArcViewerPopOut(props.arcJson, metadata.title, repositoryUrl, props.token)} />
       }>
-        <Suspense fallback={<Text as="p" role="status">Loading ARC viewer…</Text>}>
+        <Suspense fallback={<ArcMageLoading label="Loading ARC viewer…" />}>
           <ArcViewer jsonString={props.arcJson} repositoryUrl={repositoryUrl} token={props.token} embedded />
         </Suspense>
       </Dashlet>

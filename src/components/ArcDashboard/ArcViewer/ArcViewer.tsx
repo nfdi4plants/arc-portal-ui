@@ -7,6 +7,7 @@ import '@primer/css/dist/primer.css'
 import {WebViewer} from '@nfdi4plants/arc-web-view'
 import {Component, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode} from 'react'
 import { PopupDashletModeContext } from '../../PopupDashlet/PopupDashletContext'
+import { ArcMageLoading } from '../ArcMage'
 import './arcViewer.css'
 
 const defaultArcUrl = `${import.meta.env.BASE_URL}sample-arcs/facultative-cam-in-talinum/ro-crate-metadata.json`
@@ -177,10 +178,10 @@ function ArcViewer({ jsonString, embedded = false, repositoryUrl, token, folderR
             <ExpandedWebViewer provideJson={provideJson} repositoryUrl={repositoryUrl} json={arcJson} token={token} folderRequest={folderRequest} />
           </ViewerErrorBoundary>
         </section>
-      ) : (
+      ) : loading ? <ArcMageLoading /> : (
         <section className="empty-state">
-          <h2>{loading ? 'Loading ARC…' : 'ARC unavailable'}</h2>
-          <p>{loading ? 'Loading the ARC metadata and file view.' : 'Please refresh the page to try again.'}</p>
+          <h2>ARC unavailable</h2>
+          <p>Please refresh the page to try again.</p>
         </section>
       )}
     </>

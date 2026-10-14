@@ -1,8 +1,9 @@
-import { Banner, Spinner, Stack, Text } from '@primer/react'
+import { Banner } from '@primer/react'
 import type { ComponentType } from 'react'
 import { useArcSelector, useArcStatus } from '../../arc/hooks'
 import { buildProvenanceIndex } from '../../arc/provenance/buildIndex'
 import { DashboardWindow } from '../DashboardWindow'
+import { ArcMageLoading } from './ArcMage'
 import { selectInvestigationMetadata } from './Investigation/selectInvestigationMetadata'
 import type { DashboardContentProps, DashboardProps } from './dashboardTypes'
 import './Investigation/investigation.css'
@@ -25,9 +26,9 @@ export function ArcDashboardFrame({ content: Content, label, fillHeight, ...prop
           <Banner variant="critical" title="Could not load ARC" description={status.error instanceof Error ? status.error.message : String(status.error)} />
         </div>
       ) : !metadata ? (
-        <Stack className="investigation-feedback" direction="horizontal" align="center" justify="center" gap="condensed" role="status">
-          <Spinner size="large" /><Text as="span">Loading ARC…</Text>
-        </Stack>
+        <div className="investigation-feedback">
+          <ArcMageLoading />
+        </div>
       ) : (
         <Content {...props} metadata={metadata} provenance={provenance} />
       )}
