@@ -98,6 +98,11 @@ Only one air heavy fits in one airtime: until the mage lands, wall jumps or is t
 heavy press in the air does nothing (up and dash heavies still play). The bounce continues that
 airtime, so it gives back no jump or air dash, not even when the landing ring bounced the mage off
 the floor (`startPlunge`, `plungeBounced` and `airHeavyRefused` in `model/input/motor.ts`).
+The Serial Dilution card lifts the one-per-airtime rule for air heavies that hit: after a bounce
+another air heavy may start, up to 5 per airtime (`PLUNGE_CHAIN_MAX`). The first bounce is a full
+jump high and each next one lower, 75%, 50%, 30% and 15% of it (`CHAIN_BOUNCE_HEIGHTS`,
+`bounceFactor`). The count (`plungeChain`) starts over on the same landing, wall jump or teleport,
+and the bounces still give back no jump, air dash or coyote time.
 Attacks during a dash, or up to 80 ms after it, play the dash light (no lock) or the
 dash heavy. Attacks with up held play an overhead version, and ranged weapons keep aiming at the cursor.
 Each weapon only defines the variants of its card slot (light weapons: light, dash light, up light.
@@ -136,6 +141,7 @@ Click the canvas to give it keyboard focus.
 | What | Where |
 |---|---|
 | Run, jump, dash, coyote time, jump buffer, wall jump | `model/input/motor.ts` (`MOTOR`) |
+| Air heavy bounce and Serial Dilution chain heights | `model/input/motor.ts` (`PLUNGE_BOUNCE_FACTOR`, `CHAIN_BOUNCE_HEIGHTS`) |
 | Mob hp, damage, speed and XP per mob (10, or 15 with an ontology accession) | `model/content/monster.ts` |
 | Mob behaviour timing (windups, knockback, aggro range, blink and bomb timers) | `phaser/mobs/tuning.ts` |
 | Node boss hp (`400 * (1 + 0.35 * segment index)`) and XP | `model/content/boss.ts` |

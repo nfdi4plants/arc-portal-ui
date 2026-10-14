@@ -5,13 +5,13 @@ import { applyCard, canApply, CARDS, createBuild } from '../../../src/game/model
 const countOf = (kind: PowerUpKind) => CARDS.filter((card) => card.kind === kind).length
 
 describe('catalog', () => {
-  it('has eight stat cards, eight weapon cards, 13 mechanics and five legendaries', () => {
+  it('has eight stat cards, eight weapon cards, 14 mechanics and five legendaries', () => {
     expect({
       stat: countOf('stat'),
       weapon: countOf('weapon'),
       mechanic: countOf('mechanic'),
       legendary: countOf('legendary'),
-    }).toEqual({ stat: 8, weapon: 8, mechanic: 13, legendary: 5 })
+    }).toEqual({ stat: 8, weapon: 8, mechanic: 14, legendary: 5 })
   })
 
   it('gives every catalog card an effect that applyCard accepts', () => {

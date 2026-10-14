@@ -30,6 +30,15 @@ export const MOTOR = {
 // v = sqrt(2 g h) gives the apex height without the small extra from the apex hang.
 export const JUMP_VELOCITY = Math.sqrt(2 * MOTOR.gravity * MOTOR.jumpHeightTiles * TILE)
 
+// The bounce after an air heavy hit launches at this share of a jump's speed. Height scales with
+// the square, so the peak is 0.55^2 = about 30% of a full jump (3.5 tiles), roughly 1 tile.
+export const PLUNGE_BOUNCE_FACTOR = 0.55
+// Serial Dilution: bounce heights of a chain as shares of a full jump's height, one per air heavy
+// of the airtime. The first is a full jump, so two or three plunges chain easily, four or five
+// take a quick hand, and a sixth is refused (PLUNGE_CHAIN_MAX).
+export const CHAIN_BOUNCE_HEIGHTS: readonly number[] = [1, 0.75, 0.5, 0.3, 0.15]
+export const PLUNGE_CHAIN_MAX = CHAIN_BOUNCE_HEIGHTS.length
+
 export type MotorAction = 'left' | 'right' | 'down' | 'jump' | 'dash'
 
 // An InputFrame fits as is. The motor reads only the MotorAction entries.
@@ -78,6 +87,10 @@ export interface MotorState {
   plungeUsed: boolean
   plungeJumpsUsed: number
   plungeAirDashUsed: boolean
+  // Air heavies started in this airtime, and the place of the last one in that count (1 for the
+  // first). A bounce off the floor continues the airtime, so it restores plungeChain from plungeLink.
+  plungeChain: number
+  plungeLink: number
   // Set for the step in which the move started, for animation and events.
   jumped: boolean
   dashed: boolean
@@ -105,6 +118,8 @@ export function createMotorState(facing: 1 | -1 = 1): MotorState {
     plungeUsed: false,
     plungeJumpsUsed: 0,
     plungeAirDashUsed: false,
+    plungeChain: 0,
+    plungeLink: 0,
     jumped: false,
     dashed: false,
   }
@@ -170,18 +185,31 @@ export function startPlunge(state: MotorState): void {
   state.plungeUsed = true
   state.plungeJumpsUsed = state.jumpsUsed
   state.plungeAirDashUsed = state.airDashUsed
+  state.plungeChain++
+  state.plungeLink = state.plungeChain
 }
 
-// The air heavy bounced the mage up (the caller sets the velocity). The bounce continues the airtime
-// the plunge started in, also when the landing ring bounced it off the floor: the jumps and the air
-// dash are as they were before the plunge, the coyote time of that landing is gone and no second air
-// heavy may start before the next landing.
-export function plungeBounced(state: MotorState): void {
-  state.plungeUsed = true
+// The share of a jump's launch speed the bounce after air heavy number `link` of an airtime gets.
+// Without Serial Dilution (`chains`) every bounce is the small one.
+export function bounceFactor(link: number, chains: boolean): number {
+  if (!chains) return PLUNGE_BOUNCE_FACTOR
+  const index = Math.min(PLUNGE_CHAIN_MAX, Math.max(1, link)) - 1
+  return Math.sqrt(CHAIN_BOUNCE_HEIGHTS[index])
+}
+
+// The air heavy bounced the mage up. Returns the bounce's share of the jump speed, and the caller
+// sets the velocity. The bounce continues the airtime the plunge started in, also when the landing
+// ring bounced it off the floor: the jumps and the air dash are as they were before the plunge and
+// the coyote time of that landing is gone. Without Serial Dilution no second air heavy may start
+// before the next landing. With it (`chains`) the next one may, up to PLUNGE_CHAIN_MAX per airtime.
+export function plungeBounced(state: MotorState, chains = false): number {
+  state.plungeChain = state.plungeLink
+  state.plungeUsed = !chains || state.plungeChain >= PLUNGE_CHAIN_MAX
   state.jumpsUsed = state.plungeJumpsUsed
   state.airDashUsed = state.plungeAirDashUsed
   state.coyoteMs = 0
   state.jumpHeld = false
+  return bounceFactor(state.plungeLink, chains)
 }
 
 // A plain heavy press in the air plays the air heavy, which only one may do per airtime. Up and dash
@@ -223,6 +251,7 @@ export function stepMotor(state: MotorState, input: MotorInput, env: MotorEnv, d
     s.jumpsUsed = 0
     s.airDashUsed = false
     s.plungeUsed = false
+    s.plungeChain = 0
     if (s.vy > 0) s.vy = 0
   } else {
     s.coyoteMs = Math.max(0, s.coyoteMs - dtMs)
@@ -272,6 +301,7 @@ export function stepMotor(state: MotorState, input: MotorInput, env: MotorEnv, d
         s.wallGraceMs = 0
         s.jumpsUsed = Math.max(1, s.jumpsUsed)
         s.plungeUsed = false
+        s.plungeChain = 0
       }
     }
   }

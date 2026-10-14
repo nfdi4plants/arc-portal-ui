@@ -136,6 +136,14 @@ export const CARDS: readonly PowerUpCard[] = [
     kind: 'mechanic',
   },
   {
+    id: 'mechanic.serialDilution',
+    name: 'Serial Dilution',
+    description:
+      'Air heavies that hit can be chained before you land. The first bounce is as high as a jump, each next one lower (75%, 50%, 30%, 15% of it). Up to 5 air heavies per airtime. Bounces give back no jump or air dash.',
+    rarity: 'uncommon',
+    kind: 'mechanic',
+  },
+  {
     id: 'mechanic.wallJump',
     name: 'Wall Jump',
     description: 'Jump off a wall.',

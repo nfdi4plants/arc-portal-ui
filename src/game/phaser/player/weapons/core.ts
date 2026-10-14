@@ -25,6 +25,7 @@ export const PASSIVE_IDS: readonly PassiveId[] = [
   'shockwaveHeavy',
   'familiar',
   'extraChoice',
+  'serialDilution',
   'theOntology',
   'gitRevert',
   'doiExcalibur',

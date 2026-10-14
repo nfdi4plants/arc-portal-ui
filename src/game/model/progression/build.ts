@@ -191,6 +191,7 @@ const EFFECTS = new Map<string, Effect>([
   ['mechanic.shockwaveHeavy', mechanic('shockwaveHeavy')],
   ['mechanic.familiar', mechanic('familiar')],
   ['mechanic.extraChoice', mechanic('extraChoice', (build) => ({ ...build, offerSize: 4 }))],
+  ['mechanic.serialDilution', mechanic('serialDilution')],
   ['legendary.theOntology', legendary('theOntology')],
   ['legendary.gitRevert', legendary('gitRevert')],
   ['legendary.doiExcalibur', legendary('doiExcalibur')],

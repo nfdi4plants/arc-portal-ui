@@ -2,7 +2,16 @@ import { describe, expect, it } from 'vitest'
 import { STEP_MS } from '../../../src/game/contracts/constants'
 import type { Action } from '../../../src/game/contracts/input'
 import type { AttackMove, AttackVariant } from '../../../src/game/contracts/player'
-import { JUMP_VELOCITY, MOTOR, availableJump, createMotorState, plungeBounced } from '../../../src/game/model/input/motor'
+import {
+  CHAIN_BOUNCE_HEIGHTS,
+  JUMP_VELOCITY,
+  MOTOR,
+  PLUNGE_BOUNCE_FACTOR,
+  availableJump,
+  bounceFactor,
+  createMotorState,
+  plungeBounced,
+} from '../../../src/game/model/input/motor'
 import type { MotorEnv } from '../../../src/game/model/input/motor'
 import { createAttackMachine } from '../../../src/game/phaser/player/attacks'
 import { createControls, lungeVelocity } from '../../../src/game/phaser/player/controls'
@@ -64,11 +73,10 @@ function setup(mechanics: Partial<MotorEnv['mechanics']> = {}) {
   const wait = (ms: number) => {
     for (let n = Math.round(ms / STEP_MS); n > 0; n--) step()
   }
-  // What Player does when the first hit of an air heavy lands (PLUNGE_BOUNCE_FACTOR is 0.55).
-  const bounce = () => {
+  // What Player does when the first hit of an air heavy lands. `chains` is Serial Dilution.
+  const bounce = (chains = false) => {
     if (!attacks.onOwnHit()) return false
-    motor.vy = -JUMP_VELOCITY * 0.55
-    plungeBounced(motor)
+    motor.vy = -JUMP_VELOCITY * plungeBounced(motor, chains)
     return true
   }
   return { motor, motorEnv, attacks, started, step, wait, bounce, airborne: () => y < 0 }
@@ -251,6 +259,77 @@ describe('createControls', () => {
       step(['jump'])
       expect(motor.jumped).toBe(false)
     })
+  })
+})
+
+describe('Serial Dilution', () => {
+  const meteors = (started: { name: string }[]) => started.filter((s) => s.name === 'meteor').length
+
+  // Jumps, then plunges and bounces `count` times. Each plunge hits 100 ms after the press and
+  // the next press comes 150 ms into the bounce, well before its peak.
+  function chain(count: number, chains: boolean) {
+    const rig = setup()
+    rig.step(['jump'])
+    rig.wait(150)
+    for (let i = 0; i < count; i++) {
+      rig.step(['heavy'])
+      rig.wait(100)
+      rig.bounce(chains)
+      rig.wait(150)
+    }
+    return rig
+  }
+
+  it('lets a plunge that hit start another one before landing', () => {
+    const { started, step, airborne } = chain(1, true)
+    expect(airborne()).toBe(true)
+    step(['heavy'])
+    expect(meteors(started)).toBe(2)
+  })
+
+  it('keeps one air heavy per airtime without the card', () => {
+    const { started, step, wait, airborne } = chain(1, false)
+    expect(airborne()).toBe(true)
+    step(['heavy'])
+    wait(50)
+    expect(meteors(started)).toBe(1)
+  })
+
+  it('refuses a sixth air heavy in one airtime', () => {
+    const { started, step, wait, motor, airborne } = chain(5, true)
+    expect(meteors(started)).toBe(5)
+    expect(motor.plungeChain).toBe(5)
+    expect(airborne()).toBe(true)
+    step(['heavy'])
+    wait(50)
+    expect(meteors(started)).toBe(5)
+  })
+
+  it('starts the count over on landing', () => {
+    const { started, step, wait, motor, airborne } = chain(5, true)
+    wait(1500)
+    expect(airborne()).toBe(false)
+    expect(motor.plungeChain).toBe(0)
+    step(['jump'])
+    wait(150)
+    step(['heavy'])
+    expect(meteors(started)).toBe(6)
+  })
+
+  it('gives back no jump with a chained bounce', () => {
+    const { motor, motorEnv } = chain(2, true)
+    expect(motor.jumpsUsed).toBe(1)
+    expect(motor.coyoteMs).toBe(0)
+    expect(availableJump(motor, motorEnv)).toBeNull()
+  })
+
+  it('bounces a full jump high first and lower on every further bounce', () => {
+    expect(bounceFactor(1, true) * JUMP_VELOCITY).toBeCloseTo(JUMP_VELOCITY)
+    // Height grows with the square of the launch speed.
+    const heights = [1, 2, 3, 4, 5].map((link) => bounceFactor(link, true) ** 2)
+    expect(heights).toEqual(CHAIN_BOUNCE_HEIGHTS.map((h) => expect.closeTo(h, 6)))
+    for (let i = 1; i < heights.length; i++) expect(heights[i]).toBeLessThan(heights[i - 1])
+    expect(bounceFactor(1, false)).toBe(PLUNGE_BOUNCE_FACTOR)
   })
 })
 

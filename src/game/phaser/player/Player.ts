@@ -31,9 +31,6 @@ const GHOST_INTERVAL_MS = 28
 const HOVER_FALL_SPEED = 30
 // An up heavy in the air rises a little instead of plunging.
 const RISING_HOP_SPEED = 260
-// The bounce after an air heavy hit launches at this share of a jump's speed. Height scales with
-// the square, so the peak is 0.55^2 = about 30% of a full jump (3.5 tiles), roughly 1 tile.
-export const PLUNGE_BOUNCE_FACTOR = 0.55
 // The swing smear: alpha of each copy, newest first. Light moves use the first three.
 const SMEAR_ALPHA = [0.25, 0.17, 0.1, 0.05]
 const SMEAR_LIGHT_COUNT = 3
@@ -603,6 +600,7 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
       motor.vy = 0
       motor.dashMs = 0
       motor.plungeUsed = false
+      motor.plungeChain = 0
       grounded = false
       container.setPosition(tx, ty)
     },
@@ -660,8 +658,9 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
   // motor, so a bounce during hit-stop applies when the freeze ends.
   const stopBounceListener = deps.combat.on('hit', (event) => {
     if (event.attacker !== handle || destroyed || !attacks.onOwnHit()) return
-    handle.setVelocity(motor.vx, -JUMP_VELOCITY * PLUNGE_BOUNCE_FACTOR)
-    plungeBounced(motor)
+    // Serial Dilution chains the air heavies, each bounce lower than the one before.
+    const factor = plungeBounced(motor, build.mechanics.includes('serialDilution'))
+    handle.setVelocity(motor.vx, -JUMP_VELOCITY * factor)
     squashX = 0.82
     squashY = 1.2
     puffDust()

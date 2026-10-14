@@ -29,6 +29,7 @@ export const FLAVOR: Record<string, string> = {
   'mechanic.shockwaveHeavy': 'The ripple effect of a very heavy dataset.',
   'mechanic.familiar': 'A tiny assistant who never asks for authorship.',
   'mechanic.extraChoice': 'One more option, one more thing to annotate.',
+  'mechanic.serialDilution': 'Each step a little weaker than the last, exactly as the protocol says.',
   'legendary.theOntology': 'Everything is tagged, even the coffee mug.',
   'legendary.gitRevert': 'Undo that last experiment, quietly.',
   'legendary.doiExcalibur': 'Pulled from a stone, citable forever.',

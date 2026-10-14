@@ -29,6 +29,7 @@ export type MechanicId =
   | 'shockwaveHeavy'
   | 'familiar'
   | 'extraChoice'
+  | 'serialDilution'
 
 export type LegendaryId = 'theOntology' | 'gitRevert' | 'doiExcalibur' | 'fairPrinciples' | 'peerReview'
 
