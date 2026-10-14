@@ -34,7 +34,7 @@ describe('ArcDashboard', () => {
     expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('link', { name: 'Selected ARC' })).toHaveAttribute('href', 'https://datahub.example/lab/arc')
     expect(await screen.findByText('ARC viewer', {}, { timeout: 5000 })).toBeVisible()
-    expect(viewer).toHaveBeenCalledWith({ jsonString: expect.stringContaining('Facultative CAM in Talinum triangulare'), embedded: true })
+    expect(viewer).toHaveBeenCalledWith({ jsonString: expect.stringContaining('Facultative CAM in Talinum triangulare'), embedded: true, repositoryUrl: "https://datahub.example/lab/arc", token: undefined })
     expect(fetch).toHaveBeenCalledOnce()
     await user.click(screen.getByRole('button', { name: 'Back' }))
     expect(onBack).toHaveBeenCalledOnce()

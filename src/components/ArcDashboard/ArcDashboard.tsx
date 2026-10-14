@@ -18,7 +18,7 @@ type ArcDashboardProps = {
     dataHubData?: ArcRepositoryOverview;
 };
 
-function LoadedArc({ arc, name, url, onBack, dataHubData }: { arc: ARC } & Pick<ArcDashboardProps, 'name' | 'url' | 'onBack' | 'dataHubData'>) {
+function LoadedArc({ arc, name, url, token, onBack, dataHubData }: { arc: ARC } & Pick<ArcDashboardProps, 'name' | 'url' | 'token' | 'onBack' | 'dataHubData'>) {
     // Built once per ARC. A new index sends the explorer back to its datasets view.
     const provenance = useMemo(() => buildProvenanceIndex(arc), [arc])
     const metadata = useMemo(() => selectInvestigationMetadata(arc), [arc])
@@ -30,6 +30,8 @@ function LoadedArc({ arc, name, url, onBack, dataHubData }: { arc: ARC } & Pick<
                 metadata={metadata}
                 provenance={provenance}
                 arcJson={arcJson}
+                repositoryUrl={url}
+                token={token}
                 dataHubData={dataHubData}
                 dataHubLinks={[{ name, url }]}
                 actions={<Button onClick={onBack}>Back</Button>}
@@ -45,7 +47,7 @@ function ArcDashboard({ name, url, source, projectId, token, onBack, dataHubData
     if (state.status === 'Error') return <p role="alert">Could not load ARC.</p>
     if (state.status !== 'Result') return <p>Loading…</p>
 
-    return <LoadedArc arc={state.arc} name={name} url={url} onBack={onBack} dataHubData={dataHubData} />
+    return <LoadedArc arc={state.arc} name={name} url={url} token={token} onBack={onBack} dataHubData={dataHubData} />
 }
 
 export default ArcDashboard;

@@ -17,7 +17,7 @@ const meta = {
   parameters: {
     docs: {
       description: {
-        component: 'ARC summary above matching dashlets using the shared DataHub dashboard styling: investigation details, ArcWebView, and the provenance explorer. All scenarios use the same bundled Talinum ARC with caller-supplied public, private, or unavailable DataHub information. These stories make no DataHub requests.',
+        component: 'ARC summary above matching dashlets using the shared DataHub dashboard styling: investigation details, ArcWebView, and the provenance explorer. All scenarios use the same bundled Talinum ARC with caller-supplied public, private, or unavailable DataHub information. Investigation and viewer dashlets include buttons to open them in interactive popups. These stories make no DataHub requests.',
       },
     },
   },
