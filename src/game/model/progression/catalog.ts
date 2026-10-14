@@ -32,7 +32,7 @@ export const CARDS: readonly PowerUpCard[] = [
   {
     id: 'stat.freshBattery',
     name: 'Fresh Battery',
-    description: 'Dash cooldown 15% shorter, down to 250 ms.',
+    description: 'Dash cooldown 0.5 s shorter, down to 1 s.',
     rarity: 'common',
     kind: 'stat',
   },

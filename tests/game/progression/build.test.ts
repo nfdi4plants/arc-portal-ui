@@ -6,7 +6,7 @@ describe('createBuild', () => {
   it('starts at level 1 with the staff in both slots and three offered cards', () => {
     const build = createBuild()
     expect(build).toMatchObject({ level: 1, xp: 0, hp: 100, offerSize: 3, mechanics: [], legendaries: [] })
-    expect(build.stats).toMatchObject({ maxHp: 100, moveSpeed: 1, critChance: 0.05, dashCooldownMs: 600, lifesteal: 0 })
+    expect(build.stats).toMatchObject({ maxHp: 100, moveSpeed: 1, critChance: 0.05, dashCooldownMs: 2000, lifesteal: 0 })
     expect(build.weapons).toEqual({ light: { id: 'staff', tier: 1 }, heavy: { id: 'staff', tier: 1 } })
     expect(build.abilitySlots).toEqual([null, null, null, null])
   })

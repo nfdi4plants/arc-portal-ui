@@ -5,7 +5,7 @@ describe('cardDetails', () => {
   it('shows the current and the new value of a stat with its cap', () => {
     expect(cardDetails(createBuild(), 'stat.swiftFeet')[0]).toBe('Move speed: 1.00x -> 1.12x (max 1.80x)')
     expect(cardDetails(createBuild(), 'stat.keenEye')[0]).toBe('Crit chance: 5% -> 10% (max 60%)')
-    expect(cardDetails(createBuild(), 'stat.freshBattery')[0]).toBe('Dash cooldown: 600 ms -> 510 ms (min 250 ms)')
+    expect(cardDetails(createBuild(), 'stat.freshBattery')[0]).toBe('Dash cooldown: 2000 ms -> 1500 ms (min 1000 ms)')
   })
 
   it('says so when a stat is already at its cap', () => {

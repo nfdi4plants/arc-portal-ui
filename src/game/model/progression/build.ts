@@ -18,7 +18,7 @@ export const STAT_CAPS = {
   damage: 4,
   meleeRange: 1.8,
   critChance: 0.6,
-  dashCooldownMs: 250,
+  dashCooldownMs: 1000,
 } as const
 
 interface Effect {
@@ -41,7 +41,7 @@ export const createBuild: CreateBuild = () => ({
     meleeRange: 1,
     critChance: 0.05,
     critMultiplier: 1.5,
-    dashCooldownMs: 600,
+    dashCooldownMs: 2000,
     lifesteal: 0,
   },
   weapons: {
@@ -84,11 +84,14 @@ function raiseStat(field: CappedStat, update: (value: number) => number): Effect
   }
 }
 
+// Each Fresh Battery card takes this much off the dash cooldown, so two cards reach the floor.
+const FRESH_BATTERY_MS = 500
+
 const freshBattery: Effect = {
   applies: (build) => build.stats.dashCooldownMs > STAT_CAPS.dashCooldownMs,
   apply: (build) => ({
     ...build,
-    stats: { ...build.stats, dashCooldownMs: Math.max(STAT_CAPS.dashCooldownMs, build.stats.dashCooldownMs * 0.85) },
+    stats: { ...build.stats, dashCooldownMs: Math.max(STAT_CAPS.dashCooldownMs, build.stats.dashCooldownMs - FRESH_BATTERY_MS) },
   }),
 }
 

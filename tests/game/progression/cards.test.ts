@@ -40,11 +40,11 @@ describe('stat cards', () => {
     expect(applyCard(build, 'stat.swiftFeet')).toBe(build)
   })
 
-  it('shortens dash cooldown by 15% per card and stops at the 250 ms floor', () => {
-    expect(applyCard(createBuild(), 'stat.freshBattery').stats.dashCooldownMs).toBeCloseTo(510)
+  it('shortens dash cooldown by 500 ms per card and stops at the 1 s floor', () => {
+    expect(applyCard(createBuild(), 'stat.freshBattery').stats.dashCooldownMs).toBe(1500)
     let build = createBuild()
     for (let i = 0; i < 8; i++) build = applyCard(build, 'stat.freshBattery')
-    expect(build.stats.dashCooldownMs).toBe(250)
+    expect(build.stats.dashCooldownMs).toBe(1000)
     expect(canApply(build, 'stat.freshBattery')).toBe(false)
   })
 
