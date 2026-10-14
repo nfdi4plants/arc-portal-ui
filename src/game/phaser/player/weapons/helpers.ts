@@ -1,4 +1,4 @@
-import type { Combatant } from '../../../contracts/combat'
+import type { Combatant, HitShape } from '../../../contracts/combat'
 
 // Pure helpers of the loadout. Nothing here imports Phaser, so they run in jsdom tests.
 
@@ -138,4 +138,30 @@ export function createDamageModifier(
   roll: () => number,
 ): (attacker: Combatant, base: number) => { damage: number; crit: boolean } {
   return (attacker, base) => (attacker === owner ? rollHit(base, state, roll()) : { damage: base, crit: false })
+}
+
+// Up attacks without moves of their own turn their hitboxes to point overhead. The box starts a
+// little below the top of the head, so a mob standing on the mage is still hit.
+const OVERHEAD_BASE_Y = -30
+// A thin forward box (the whip lash) would make a thread above the head that is hard to land.
+const OVERHEAD_MIN_WIDTH = 20
+const UPWARD_MIN_LIFT = 160
+const UPWARD_FORWARD_SHARE = 0.25
+
+// Maps a shape authored for a forward attack (relative to the feet, facing right) to one centred
+// over the mage. A rect swaps width and height, so the reach goes up. A circle moves its forward
+// offset upwards.
+export function overheadShape(shape: HitShape): HitShape {
+  if (shape.kind === 'circle') {
+    return { kind: 'circle', x: 0, y: Math.min(shape.y, OVERHEAD_BASE_Y) - Math.abs(shape.x), r: shape.r }
+  }
+  const width = Math.max(OVERHEAD_MIN_WIDTH, shape.h)
+  return { kind: 'rect', x: -width / 2, y: OVERHEAD_BASE_Y - shape.w, w: width, h: shape.w + Math.max(0, shape.x) }
+}
+
+// Knockback for an overhead hit: mostly up, with a small part of the forward push left.
+export function upwardKnockback(knockback: Point): Point {
+  if (knockback.x === 0 && knockback.y === 0) return knockback
+  const lift = Math.max(UPWARD_MIN_LIFT, Math.abs(knockback.y), Math.abs(knockback.x) * 0.9)
+  return { x: knockback.x * UPWARD_FORWARD_SHARE, y: -lift }
 }

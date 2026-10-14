@@ -7,9 +7,12 @@ const PUFFS = 8
 // One puff crosses the cone in this time. The puffs are spread evenly over the cycle.
 const CYCLE_MS = 220
 
+// Which way the flame streams from the mage: ahead, below the feet or above the head.
+export type FlameDirection = 'forward' | 'down' | 'up'
+
 export interface FlameVisual {
-  // Shows the cone in front of the player until `durationMs` have passed. A second call extends it.
-  show(player: PlayerHandle, durationMs: number, length: number): void
+  // Shows the cone until `durationMs` have passed. A second call extends it.
+  show(player: PlayerHandle, durationMs: number, length: number, direction?: FlameDirection): void
 }
 
 const visuals = new WeakMap<Phaser.Scene, FlameVisual>()
@@ -32,6 +35,7 @@ export function flameVisual(scene: Phaser.Scene, art: ScribbleArt): FlameVisual 
   let startAt = 0
   let endAt = 0
   let length = 0
+  let direction: FlameDirection = 'forward'
 
   const hideAll = () => {
     for (const puff of puffs) puff.setVisible(false)
@@ -52,10 +56,13 @@ export function flameVisual(scene: Phaser.Scene, art: ScribbleArt): FlameVisual 
     for (let i = 0; i < PUFFS; i++) {
       const t = ((now - startAt) / CYCLE_MS + i / PUFFS) % 1
       const row = (i % 3) - 1
-      puffs[i]
-        .setPosition(feet.x + dir * (10 + t * length), feet.y - 24 + row * t * length * 0.2)
+      const spread = row * t * length * 0.2
+      const puff = puffs[i]
+      if (direction === 'forward') puff.setPosition(feet.x + dir * (10 + t * length), feet.y - 24 + spread).setRotation(dir * (Math.PI / 2))
+      else if (direction === 'down') puff.setPosition(feet.x + spread, feet.y - 4 + t * length).setRotation(Math.PI)
+      else puff.setPosition(feet.x + spread, feet.y - 40 - t * length).setRotation(0)
+      puff
         .setScale(scale * (0.6 + t * 1.2))
-        .setRotation(dir * (Math.PI / 2))
         .setAlpha(fade * (1 - t * 0.8))
         .setVisible(true)
     }
@@ -71,12 +78,13 @@ export function flameVisual(scene: Phaser.Scene, art: ScribbleArt): FlameVisual 
   scene.events.once('shutdown', destroy)
 
   const visual: FlameVisual = {
-    show(target, durationMs, reach) {
+    show(target, durationMs, reach, towards = 'forward') {
       const now = scene.time.now
       if (!player) startAt = now
       player = target
       endAt = now + durationMs
       length = reach
+      direction = towards
     },
   }
   visuals.set(scene, visual)

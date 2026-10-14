@@ -69,6 +69,15 @@ src/game/
 `RunDirector` holds the run state (build, rng, clock, stage) free of Phaser. Scenes come and go per
 stage and read it through `RunContext`.
 
+## Attack variants
+
+Heavy pressed in the air plays the weapon's air heavy, mostly a plunge with a landing hit and a
+short landing lock. Attacks during a dash, or up to 80 ms after it, play the dash light (no lock) or the
+dash heavy. Attacks with up held play an overhead version, and ranged weapons keep aiming at the cursor.
+Each moveset defines its variants (`airHeavy`, `dashLight`, `dashHeavy`, `upLight`, `upHeavy`), the
+fallbacks live in `phaser/player/weapons/variants.ts`, and the attack machine in
+`phaser/player/attacks.ts` picks the variant, runs plunges until landing and applies locks.
+
 ## Running the sandboxes
 
 Start Storybook with `npm run storybook` (port 6006) and open these stories:

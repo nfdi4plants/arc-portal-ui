@@ -152,7 +152,7 @@ export const CARDS: readonly PowerUpCard[] = [
   {
     id: 'mechanic.groundSlam',
     name: 'Ground Slam',
-    description: 'Hold down and press heavy in the air to plunge and slam the ground around you.',
+    description: 'Your heavy attacks in the air land harder: landing hits reach 50% further and send two shockwaves along the ground.',
     rarity: 'rare',
     kind: 'mechanic',
   },

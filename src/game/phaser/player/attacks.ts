@@ -1,31 +1,56 @@
-import type { AttackMove } from '../../contracts/player'
+import type { AttackMove, AttackVariant } from '../../contracts/player'
 import type { WeaponSlot } from '../../contracts/progression'
 
 export type AttackPhase = 'idle' | 'startup' | 'active' | 'recovery'
 
 export const ATTACK_BUFFER_MS = 150
+// A plunge without maxMs that has not landed after this long fell into a pit or off the level.
+export const PLUNGE_MAX_MS = 2000
+// How long after its active phase started a move still waits for the landing that fires onLand.
+export const LANDING_WINDOW_MS = 1500
 
 export interface AttackHooks {
   movesFor(slot: WeaponSlot): AttackMove[]
-  onStart(slot: WeaponSlot, comboIndex: number, move: AttackMove): void
+  // The version of a slot for a variant other than 'ground'. Null means the slot has none, and the
+  // machine tries the next variant. comboIndex matters for up lights only.
+  variantFor?(slot: WeaponSlot, variant: Exclude<AttackVariant, 'ground'>, comboIndex: number): AttackMove | null
+  onStart(slot: WeaponSlot, comboIndex: number, move: AttackMove, variant: AttackVariant): void
   onActive(slot: WeaponSlot, comboIndex: number, move: AttackMove): void
+  onLand?(slot: WeaponSlot, move: AttackMove): void
 }
 
 export interface AttackStepEnv {
   grounded: boolean
   attackSpeed: number
-  // False while dashing, flinching or dead. Presses stay buffered.
+  // False while flinching or dead, or on the step a dash starts. Presses stay buffered.
   canStart: boolean
+  // True during a dash and shortly after it. A press made now plays the dash variant, also when
+  // the buffer starts it a little later.
+  dashing?: boolean
+  // Up held and down not held, so a pogo (down + light in the air) keeps its place.
+  up?: boolean
+}
+
+export interface AttackInfo {
+  slot: WeaponSlot
+  comboIndex: number
+  move: AttackMove
+  variant: AttackVariant
 }
 
 export interface AttackMachine {
   step(dtMs: number, pressed: { light: boolean; heavy: boolean }, env: AttackStepEnv): void
   phase(): AttackPhase
-  current(): { slot: WeaponSlot; comboIndex: number; move: AttackMove } | null
-  // Startup, active, or recovery before the move's cancelAfterMs. Jumps and dashes wait.
+  current(): Readonly<AttackInfo> | null
+  // Startup, active, recovery before the move's cancelAfterMs, or a lock. Jumps and dashes wait.
   isLocked(): boolean
-  // Recovery after cancelAfterMs: jump, dash and the next attack may cut the move short.
+  // Recovery after cancelAfterMs and no lock: jump, dash and the next attack may cut the move short.
   canCancel(): boolean
+  // Time left of a lockMs or landingLockMs lock. The player takes no movement input meanwhile.
+  lockRemainingMs(): number
+  // Time since the current move started, for hover.
+  moveElapsedMs(): number
+  // Ends the move, its lock and a landing it still waits for. For hits, teleports and cancels.
   cancel(): void
 }
 
@@ -34,81 +59,165 @@ export interface AttackMachine {
 export function createAttackMachine(hooks: AttackHooks): AttackMachine {
   let phase: AttackPhase = 'idle'
   let elapsed = 0
+  let moveMs = 0
   let attackSpeed = 1
   let slot: WeaponSlot = 'light'
   let comboIndex = 0
   let move: AttackMove | null = null
   // Allocated once per started move, so current() is free to call every frame.
-  let info: { slot: WeaponSlot; comboIndex: number; move: AttackMove } | null = null
+  let info: AttackInfo | null = null
   let bufferedSlot: WeaponSlot | null = null
   let bufferedMs = 0
+  let bufferedDash = false
+  let lockMs = 0
+  // The move waiting for its landing, which may outlive the move itself.
+  let landing: AttackMove | null = null
+  let landingSlot: WeaponSlot = 'heavy'
+  let landingMs = 0
 
   const scaled = (ms: number) => ms / attackSpeed
 
-  const advance = () => {
-    for (;;) {
-      if (!move) return
-      if (phase === 'startup' && elapsed >= scaled(move.startupMs)) {
-        elapsed -= scaled(move.startupMs)
-        phase = 'active'
-        hooks.onActive(slot, comboIndex, move)
-      } else if (phase === 'active' && elapsed >= scaled(move.activeMs)) {
-        elapsed -= scaled(move.activeMs)
-        phase = 'recovery'
-      } else if (phase === 'recovery' && elapsed >= scaled(move.recoveryMs)) {
-        cancel()
-      } else {
-        return
-      }
-    }
+  const lock = (ms: number | undefined) => {
+    if (ms) lockMs = Math.max(lockMs, scaled(ms))
   }
 
-  const start = (nextSlot: WeaponSlot, index: number, grounded: boolean): boolean => {
-    const moves = hooks.movesFor(nextSlot)
-    if (moves.length === 0) return false
-    const nextIndex = index % moves.length
-    const next = moves[nextIndex]
-    if (!grounded && !next.allowedInAir) return false
-    slot = nextSlot
-    comboIndex = nextIndex
-    move = next
-    info = { slot, comboIndex, move }
-    phase = 'startup'
-    elapsed = 0
-    hooks.onStart(slot, comboIndex, move)
-    advance()
-    return true
+  const land = () => {
+    const landed = landing
+    landing = null
+    if (!landed) return
+    lock(landed.landingLockMs)
+    hooks.onLand?.(landingSlot, landed)
   }
 
-  const canCancel = () => phase === 'recovery' && move !== null && elapsed >= scaled(move.cancelAfterMs)
-
-  const cancel = () => {
+  const finish = () => {
     phase = 'idle'
     move = null
     info = null
     elapsed = 0
   }
 
+  const toRecovery = (current: AttackMove) => {
+    phase = 'recovery'
+    lock(current.lockMs)
+  }
+
+  const advance = (grounded: boolean) => {
+    for (;;) {
+      const current = move
+      if (!current) return
+      if (phase === 'startup') {
+        if (elapsed < scaled(current.startupMs)) return
+        elapsed -= scaled(current.startupMs)
+        phase = 'active'
+        if (current.onLand || current.plunge || current.landingLockMs) {
+          landing = current
+          landingSlot = slot
+          landingMs = 0
+        }
+        hooks.onActive(slot, comboIndex, current)
+      } else if (phase === 'active' && current.plunge) {
+        if (landing === current && grounded) land()
+        const falling = landing === current
+        if (falling && elapsed < scaled(current.plunge.maxMs ?? PLUNGE_MAX_MS)) return
+        // Without maxMs the fall timed out over a pit, so no landing is due any more.
+        if (falling && current.plunge.maxMs === undefined) landing = null
+        elapsed = 0
+        toRecovery(current)
+      } else if (phase === 'active') {
+        if (elapsed < scaled(current.activeMs)) return
+        elapsed -= scaled(current.activeMs)
+        toRecovery(current)
+      } else if (phase === 'recovery') {
+        if (elapsed < scaled(current.recoveryMs)) return
+        finish()
+      } else {
+        return
+      }
+    }
+  }
+
+  const variant = (nextSlot: WeaponSlot, kind: Exclude<AttackVariant, 'ground'>, index: number) =>
+    hooks.variantFor?.(nextSlot, kind, index) ?? null
+
+  const start = (nextSlot: WeaponSlot, index: number, env: AttackStepEnv, dash: boolean): boolean => {
+    const { grounded } = env
+    const moves = hooks.movesFor(nextSlot)
+    const nextIndex = moves.length > 0 ? index % moves.length : 0
+    let kind: AttackVariant = 'ground'
+    let next: AttackMove | null = null
+    if (dash) {
+      next = variant(nextSlot, 'dash', 0)
+      if (next) kind = 'dash'
+    }
+    if (!next && env.up) {
+      next = variant(nextSlot, 'up', nextIndex)
+      if (next) kind = 'up'
+    }
+    if (!next && !grounded && nextSlot === 'heavy') {
+      next = variant(nextSlot, 'air', 0)
+      if (next) kind = 'air'
+    }
+    if (!next) {
+      if (moves.length === 0) return false
+      next = moves[nextIndex]
+      if (!grounded && !next.allowedInAir) return false
+    }
+    slot = nextSlot
+    comboIndex = kind === 'dash' || kind === 'air' ? 0 : nextIndex
+    move = next
+    info = { slot, comboIndex, move, variant: kind }
+    phase = 'startup'
+    elapsed = 0
+    moveMs = 0
+    landing = null
+    hooks.onStart(slot, comboIndex, move, kind)
+    advance(grounded)
+    return true
+  }
+
+  const canCancel = () => phase === 'recovery' && move !== null && lockMs <= 0 && elapsed >= scaled(move.cancelAfterMs)
+
+  const cancel = () => {
+    finish()
+    landing = null
+    lockMs = 0
+  }
+
   return {
     step(dtMs, pressed, env) {
       attackSpeed = Math.max(0.05, env.attackSpeed)
+      const dashing = env.dashing ?? false
       if (pressed.heavy || pressed.light) {
         bufferedSlot = pressed.heavy ? 'heavy' : 'light'
         bufferedMs = ATTACK_BUFFER_MS
+        bufferedDash = dashing
+      } else if (bufferedSlot && dashing) {
+        bufferedDash = true
       }
+      // A dash out of a finished air move drops the landing it waited for.
+      if (dashing && phase === 'idle') landing = null
 
+      if (lockMs > 0) lockMs = Math.max(0, lockMs - dtMs)
       if (phase !== 'idle') {
         elapsed += dtMs
-        advance()
+        moveMs += dtMs
+        advance(env.grounded)
       }
 
-      if (bufferedSlot && env.canStart) {
+      // A falling plunge lands inside advance. Every other move waits for its landing here.
+      if (landing && !(phase === 'active' && move === landing && landing.plunge)) {
+        landingMs += dtMs
+        if (env.grounded) land()
+        else if (landingMs >= LANDING_WINDOW_MS) landing = null
+      }
+
+      if (bufferedSlot && env.canStart && lockMs <= 0) {
         let started = false
         if (phase === 'idle') {
-          started = start(bufferedSlot, 0, env.grounded)
+          started = start(bufferedSlot, 0, env, dashing || bufferedDash)
         } else if (canCancel()) {
           const chain = bufferedSlot === 'light' && slot === 'light'
-          started = start(bufferedSlot, chain ? comboIndex + 1 : 0, env.grounded)
+          started = start(bufferedSlot, chain ? comboIndex + 1 : 0, env, dashing || bufferedDash)
         }
         if (started) bufferedSlot = null
       }
@@ -120,8 +229,10 @@ export function createAttackMachine(hooks: AttackHooks): AttackMachine {
     },
     phase: () => phase,
     current: () => info,
-    isLocked: () => phase !== 'idle' && !canCancel(),
+    isLocked: () => lockMs > 0 || (phase !== 'idle' && !canCancel()),
     canCancel,
+    lockRemainingMs: () => lockMs,
+    moveElapsedMs: () => moveMs,
     cancel,
   }
 }

@@ -339,7 +339,8 @@ function buildPanel(scene: Phaser.Scene, checked: Set<string>, tierTwo: Set<stri
   stats.style.cssText = 'margin:0 0 6px;font:11px/1.35 monospace;white-space:pre-wrap'
   const hint = document.createElement('div')
   hint.style.cssText = 'margin-bottom:6px;opacity:.8'
-  hint.textContent = 'Click the canvas first. WASD, Space, Shift, mouse buttons, Q E R F. Down + attack in the air for pogo and plunge.'
+  hint.textContent =
+    'Click the canvas first. WASD, Space, Shift, mouse buttons, Q E R F. Heavy in the air plunges, attacks during a dash are dash attacks, W + attack goes up, down + light in the air is the pogo.'
   root.append(stats, hint)
 
   const boxes = new Map<string, HTMLInputElement>()

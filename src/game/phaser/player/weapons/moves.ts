@@ -3,44 +3,41 @@ import type { AttackContext, AttackMove, WeaponMoveset } from '../../../contract
 import type { WeaponSlot } from '../../../contracts/progression'
 import type { Core, Feature } from './core'
 import type { Point } from './helpers'
-import { SUB_HITS, bindScheduler, heavyOf, spawnShockwaves } from './kit'
+import { SUB_HITS, bindFx, bindScheduler, heavyOf, spawnShockwaves } from './kit'
 import type { HeavyDeclaration } from './kit'
+import { airHeavyOf, dashHeavyOf, dashLightOf, upHeavyOf, upLightOf, upward } from './variants'
 
 export interface MoveLayer extends Feature {
   // Returns a moveset that runs the base moves and adds the combat effects of the mechanics.
   wrap(base: WeaponMoveset): WeaponMoveset
 }
 
-const PLUNGE_SPEED = 720
-// A plunge that never lands (it was knocked off course, say) ends after this long.
-const PLUNGE_MAX_MS = 2000
 const POGO_BOUNCE = -480
 const DOI_SHARE = 0.6
 
 const SHOCKWAVE = { damage: 12, width: 14, height: 16, speed: 230, distance: 150 }
 
-// The plunge move that a heavy press with down held plays in the air.
-const PLUNGE_MOVE = { startupMs: 60, activeMs: 40, recoveryMs: 200, cancelAfterMs: 80 }
+// Ground Slam: the landing of every air heavy covers 50% more and sends two waves along the ground.
+const SLAM_AREA = 1.5
+const SLAM_WAVES = { damage: 12, width: 16, height: 18, speed: 240, distance: 160 }
 
-// Wraps the weapon movesets. Every move runs through a copy of the attack context whose combat
-// world reports each spawned spec back (to Peer Review, and for DOI Excalibur the largest damage
-// of a heavy move that declares none). The mechanics that change or extend a move live here:
+// Wraps the weapon movesets, including their air, dash and up variants (or the fallbacks from
+// variants.ts). Every move runs through a copy of the attack context whose combat world reports
+// each spawned spec back (to Peer Review, and for DOI Excalibur the largest damage of a heavy move
+// that declares none). The mechanics that change or extend a move live here:
 //  - tripleCombo appends a spin finisher to the light string
-//  - pogo turns a light attack in the air with down held into a downward stab that bounces
-//  - groundSlam lets the heavy attack start in the air. The press decides at its start whether it
-//    is a plunge (attackStarted carries the held keys, so down held in the air is a plunge), and
-//    the heavy then plays a quick plunge move that slams on landing. Without down the heavy move
-//    plays as usual.
+//  - pogo turns a ground light in the air with down held into a downward stab that bounces. Dash
+//    and up lights never pogo, and the attack machine only picks up when down is not held.
+//  - groundSlam makes every air heavy land harder: its landing hits use 1.5 times the melee range,
+//    and two waves run along the ground. An air heavy without a landing hit gets the waves only.
 //  - shockwaveHeavy and doiExcalibur add their hits when the main damage of a heavy move happens.
-//    That is the start of the active phase, except for the Petri shield, whose bash comes later.
+//    That is the start of the active phase (later for a move that declares a delay), or the
+//    landing for an air heavy that has one. Dash and up heavies count as heavy moves.
+// echoStrike needs nothing here: it repeats every hit tagged 'light', dash lights included.
 export function createMoveLayer(core: Core): MoveLayer {
   const { deps, flags } = core
   const { player, combat: real } = deps
   const tap = { active: false, maxDamage: 0 }
-  let plunging = false
-  let plungeMs = 0
-  // Set by attackStarted: the heavy that just started is a plunge.
-  let plunge = false
 
   const note = (hit: HitboxSpec | ProjectileSpec, origin: Point | null) => {
     if (tap.active && hit.damage > tap.maxDamage) tap.maxDamage = hit.damage
@@ -66,6 +63,8 @@ export function createMoveLayer(core: Core): MoveLayer {
     hitStopRemainingMs: () => real.hitStopRemainingMs(),
     destroy: () => real.destroy(),
   }
+
+  const tappedCtx = (ctx: AttackContext): AttackContext => ({ ...ctx, combat: tapped })
 
   const pogoStab = (ctx: AttackContext) => {
     ctx.combat.spawnHitbox({
@@ -98,7 +97,7 @@ export function createMoveLayer(core: Core): MoveLayer {
     })
   }
 
-  const finisher: AttackMove = {
+  const finisherBase: AttackMove = {
     name: 'Spin finisher',
     startupMs: 80,
     activeMs: 120,
@@ -106,31 +105,7 @@ export function createMoveLayer(core: Core): MoveLayer {
     cancelAfterMs: 160,
     lunge: 0,
     allowedInAir: true,
-    onActive: (ctx) => run(ctx, 'light', spin),
-  }
-
-  const startPlunge = (ctx: AttackContext) => {
-    plunging = true
-    plungeMs = 0
-    ctx.player.setVelocity(0, PLUNGE_SPEED)
-  }
-
-  const land = () => {
-    plunging = false
-    const feet = player.position()
-    const scale = core.build.stats.meleeRange
-    real.spawnHitbox({
-      owner: player,
-      shape: { kind: 'circle', x: 0, y: -8, r: 56 * scale },
-      follow: false,
-      activeMs: 110,
-      damage: 30,
-      knockback: { x: 240, y: -300 },
-      hitStopMs: 80,
-      maxTargets: Infinity,
-      tags: ['heavy', 'slam'],
-    })
-    core.fx.burst(feet.x, feet.y - 6, 'crit', 2.5 * scale)
+    onActive: spin,
   }
 
   const doiHits = (moveDamage: number) => {
@@ -153,63 +128,79 @@ export function createMoveLayer(core: Core): MoveLayer {
     if (flags.doiExcalibur && moveDamage > 0) doiHits(moveDamage)
   }
 
-  // Runs a move body. A heavy move that declares its damage triggers the extras when that damage
-  // happens. One that declares nothing (the staff slam) triggers them after the body, with the
-  // largest damage the body spawned.
-  function run(ctx: AttackContext, slot: WeaponSlot, body: (ctx: AttackContext) => void, heavy?: HeavyDeclaration) {
-    if (slot === 'light' && flags.pogo && !player.isGrounded() && ctx.held.has('down')) {
-      pogoStab({ ...ctx, combat: tapped })
-      return
-    }
-    const wrapped: AttackContext = { ...ctx, combat: tapped }
+  // Runs a move body and returns the largest damage it spawned.
+  const measure = (ctx: AttackContext, body: (ctx: AttackContext) => void): number => {
     tap.maxDamage = 0
     tap.active = true
     try {
-      body(wrapped)
+      body(ctx)
     } finally {
       tap.active = false
     }
-    if (slot !== 'heavy') return
-    if (!heavy) {
-      heavyExtras(wrapped, tap.maxDamage)
-      return
-    }
-    const delayMs = (heavy.delayMs ?? 0) / core.build.stats.attackSpeed
-    if (delayMs > 0) core.scheduler.at(delayMs, () => heavyExtras(wrapped, heavy.damage), SUB_HITS)
-    else heavyExtras(wrapped, heavy.damage)
+    return tap.maxDamage
   }
 
-  // The heavy move of a mage in the air with Ground Slam. The attack machine picks the move before
-  // attackStarted says whether down was held, and it reads the timing of the move on every step.
-  // So the timing follows `plunge`, which that event sets.
-  const airHeavy = (move: AttackMove, heavy: HeavyDeclaration | undefined): AttackMove => ({
-    name: move.name,
-    get startupMs() {
-      return plunge ? PLUNGE_MOVE.startupMs : move.startupMs
+  // A heavy move that declares its damage triggers the extras when that damage happens. One that
+  // declares nothing (the staff moves) triggers them right after the body, with the largest damage
+  // the body spawned.
+  const extrasAfter = (ctx: AttackContext, heavy: HeavyDeclaration | undefined, spawned: number, useDelay: boolean) => {
+    if (!heavy) {
+      heavyExtras(ctx, spawned)
+      return
+    }
+    const delayMs = useDelay ? (heavy.delayMs ?? 0) / core.build.stats.attackSpeed : 0
+    if (delayMs > 0) core.scheduler.at(delayMs, () => heavyExtras(ctx, heavy.damage), SUB_HITS)
+    else heavyExtras(ctx, heavy.damage)
+  }
+
+  const light = (move: AttackMove, pogo: boolean): AttackMove => ({
+    ...move,
+    onActive(ctx) {
+      const wrapped = tappedCtx(ctx)
+      if (pogo && flags.pogo && !player.isGrounded() && ctx.held.has('down')) pogoStab(wrapped)
+      else move.onActive(wrapped)
     },
-    get activeMs() {
-      return plunge ? PLUNGE_MOVE.activeMs : move.activeMs
-    },
-    get recoveryMs() {
-      return plunge ? PLUNGE_MOVE.recoveryMs : move.recoveryMs
-    },
-    get cancelAfterMs() {
-      return plunge ? PLUNGE_MOVE.cancelAfterMs : move.cancelAfterMs
-    },
-    get lunge() {
-      return plunge ? 0 : move.lunge
-    },
-    allowedInAir: true,
-    onActive: (ctx) => (plunge ? startPlunge(ctx) : run(ctx, 'heavy', move.onActive, heavy)),
   })
 
-  const build = (base: WeaponMoveset, slot: WeaponSlot, tier: 1 | 2, air: boolean): AttackMove[] => {
-    const moves = base.moves(slot, tier).map((move): AttackMove => {
-      const heavy = slot === 'heavy' ? heavyOf(move) : undefined
-      if (air) return airHeavy(move, heavy)
-      return { ...move, onActive: (ctx) => run(ctx, slot, move.onActive, heavy) }
-    })
-    if (slot === 'light' && flags.tripleCombo) moves.push(finisher)
+  const heavy = (move: AttackMove): AttackMove => {
+    const declared = heavyOf(move)
+    return {
+      ...move,
+      onActive(ctx) {
+        const wrapped = tappedCtx(ctx)
+        extrasAfter(wrapped, declared, measure(wrapped, move.onActive), true)
+      },
+    }
+  }
+
+  const land = (ctx: AttackContext, landing: AttackMove['onLand'], declared: HeavyDeclaration | undefined) => {
+    const wrapped = tappedCtx(ctx)
+    const slam = flags.groundSlam
+    if (landing) {
+      const area = slam ? { ...wrapped, rangeScale: wrapped.rangeScale * SLAM_AREA } : wrapped
+      extrasAfter(wrapped, declared, measure(area, (c) => landing(c)), false)
+    }
+    if (slam) spawnShockwaves(wrapped, SLAM_WAVES)
+  }
+
+  const airHeavy = (move: AttackMove): AttackMove => {
+    const declared = heavyOf(move)
+    const landing = move.onLand
+    return {
+      ...move,
+      onActive(ctx) {
+        const wrapped = tappedCtx(ctx)
+        const spawned = measure(wrapped, move.onActive)
+        // A move that lands has its main damage on the landing.
+        if (!landing) extrasAfter(wrapped, declared, spawned, true)
+      },
+      onLand: landing || flags.groundSlam ? (ctx) => land(ctx, landing, declared) : undefined,
+    }
+  }
+
+  const buildList = (base: WeaponMoveset, slot: WeaponSlot, tier: 1 | 2): AttackMove[] => {
+    const moves = base.moves(slot, tier).map((move) => (slot === 'light' ? light(move, true) : heavy(move)))
+    if (slot === 'light' && flags.tripleCombo) moves.push(light(finisherBase, true))
     return moves
   }
 
@@ -220,46 +211,80 @@ export function createMoveLayer(core: Core): MoveLayer {
     }),
   )
   core.own(bindScheduler(deps.scene, core.scheduler))
-  core.own(
-    player.on('attackStarted', ({ slot, held }) => {
-      // A new attack ends a plunge that is still falling.
-      plunging = false
-      plunge = slot === 'heavy' && flags.groundSlam && !player.isGrounded() && held.has('down')
-    }),
-  )
-  // A hit or a dash cancels the attack, so its sub-hits and a plunge in flight stop with it.
-  const interrupt = () => {
-    plunging = false
-    core.scheduler.cancel(SUB_HITS)
-  }
+  core.own(bindFx(deps.scene, core.fx))
+  // A hit or a dash cancels the attack, so its sub-hits stop with it.
+  const interrupt = () => core.scheduler.cancel(SUB_HITS)
   core.own(player.on('damaged', interrupt))
   core.own(player.on('dashed', interrupt))
 
   return {
     wrap(base) {
-      const ground: (AttackMove[] | undefined)[] = [undefined, undefined, undefined, undefined]
-      const air: (AttackMove[] | undefined)[] = [undefined, undefined]
+      const lists: (AttackMove[] | undefined)[] = [undefined, undefined, undefined, undefined]
+      // Air heavy, dash light, dash heavy and up heavy, two tiers each. Null is a cached "none".
+      const singles: (AttackMove | null | undefined)[] = Array.from({ length: 8 }, () => undefined)
+      const upLights = [new Map<number, AttackMove | null>(), new Map<number, AttackMove | null>()]
       let version = -1
+      const fresh = () => {
+        if (version === core.version) return
+        lists.fill(undefined)
+        singles.fill(undefined)
+        for (const map of upLights) map.clear()
+        version = core.version
+      }
+      const single = (kind: number, tier: 1 | 2, make: () => AttackMove | null): AttackMove | null => {
+        fresh()
+        const index = kind * 2 + tier - 1
+        let result = singles[index]
+        if (result === undefined) {
+          result = make()
+          singles[index] = result
+        }
+        return result
+      }
+      const list = (slot: WeaponSlot, tier: 1 | 2): AttackMove[] => {
+        fresh()
+        return (lists[(slot === 'light' ? 0 : 2) + tier - 1] ??= buildList(base, slot, tier))
+      }
       return {
         id: base.id,
-        moves(slot, tier) {
-          if (version !== core.version) {
-            ground.fill(undefined)
-            air.fill(undefined)
-            version = core.version
-          }
-          if (slot === 'heavy' && flags.groundSlam && !player.isGrounded()) return (air[tier - 1] ??= build(base, slot, tier, true))
-          return (ground[(slot === 'light' ? 0 : 2) + tier - 1] ??= build(base, slot, tier, false))
+        moves: list,
+        airHeavy: (tier) =>
+          single(0, tier, () => {
+            const move = airHeavyOf(base, tier)
+            return move && airHeavy(move)
+          }),
+        dashLight: (tier) =>
+          single(1, tier, () => {
+            const move = dashLightOf(base, tier)
+            return move && light(move, false)
+          }),
+        dashHeavy: (tier) =>
+          single(2, tier, () => {
+            const move = dashHeavyOf(base, tier)
+            return move && heavy(move)
+          }),
+        upHeavy: (tier) =>
+          single(3, tier, () => {
+            const move = upHeavyOf(base, tier)
+            return move && heavy(move)
+          }),
+        upLight(tier, comboIndex) {
+          fresh()
+          const cache = upLights[tier - 1]
+          let result = cache.get(comboIndex)
+          if (result !== undefined) return result
+          // Past the end of the weapon's own string comes the Triple Combo finisher.
+          const own = base.moves('light', tier).length
+          // The finisher turns overhead only for a weapon whose lights do, so a wand keeps aiming.
+          let move = upLightOf(base, tier, Math.min(comboIndex, Math.max(0, own - 1)))
+          if (move && comboIndex >= own) move = flags.tripleCombo ? upward(finisherBase) : null
+          result = move && light(move, false)
+          cache.set(comboIndex, result)
+          return result
         },
       }
     },
     sync() {},
-    update(dtMs) {
-      if (!plunging) return
-      plungeMs += dtMs
-      if (player.isGrounded()) land()
-      // The plunge sets a downward speed, so an upward one means a jump has taken over.
-      else if (plungeMs > PLUNGE_MAX_MS || player.isDead() || player.velocity().y < 0) plunging = false
-    },
+    update() {},
   }
 }
