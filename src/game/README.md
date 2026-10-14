@@ -85,7 +85,9 @@ by a phantom" and tells the player to fill in the missing value. Key P in the Mo
 Light presses walk the light string. A light press during a move of the string waits for the
 move's cancel window, and a press up to 250 ms after the move ended (`COMBO_GRACE_MS` in
 `phaser/player/attacks.ts`) still plays the next move, so a steady mash chains the whole string and
-the Triple Combo finisher. A longer pause, a heavy, a dash, a jump or a hit starts the string over.
+the Triple Combo finisher. Only one press waits at a time and later presses merge into it, so a
+mash stops at most one move after the last press. A longer pause, a heavy, a dash, a jump or a hit
+starts the string over.
 A move's lunge pushes the mage forward only while left or right is held. Without a direction the
 attack stays in place on the ground and keeps the air speed in the air.
 
@@ -145,11 +147,20 @@ Click the canvas to give it keyboard focus.
 | Rarity odds | `model/progression/offer.ts` |
 | Staff timing and damage | `phaser/player/staffMoveset.ts` |
 | Other weapons | `phaser/player/weapons/light.ts`, `phaser/player/weapons/heavy.ts` |
+| Weapon numbers on the level-up screen (follow the movesets, a test compares them) | `model/progression/weaponStats.ts` |
+| Attack buffer and combo grace | `phaser/player/attacks.ts` |
 | Player i-frames and flinch | `phaser/player/Player.ts` |
 | Pit damage, banner time, mob wake distance, monster prewarm rate | `phaser/scenes/StretchScene.ts` |
 | Level layout | `phaser/scenes/levelGen.ts` |
 
 Change a pure constant together with its test under `tests/game/`.
+
+Attack timing. A mash plays one move per startup, active and `cancelAfterMs`, so that sum sets the
+attack rate. Light moves of the string take about 320 to 490 ms (about 2.5 to 3 hits per second,
+shots no faster than melee jabs, string enders slower), and `tests/game/player/combo.test.ts` keeps
+a frantic mash at or below 3 per second. Ground and up heavies take about 0.8 to 1 s from startup
+to the end of recovery. Air and dash heavies are gated by the airtime and the dash cooldown, so they
+stay quicker. Quick Hands (`attackSpeed`) divides every phase.
 
 ## Performance rules
 

@@ -6,7 +6,7 @@
 
 export type AttackPhase = 'none' | 'windup' | 'active' | 'recovery'
 
-// Bar size at quality 1. Ten light staff jabs or two heavy swings fill it.
+// Bar size at quality 1. Nine light staff jabs or two heavy slams fill it.
 const BAR_AT_FULL_QUALITY = 60
 // At quality 0 the bar is this many times larger.
 const LOW_QUALITY_FACTOR = 10

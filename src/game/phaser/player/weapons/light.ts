@@ -91,9 +91,9 @@ export const wandMoveset: WeaponMoveset = {
   moves: memoMoves((slot, tier) => {
     if (slot === 'heavy') return []
     return [
-      wandShot('Bolt', lightTiming(70, 40, 150, 70), 9, tier),
-      wandShot('Bolt', lightTiming(70, 40, 150, 70), 9, tier),
-      wandShot('Bolt volley', lightTiming(90, 40, 230, 130), 14, tier),
+      wandShot('Bolt', lightTiming(120, 40, 240, 220), 13, tier),
+      wandShot('Bolt', lightTiming(120, 40, 240, 220), 13, tier),
+      wandShot('Bolt volley', lightTiming(140, 40, 320, 280), 20, tier),
     ]
   }),
 }
@@ -131,10 +131,10 @@ export const pipetteMoveset: WeaponMoveset = {
   moves: memoMoves((slot, tier) => {
     if (slot === 'heavy') return []
     return [
-      dropletShot(lightTiming(40, 40, 100, 50), 8, tier),
-      dropletShot(lightTiming(40, 40, 100, 50), 8, tier),
-      dropletShot(lightTiming(40, 40, 100, 50), 8, tier),
-      dropletShot(lightTiming(50, 40, 170, 100), 10, tier),
+      dropletShot(lightTiming(100, 40, 220, 190), 14, tier),
+      dropletShot(lightTiming(100, 40, 220, 190), 14, tier),
+      dropletShot(lightTiming(100, 40, 220, 190), 14, tier),
+      dropletShot(lightTiming(120, 40, 280, 230), 17, tier),
     ]
   }),
 }
@@ -164,14 +164,14 @@ function passCut(tier: 1 | 2): AttackMove {
 
 function risingCut(tier: 1 | 2): AttackMove {
   const knockback = { x: 60, y: -240 }
-  return move('Rising Cut', variantTiming(50, 60, 110, 60), (ctx, self) => {
+  return move('Rising Cut', variantTiming(95, 60, 200, 175), (ctx, self) => {
     const ms = activeMs(ctx, self)
     if (tier === 1) {
-      overheadBox(ctx, 46, 30, ms, 9, knockback, 25, LIGHT_TAGS)
+      overheadBox(ctx, 46, 30, ms, 12, knockback, 25, LIGHT_TAGS)
       return
     }
-    overheadBox(ctx, 46, 30, ms, 9 * DUAL_SHARE, knockback, 25, LIGHT_TAGS)
-    later(ctx, 40, () => overheadBox(ctx, 46, 30, ms, 9 * DUAL_SHARE, knockback, 25, LIGHT_TAGS))
+    overheadBox(ctx, 46, 30, ms, 12 * DUAL_SHARE, knockback, 25, LIGHT_TAGS)
+    later(ctx, 40, () => overheadBox(ctx, 46, 30, ms, 12 * DUAL_SHARE, knockback, 25, LIGHT_TAGS))
   })
 }
 
@@ -183,10 +183,10 @@ export const scalpelMoveset: WeaponMoveset = {
     if (slot === 'heavy') return []
     const quick = { x: 70, y: -20 }
     return [
-      scalpelMove('Scalpel cut', lightTiming(45, 45, 100, 55, 120), stab(8, quick, 25), tier),
-      scalpelMove('Scalpel cut', lightTiming(45, 45, 100, 55, 120), stab(8, quick, 25), tier),
-      scalpelMove('Scalpel cut', lightTiming(45, 45, 100, 55, 120), stab(8, quick, 25), tier),
-      scalpelMove('Scalpel slash', lightTiming(55, 55, 190, 110, 200), stab(12, { x: 200, y: -120 }, 45), tier),
+      scalpelMove('Scalpel cut', lightTiming(95, 50, 200, 175, 120), stab(12, quick, 25), tier),
+      scalpelMove('Scalpel cut', lightTiming(95, 50, 200, 175, 120), stab(12, quick, 25), tier),
+      scalpelMove('Scalpel cut', lightTiming(95, 50, 200, 175, 120), stab(12, quick, 25), tier),
+      scalpelMove('Scalpel slash', lightTiming(115, 60, 280, 215, 200), stab(20, { x: 200, y: -120 }, 45), tier),
     ]
   }),
 }
@@ -228,8 +228,8 @@ function crack(tier: 1 | 2): AttackMove {
 function skyLash(tier: 1 | 2): AttackMove {
   // Tier 2 drags a flyer down towards the mage, as its lash pulls enemies in.
   const knockback = tier === 2 ? { x: 0, y: 160 } : { x: 20, y: -220 }
-  return move('Sky Lash', variantTiming(90, 70, 170, 90), (ctx, self) => {
-    overheadBox(ctx, 92, 24, activeMs(ctx, self), 12, knockback, 35, LIGHT_TAGS)
+  return move('Sky Lash', variantTiming(130, 75, 260, 185), (ctx, self) => {
+    overheadBox(ctx, 92, 24, activeMs(ctx, self), 14, knockback, 35, LIGHT_TAGS)
     const feet = ctx.player.position()
     streak(ctx, feet.x + ctx.player.facing() * 4, feet.y - 34, feet.x, feet.y - 30 - 92 * ctx.rangeScale, 140)
   })
@@ -242,8 +242,8 @@ export const whipMoveset: WeaponMoveset = {
   moves: memoMoves((slot, tier) => {
     if (slot === 'heavy') return []
     return [
-      move('Whip lash', lightTiming(90, 70, 170, 90, 60), (ctx, self) => spawnMelee(ctx, activeMs(ctx, self), lash(11, 130, 30, tier))),
-      move('Whip crack', lightTiming(100, 80, 240, 130, 100), (ctx, self) => spawnMelee(ctx, activeMs(ctx, self), lash(14, 200, 45, tier))),
+      move('Whip lash', lightTiming(130, 75, 260, 185, 60), (ctx, self) => spawnMelee(ctx, activeMs(ctx, self), lash(13, 130, 30, tier))),
+      move('Whip crack', lightTiming(150, 85, 320, 235, 100), (ctx, self) => spawnMelee(ctx, activeMs(ctx, self), lash(17, 200, 45, tier))),
     ]
   }),
 }

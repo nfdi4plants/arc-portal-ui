@@ -42,7 +42,7 @@ const heavyTiming = (startupMs: number, activeMs: number, recoveryMs: number, ca
 // ungrouped, so a hit on the mage does not make the disc vanish in flight.
 const DISC_SPEED = 320
 const DISC_REACH = 160
-const DISC_DAMAGE = 20
+const DISC_DAMAGE = 30
 
 const disc = (damage: number, lifetimeMs: number, velocity: { x: number; y: number }, tags: string[]): Shot => ({
   art: 'disc',
@@ -153,7 +153,7 @@ export const discMoveset: WeaponMoveset = {
     return [
       move(
         'Disc throw',
-        heavyTiming(200, 80, 300, 180),
+        heavyTiming(280, 80, 480, 360),
         (ctx) => {
           for (const height of heights) throwDisc(ctx, height, DISC_DAMAGE)
         },
@@ -213,10 +213,10 @@ function pendulum(tier: 1 | 2): AttackMove {
 }
 
 function uppercut(tier: 1 | 2): AttackMove {
-  const damage = tier === 2 ? 34 : 30
+  const damage = tier === 2 ? 38 : 34
   return move(
     'Uppercut',
-    variantTiming(260, 110, 300, 200),
+    variantTiming(320, 110, 420, 300),
     (ctx, self) => {
       overheadBox(ctx, 90, 50, activeMs(ctx, self), damage, { x: 80, y: -520 }, 90, HEAVY_TAGS)
       const feet = ctx.player.position()
@@ -506,10 +506,10 @@ function shieldCharge(tier: 1 | 2): AttackMove {
 const LID_MS = 300
 
 function lidLift(tier: 1 | 2): AttackMove {
-  const damage = tier === 2 ? 32 : 24
+  const damage = tier === 2 ? 36 : 28
   return move(
     'Lid Lift',
-    variantTiming(70, LID_MS + 60, 240, 180),
+    variantTiming(120, LID_MS + 60, 380, 300),
     (ctx) => {
       const speed = ctx.player.getBuild().stats.attackSpeed
       const scale = ctx.rangeScale

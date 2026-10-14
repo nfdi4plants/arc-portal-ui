@@ -85,7 +85,7 @@ export function createMoveLayer(core: Core): MoveLayer {
       shape: { kind: 'rect', x: -SPIN_BACK * scale, y: -48, w: (SPIN_BACK + SPIN_FRONT) * scale, h: 48 },
       follow: true,
       activeMs: 120 / ctx.player.getBuild().stats.attackSpeed,
-      damage: 14,
+      damage: 20,
       knockback: { x: 220, y: -140 },
       hitStopMs: 50,
       maxTargets: Infinity,
@@ -96,10 +96,10 @@ export function createMoveLayer(core: Core): MoveLayer {
 
   const finisherBase: AttackMove = {
     name: 'Spin finisher',
-    startupMs: 80,
+    startupMs: 130,
     activeMs: 120,
-    recoveryMs: 260,
-    cancelAfterMs: 160,
+    recoveryMs: 320,
+    cancelAfterMs: 240,
     lunge: 120,
     allowedInAir: true,
     spin: true,

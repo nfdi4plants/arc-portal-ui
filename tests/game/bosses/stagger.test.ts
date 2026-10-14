@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { staggerBarSize, staggerDurationMs, staggerLocked, staggerProgress } from '../../../src/game/phaser/bosses/stagger'
 
-// Staff damage: a light jab does 10, a heavy swing 30.
-const jab = { damage: 10, tags: ['light'] }
-const swing = { damage: 30, tags: ['heavy'] }
+// Staff damage: a light jab does 12, a heavy slam 36.
+const jab = { damage: 12, tags: ['light'] }
+const swing = { damage: 36, tags: ['heavy'] }
 const shot = { damage: 10, tags: ['light', 'projectile'] }
 const bigShot = { damage: 30, tags: ['heavy', 'projectile'] }
 
@@ -34,7 +34,7 @@ describe('staggerProgress', () => {
   })
 
   it('scales with the damage and the hit stagger multiplier', () => {
-    expect(staggerProgress({ ...jab, damage: 20 })).toBeCloseTo(2 * staggerProgress(jab))
+    expect(staggerProgress({ ...jab, damage: 24 })).toBeCloseTo(2 * staggerProgress(jab))
     expect(staggerProgress({ ...jab, stagger: 2 })).toBeCloseTo(2 * staggerProgress(jab))
   })
 })
