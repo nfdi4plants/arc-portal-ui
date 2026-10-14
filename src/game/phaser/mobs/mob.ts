@@ -19,7 +19,7 @@ import { approach, blinkDestination } from './motion'
 import { createFlimmer } from './phantom'
 import type { Flimmer } from './phantom'
 import { dropShieldFragment } from './pickups'
-import { hitReaction } from './reaction'
+import { hitReaction, shrugsOff } from './reaction'
 import { createStance, stanceMods, stepStance } from './stance'
 import type { StanceMods } from './stance'
 import {
@@ -101,6 +101,8 @@ const DIVE_FACTOR = 2.6
 const DIVE_MS = 900
 const STEPS_PER_PROBE = 3
 const RANGED_RECOVER_MS = 250
+// Squash of a light shot, which hurts without stunning or pushing.
+const SHOT_SQUASH = 0.35
 // A ranged weapon turns at most this far up or down to point at the player, in radians.
 const AIM_UP = -1.1
 const AIM_DOWN = 1
@@ -1358,6 +1360,15 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
       st.hp -= damage
       if (st.hp <= 0) {
         die()
+        return damage
+      }
+      if (shrugsOff(hit.tags)) {
+        st.flashMs = HIT_FLASH_MS
+        st.revealMs = PHANTOM_REVEAL_MS
+        st.provokedMs = PROVOKE_MS
+        st.squashMs = SQUASH_MS
+        st.squashAmount = SHOT_SQUASH
+        st.tiltDir = hit.knockback.x >= 0 ? 1 : -1
         return damage
       }
       const reaction = hitReaction({
