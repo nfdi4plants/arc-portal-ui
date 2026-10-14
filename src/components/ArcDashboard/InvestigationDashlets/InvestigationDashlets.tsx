@@ -1,9 +1,10 @@
 import { dataHubRepositoryUrl } from '../../../api/gitlab'
 import type { DashboardProps } from '../dashboardTypes'
-import { AnchoredOverlay, CounterLabel, Text } from '@primer/react'
+import { AnchoredOverlay, CounterLabel } from '@primer/react'
 import { TriangleDownIcon, PlayIcon, WorkflowIcon, BeakerIcon, BookIcon, BrowserIcon, DatabaseIcon, FileIcon, OrganizationIcon, PeopleIcon } from '@primer/octicons-react'
 import { lazy, Suspense, useState, type RefObject } from 'react'
 import { PopupDashlet } from '../../PopupDashlet'
+import { ArcMageLoading } from '../ArcMage'
 import { ContactList } from '../Investigation/ContactList'
 import { InvestigationDescription } from '../Investigation/InvestigationDetails/InvestigationDescription'
 import { NamedEntityList } from '../Investigation/InvestigationDetails/NamedEntityList'
@@ -93,7 +94,7 @@ export function InvestigationDashlets({ metadata, arcJson, repository, repositor
       id: 'webview', title: investigationDashletTitles.webview,
       symbol: <BrowserIcon size={48} />,
       description: "Browse the ARC's files, metadata, and annotation tables.",
-      content: <Suspense fallback={<Text as="p" role="status">Loading ARC viewer…</Text>}><ArcViewer folderRequest={folderRequest} jsonString={arcJson} repositoryUrl={repositoryUrl ?? (repository ? dataHubRepositoryUrl(repository) : undefined)} token={token} embedded /></Suspense>,
+      content: <Suspense fallback={<ArcMageLoading label="Loading ARC viewer…" />}><ArcViewer folderRequest={folderRequest} jsonString={arcJson} repositoryUrl={repositoryUrl ?? (repository ? dataHubRepositoryUrl(repository) : undefined)} token={token} embedded /></Suspense>,
     },
   ]
 

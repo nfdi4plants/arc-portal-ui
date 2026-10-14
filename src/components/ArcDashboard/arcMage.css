@@ -1,0 +1,86 @@
+.arc-mage-loading {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: min(60vh, 480px);
+  padding: 24px;
+}
+
+.arc-mage-loading-image {
+  width: clamp(140px, 30vw, 220px);
+  height: auto;
+  aspect-ratio: 198 / 290;
+}
+
+.arc-mage-screen-text {
+  fill: #7ff3ff;
+  font: bold 13px ui-monospace, SFMono-Regular, Menlo, monospace;
+  animation: arc-mage-blink 1.2s step-end infinite;
+}
+
+@keyframes arc-mage-blink {
+  50% { opacity: 0; }
+}
+
+/* Reduced motion: a steady label instead of blinking. */
+@media (prefers-reduced-motion: reduce) {
+  .arc-mage-screen-text { animation: none; }
+}
+
+.arc-mage-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.arc-mage-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.arc-mage-greeting {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.arc-mage-greeting-image {
+  height: 56px;
+  width: auto;
+  aspect-ratio: 198 / 290;
+  flex: none;
+}
+
+.arc-mage-bubble {
+  position: relative;
+  margin: 0;
+  padding: 6px 12px;
+  border: 1px solid var(--borderColor-default, #d0d7de);
+  border-radius: 12px;
+  background: var(--bgColor-default, #fff);
+  color: var(--fgColor-default, #1f2328);
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.arc-mage-bubble::before {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin-top: -5px;
+  background: inherit;
+  border-left: 1px solid var(--borderColor-default, #d0d7de);
+  border-bottom: 1px solid var(--borderColor-default, #d0d7de);
+  transform: rotate(45deg);
+}

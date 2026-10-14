@@ -6,6 +6,7 @@ import { Button } from '@primer/react'
 import { buildProvenanceIndex } from '../../arc/provenance/buildIndex.ts'
 import { NewDashboardContent } from './NewDashboard'
 import { DashboardWindow } from '../DashboardWindow'
+import { ArcMageGreeting, ArcMageLoading } from './ArcMage'
 import { selectInvestigationMetadata } from './Investigation/selectInvestigationMetadata'
 import type { ArcRepositoryOverview } from '../../api/gitlab'
 import type { DashboardContentProps } from './dashboardTypes'
@@ -38,7 +39,7 @@ function LoadedArc({ arc, name, url, token, onBack, dataHubData, content: Conten
                 token={token}
                 dataHubData={dataHubData}
                 dataHubLinks={[{ name, url }]}
-                actions={<Button onClick={onBack}>Back</Button>}
+                actions={<div className="arc-mage-actions"><ArcMageGreeting /><Button onClick={onBack}>Back</Button></div>}
             />
         </DashboardWindow>
     )
@@ -49,7 +50,7 @@ function ArcDashboard({ name, url, source, projectId, token, onBack, dataHubData
     const state = useROCrate(source, projectId, token)
 
     if (state.status === 'Error') return <p role="alert">Could not load ARC.</p>
-    if (state.status !== 'Result') return <p>Loading…</p>
+    if (state.status !== 'Result') return <ArcMageLoading />
 
     return <LoadedArc arc={state.arc} name={name} url={url} token={token} onBack={onBack} dataHubData={dataHubData} content={content} fillHeight={fillHeight} />
 }
