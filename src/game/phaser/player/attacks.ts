@@ -26,11 +26,15 @@ export interface AttackHooks {
 export interface AttackStepEnv {
   grounded: boolean
   attackSpeed: number
-  // False while flinching or dead, or on the step a dash starts. Presses stay buffered.
+  // False while flinching or dead, during a dash, or on the step a jump or dash starts. Presses stay
+  // buffered.
   canStart: boolean
   // True during a dash and shortly after it. A press made now plays the dash variant, also when
   // the buffer starts it a little later.
   dashing?: boolean
+  // True while a dash runs. A buffered press does not run out meanwhile, so it plays the dash
+  // variant when the dash ends.
+  holdBuffer?: boolean
   // Up held and down not held, so a pogo (down + light in the air) keeps its place.
   up?: boolean
 }
@@ -46,9 +50,10 @@ export interface AttackMachine {
   step(dtMs: number, pressed: { light: boolean; heavy: boolean }, env: AttackStepEnv): void
   phase(): AttackPhase
   current(): Readonly<AttackInfo> | null
-  // Startup, active, recovery before the move's cancelAfterMs, or a lock. Jumps and dashes wait.
+  // Startup, active, recovery before the move's cancelAfterMs, or a lock. The motor keeps its facing.
+  // A jump or dash that can start still ends the move (the player cancels it).
   isLocked(): boolean
-  // Recovery after cancelAfterMs and no lock: jump, dash and the next attack may cut the move short.
+  // Recovery after cancelAfterMs and no lock: the next attack may cut the move short.
   canCancel(): boolean
   // Time left of a lockMs or landingLockMs lock. The player takes no movement input meanwhile.
   lockRemainingMs(): number
@@ -245,7 +250,7 @@ export function createAttackMachine(hooks: AttackHooks): AttackMachine {
         if (started) bufferedSlot = null
       }
 
-      if (bufferedSlot) {
+      if (bufferedSlot && !env.holdBuffer) {
         bufferedMs -= dtMs
         if (bufferedMs <= 0) bufferedSlot = null
       }

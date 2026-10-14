@@ -136,6 +136,27 @@ export function canDash(state: MotorState, env: MotorEnv): boolean {
   return env.mechanics.airDash && !state.airDashUsed
 }
 
+const probeState = createMotorState()
+const probeEnv: MotorEnv = {
+  grounded: false,
+  touchingWallLeft: false,
+  touchingWallRight: false,
+  stats: { moveSpeed: 1, dashCooldownMs: 0 },
+  mechanics: { doubleJump: false, airDash: false, wallJump: false, hatGlide: false },
+}
+
+// The move a step with this input would start if no attack locked the motor, or null. It runs the
+// step on a scratch state, so it always agrees with stepMotor. The player uses it to let a jump or a
+// dash end any attack.
+export function moveStarts(state: MotorState, input: MotorInput, env: MotorEnv, dtMs: number): 'jump' | 'dash' | null {
+  if (!input.pressed.has('jump') && !input.pressed.has('dash') && state.jumpBufferMs <= 0 && state.dashBufferMs <= 0) return null
+  Object.assign(probeEnv, env)
+  probeEnv.actionsLocked = false
+  stepMotor(state, input, probeEnv, dtMs, probeState)
+  if (probeState.dashed) return 'dash'
+  return probeState.jumped ? 'jump' : null
+}
+
 function approach(value: number, target: number, maxDelta: number): number {
   if (value < target) return Math.min(target, value + maxDelta)
   return Math.max(target, value - maxDelta)

@@ -5,12 +5,13 @@ import { DEPTH, MAGE_FRAME, MAGE_TEXTURE, PALETTE, PLAYER_HEIGHT } from '../../c
 import type { Action, InputFrame } from '../../contracts/input'
 import type { AbilityHandler, AttackContext, PlayerEvents, PlayerHandle, WeaponMoveset } from '../../contracts/player'
 import type { PlayerBuild, PlayerWeaponId, WeaponSlot } from '../../contracts/progression'
-import { EMPTY_MOTOR_INPUT, JUMP_VELOCITY, MOTOR, availableJump, canDash, createMotorState, runSpeed, stepMotor } from '../../model/input/motor'
+import { EMPTY_MOTOR_INPUT, JUMP_VELOCITY, MOTOR, createMotorState, runSpeed } from '../../model/input/motor'
 import type { MotorEnv, MotorInput, MotorState } from '../../model/input/motor'
 import type { InputLayer } from '../input/InputLayer'
 import { applySpriteRef } from '../art'
 import { createAttackMachine } from './attacks'
 import type { AttackPhase } from './attacks'
+import { createControls } from './controls'
 import { bodyOf, isOneWay } from './oneWay'
 import { staffMoveset } from './staffMoveset'
 import { airHeavyOf, dashHeavyOf, dashLightOf, upHeavyOf, upLightOf } from './weapons/variants'
@@ -19,14 +20,11 @@ export const PLAYER_HURTBOX = { width: 18, height: 42 }
 const DAMAGE_IFRAMES_MS = 700
 const FLINCH_MS = 180
 const DROP_THROUGH_MS = 150
-const ATTACK_GROUND_SPEED = 0.3
 const ABILITY_ACTIONS: readonly Action[] = ['ability1', 'ability2', 'ability3', 'ability4']
 const GHOST_COUNT = 6
 const MAX_SHIELDS = 3
 const GHOST_LIFE_MS = 180
 const GHOST_INTERVAL_MS = 28
-// An attack pressed this long after a dash ended still plays the dash variant.
-const DASH_ATTACK_GRACE_MS = 80
 // The fall speed a hovering move holds the mage at.
 const HOVER_FALL_SPEED = 30
 // An up heavy in the air rises a little instead of plunging.
@@ -34,7 +32,6 @@ const RISING_HOP_SPEED = 260
 // The bounce after an air heavy hit launches at this share of a jump's speed. Height scales with
 // the square, so the peak is 0.55^2 = about 30% of a full jump (3.5 tiles), roughly 1 tile.
 export const PLUNGE_BOUNCE_FACTOR = 0.55
-const NO_HELD: ReadonlySet<string> = new Set()
 // The swing smear: alpha of each copy, newest first. Light moves use the first three.
 const SMEAR_ALPHA = [0.25, 0.17, 0.1, 0.05]
 const SMEAR_LIGHT_COUNT = 3
@@ -111,8 +108,7 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
   const movesets = new Map<PlayerWeaponId, WeaponMoveset>([['staff', staffMoveset]])
   const listeners = new Map<keyof PlayerEvents, Set<(payload: never) => void>>()
   const hurtbox = new Phaser.Geom.Rectangle(0, 0, W, H)
-  const attackPressed = { light: false, heavy: false }
-  const attackEnv = { grounded: false, attackSpeed: 1, canStart: false, dashing: false, up: false }
+  const presses = { light: false, heavy: false, up: false }
   // Used on the down + jump step, so the jump press does not reach the motor.
   const dropPressed = new Set<string>()
   const dropInput: { held: ReadonlySet<string>; pressed: ReadonlySet<string>; released: ReadonlySet<string> } = {
@@ -129,14 +125,6 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
   const mergedFrame: InputFrame = { held: mergedPressed, pressed: mergedPressed, released: mergedReleased, aim: { x, y } }
   // The held set of the step an attack started in, kept past the step for attackStarted listeners.
   const attackHeld = new Set<Action>()
-  // What the motor reads during an attack lock: no direction held, while jump and dash presses
-  // still fill their buffers, so a jump pressed at the end of the lock fires when it ends.
-  const lockedInput: { held: ReadonlySet<string>; pressed: ReadonlySet<string>; released: ReadonlySet<string> } = {
-    held: NO_HELD,
-    pressed: NO_HELD,
-    released: NO_HELD,
-  }
-  let sinceDashMs = Infinity
   // The dash speed a dash attack with keepsMomentum carries, 0 for any other attack.
   let momentumVx = 0
   let lockShown = false
@@ -230,7 +218,7 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
         if (move.keepsMomentum) momentumVx = motor.dashDir * speed * MOTOR.dashSpeedFactor
         else motor.vx = motor.dashDir * speed
         motor.dashMs = 0
-        sinceDashMs = Infinity
+        controls.endDashGrace()
       }
       emit('attackStarted', { slot, comboIndex, move, held: attackHeld, variant })
     },
@@ -244,6 +232,8 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
       move.onLand?.(contextFor(build.weapons[slot].tier))
     },
   })
+
+  const controls = createControls(motor, motorEnv, attacks)
 
   // Velocity the current move takes over from the motor: a plunge falls straight, a dash attack
   // keeps the dash speed, a hover holds the fall.
@@ -369,35 +359,6 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
       input = dropInput
     }
 
-    motorEnv.actionsLocked = false
-    motorEnv.speedScale = 1
-    if (attacks.canCancel()) {
-      const wantsJump = (input.pressed.has('jump') || motor.jumpBufferMs > 0) && availableJump(motor, motorEnv) !== null
-      const wantsDash = (input.pressed.has('dash') || motor.dashBufferMs > 0) && canDash(motor, motorEnv)
-      if (wantsJump || wantsDash) attacks.cancel()
-    }
-    // A dash and an attack pressed on the same step: the dash starts first and the attack waits in
-    // the buffer for the next step, where it plays the dash variant.
-    const dashStarting =
-      controllable && (input.pressed.has('dash') || motor.dashBufferMs > 0) && !attacks.isLocked() && canDash(motor, motorEnv)
-    attackPressed.light = controllable && frame.pressed.has('light')
-    attackPressed.heavy = controllable && frame.pressed.has('heavy')
-    attackEnv.grounded = grounded
-    attackEnv.attackSpeed = build.stats.attackSpeed
-    attackEnv.canStart = controllable && !dashStarting
-    attackEnv.dashing = motor.dashMs > 0 || sinceDashMs < DASH_ATTACK_GRACE_MS || dashStarting
-    attackEnv.up = frame.held.has('up') && !frame.held.has('down')
-    attacks.step(dt, attackPressed, attackEnv)
-
-    const locked = attacks.lockRemainingMs() > 0
-    if (locked && !lockShown) showLock()
-    lockShown = locked
-    if (locked && controllable) {
-      lockedInput.pressed = input.pressed
-      lockedInput.released = input.released
-      input = lockedInput
-    }
-
     if (controllable) {
       for (let slot = 0; slot < ABILITY_ACTIONS.length; slot++) {
         const handler = abilityHandlers[slot]
@@ -407,12 +368,14 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
       }
     }
 
-    motorEnv.actionsLocked = attacks.isLocked()
-    motorEnv.speedScale = attacks.phase() !== 'idle' && grounded ? ATTACK_GROUND_SPEED : 1
-    stepMotor(motor, input, motorEnv, dt, motor)
+    presses.light = frame.pressed.has('light')
+    presses.heavy = frame.pressed.has('heavy')
+    presses.up = frame.held.has('up') && !frame.held.has('down')
+    controls.step(input, presses, controllable, build.stats.attackSpeed, dt)
+    const locked = attacks.lockRemainingMs() > 0
+    if (locked && !lockShown) showLock()
+    lockShown = locked
     steerAttack()
-    if (motor.dashMs > 0) sinceDashMs = 0
-    else sinceDashMs += dt
     if (motor.dashed) {
       emit('dashed', { direction: motor.dashDir })
       ghostMs = 0

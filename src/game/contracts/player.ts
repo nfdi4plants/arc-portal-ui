@@ -20,9 +20,9 @@ export interface AttackContext {
 }
 
 // Which version of a slot's move an attack plays. The attack machine picks it when the attack starts:
-// 'dash' during a dash or up to 80 ms after it, else 'up' with up held (and down not held), else
-// 'air' for a heavy press in the air, else 'ground'. A slot without the picked version falls through
-// to the next one.
+// 'dash' for a press during a dash (it plays when the dash ends) or up to 80 ms after it, else 'up'
+// with up held (and down not held), else 'air' for a heavy press in the air, else 'ground'. A slot
+// without the picked version falls through to the next one.
 export type AttackVariant = 'ground' | 'up' | 'air' | 'dash'
 
 // One attack. The player's attack state machine runs the timing. All times are divided by
@@ -32,13 +32,15 @@ export interface AttackMove {
   startupMs: number
   activeMs: number
   recoveryMs: number
-  // After this many ms of recovery, jump, dash and the next attack may cancel the move.
+  // After this many ms of recovery the next attack may cancel the move. A jump or dash ends a move
+  // at any time.
   cancelAfterMs: number
   // Horizontal push at the start of the active phase, world units per second.
   lunge?: number
   allowedInAir: boolean
   // A lock that starts when the active phase ends. While it runs the mage takes no movement input
-  // and cannot jump, dash, attack or cancel the move. Presses in its last 150 ms stay buffered.
+  // and cannot attack or cancel the move into another one. Attack presses in its last 150 ms stay
+  // buffered. A jump or dash still ends the move and the lock.
   lockMs?: number
   // The same lock, started by the landing that fires onLand.
   landingLockMs?: number
