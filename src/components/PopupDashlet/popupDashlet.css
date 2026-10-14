@@ -1,0 +1,130 @@
+.popup-dashlet {
+  --dashlet-content-padding: 12px;
+  min-width: 0;
+  max-height: none;
+}
+
+.popup-dashlet > .popup-dashlet-panel {
+  position: relative;
+  inset: auto;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  box-shadow: var(--shadow-resting-small);
+  transform-origin: top left;
+}
+
+.popup-dashlet-panel:not([data-expanded])[data-expand-on-click] {
+  cursor: pointer;
+}
+
+.popup-dashlet-floating-controls {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  z-index: 2;
+}
+
+.popup-dashlet > .popup-dashlet-panel[data-expanded],
+.popup-dashlet > .popup-dashlet-panel[data-preview] {
+  position: fixed;
+  --dashlet-content-padding: 20px;
+  box-shadow: var(--shadow-floating-large);
+}
+
+.popup-dashlet-panel::backdrop {
+  background: transparent;
+}
+
+.popup-dashlet-panel[data-expanded]::backdrop { background: rgb(0 0 0 / 35%); }
+
+.popup-dashlet-overlays {
+  position: relative;
+  z-index: 1;
+}
+
+.popup-dashlet-panel .popup-dashlet-toggle {
+  position: relative;
+  z-index: 2;
+}
+
+.popup-dashlet-panel .popup-dashlet-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.popup-dashlet-bar .dashboard-window-title {
+  margin: 0;
+}
+
+.popup-dashlet-actions { display: flex; gap: 4px; }
+
+.popup-dashlet-panel[data-preview] > .popup-dashlet-bar {
+  flex-wrap: wrap;
+  padding: 6px 8px;
+}
+
+.popup-dashlet-panel[data-preview] .dashboard-window-title { white-space: normal; }
+
+.popup-dashlet-symbol {
+  display: grid;
+  flex: 1;
+  min-height: 0;
+  place-items: center;
+  color: var(--fgColor-muted);
+}
+
+.popup-dashlet-panel > .dashboard-component-content[hidden] { display: none; }
+
+.popup-dashlet-toggle {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 4px 8px;
+  border: 1px solid var(--borderColor-default);
+  border-radius: 6px;
+  background: var(--bgColor-default);
+  color: var(--fgColor-default);
+  font: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.popup-dashlet-toggle:hover {
+  background: var(--bgColor-neutral-muted);
+}
+
+.popup-dashlet-toggle:focus-visible {
+  outline: 2px solid var(--borderColor-accent-emphasis);
+  outline-offset: 2px;
+}
+
+.popup-dashlet-panel > .dashboard-component-content {
+  position: relative;
+  z-index: 0;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding: var(--dashlet-content-padding);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.popup-dashlet-panel > .dashboard-component-content:has(.arc-portal-embedded) {
+  padding: 0;
+}

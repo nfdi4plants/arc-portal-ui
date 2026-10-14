@@ -1,11 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { TalinumStory } from '../../../storybook/TalinumStory'
+import { withTalinumStory } from '../../../storybook/withTalinumStory'
 import { privateTalinumDataHubData, publicTalinumDataHubData, talinumArcJson, talinumRepository } from '../../../storybook/fixtures/talinumArc'
-import { Dashboard, type DashboardProps } from './Dashboard'
+import { Dashboard } from './Dashboard'
 
-function SampleArcDashboard(props: DashboardProps) {
-  return <TalinumStory>{() => <Dashboard {...props} />}</TalinumStory>
-}
+const SampleArcDashboard = withTalinumStory(Dashboard)
 
 const meta = {
   title: 'Dashboard',
@@ -13,6 +11,8 @@ const meta = {
   args: {
     repository: talinumRepository,
     arcJson: talinumArcJson,
+    // Repository metadata stays visible; bundled stories do not fetch GitLab file sizes.
+    repositoryUrl: '',
   },
   parameters: {
     docs: {

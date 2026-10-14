@@ -1,0 +1,5 @@
+.popup-graphview .dashboard-component-content {
+  padding: 0;
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}

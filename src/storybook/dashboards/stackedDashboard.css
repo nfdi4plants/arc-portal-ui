@@ -1,0 +1,67 @@
+.stacked-dashboard {
+  container: stacked-dashboard / inline-size;
+  display: flex;
+  flex-direction: column;
+  min-height: var(--dashboard-window-height);
+  gap: 16px;
+  color: var(--fgColor-default);
+}
+
+.stacked-dashboard-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.stacked-dashboard-body {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 3fr);
+  min-height: 492px;
+  gap: 16px;
+}
+
+.stacked-dashboard-cards {
+  display: grid;
+  grid-template-rows: repeat(6, 52px) 180px;
+  align-content: start;
+  min-width: 0;
+}
+
+.stacked-dashboard-tile {
+  position: relative;
+  height: 180px;
+}
+
+.stacked-dashboard-tile .dashboard-window-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stacked-dashboard-graphview {
+  min-width: 0;
+  min-height: 0;
+}
+
+.stacked-dashboard-graphview .popup-dashlet-panel:not([data-expanded]) [aria-label='Provenance explorer'] > header {
+  padding-right: 64px;
+}
+
+.stacked-dashboard-graphview .popup-dashlet-panel:not([data-expanded]) [aria-label='Provenance explorer'] > header > [aria-hidden='true'] {
+  right: 64px;
+}
+
+@container stacked-dashboard (max-width: 700px) {
+  .stacked-dashboard-body {
+    flex: none;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(360px, 55dvh) auto;
+  }
+
+  .stacked-dashboard-graphview {
+    grid-row: 1;
+  }
+}

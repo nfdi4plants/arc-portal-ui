@@ -59,4 +59,5 @@ describe('ArcDashboard', () => {
     expect(screen.queryByRole('region', { name: 'ARC-Dashboard' })).not.toBeInTheDocument()
     expect(screen.queryByText('ARC viewer')).not.toBeInTheDocument()
   })
+
 })

@@ -25,7 +25,7 @@ function LoadedArc({ arc, name, url, token, onBack, dataHubData }: { arc: ARC } 
     const arcJson = useMemo(() => ARC.toROCrateJsonString()(arc), [arc])
 
     return (
-        <DashboardWindow label="ARC-Dashboard" fillHeight>
+        <DashboardWindow label="ARC-Dashboard">
             <DashboardContent
                 metadata={metadata}
                 provenance={provenance}

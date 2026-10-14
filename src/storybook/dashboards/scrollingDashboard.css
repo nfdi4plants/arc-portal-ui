@@ -1,0 +1,18 @@
+.scrolling-dashboard { height: auto; min-height: var(--dashboard-window-height); gap: 16px; }
+.scrolling-dashboard-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--borderColor-default);
+  border-radius: 6px;
+  background: var(--bgColor-default);
+  box-shadow: var(--shadow-resting-small);
+}
+.scrolling-dashboard-navigation { display: flex; flex-wrap: wrap; gap: 8px; }
+.scrolling-dashboard-viewer { height: max(360px, 75dvh); flex-shrink: 0; min-width: 0; }
+.scrolling-dashboard-viewer > .popup-dashlet { height: 100%; }
+.scrolling-dashboard-viewer:focus-visible { outline: 2px solid var(--borderColor-accent-emphasis); outline-offset: 2px; }

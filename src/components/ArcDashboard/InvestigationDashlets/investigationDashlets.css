@@ -1,0 +1,21 @@
+.investigation-dashlet .metadata-card {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.investigation-dashlet .metadata-list {
+  gap: 12px;
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+}
+
+.investigation-dashlet .organization-list {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.investigation-dashlet .publication-list > li + li {
+  padding-top: 12px;
+  border-top: 1px solid var(--borderColor-muted);
+}

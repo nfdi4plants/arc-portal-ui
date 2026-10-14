@@ -2,7 +2,6 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { gitLabProjectFull, projectResponse } from './test/helpers.tsx'
-import { availableDataHubs } from './config/gitlab.ts'
 import App from './App.tsx'
 
 const fetchCall = vi.fn<typeof fetch>()
