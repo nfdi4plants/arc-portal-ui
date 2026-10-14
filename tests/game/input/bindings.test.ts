@@ -18,7 +18,7 @@ describe('bindings', () => {
   it('uses WASD, Space, Shift and the mouse buttons by default', () => {
     expect(DEFAULT_BINDINGS.left).toEqual([{ device: 'key', code: 'KeyA' }])
     expect(DEFAULT_BINDINGS.jump).toEqual([{ device: 'key', code: 'Space' }])
-    expect(DEFAULT_BINDINGS.dash).toEqual([{ device: 'key', code: 'ShiftLeft' }])
+    expect(DEFAULT_BINDINGS.dash).toEqual([{ device: 'key', code: 'KeyC' }])
     expect(DEFAULT_BINDINGS.light).toEqual([{ device: 'mouse', button: 0 }])
     expect(DEFAULT_BINDINGS.heavy).toEqual([{ device: 'mouse', button: 2 }])
     expect(DEFAULT_BINDINGS.ability4).toEqual([{ device: 'key', code: 'KeyF' }])

@@ -12,7 +12,9 @@ export const DEFAULT_BINDINGS: Bindings = {
   up: [key('KeyW')],
   down: [key('KeyS')],
   jump: [key('Space')],
-  dash: [key('ShiftLeft')],
+  // C, so dash plus right click (dash heavy) never meets Firefox's Shift + right click, which always
+  // opens the browser menu.
+  dash: [key('KeyC')],
   light: [mouse(0)],
   heavy: [mouse(2)],
   ability1: [key('KeyQ')],
