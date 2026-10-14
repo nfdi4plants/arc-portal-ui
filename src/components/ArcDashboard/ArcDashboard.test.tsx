@@ -1,5 +1,6 @@
 import { act, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import '../../test/nativeDialog.ts'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { deferred, renderWithTheme } from '../../test/helpers.tsx'
 import ArcDashboard from './ArcDashboard.tsx'
@@ -30,9 +31,9 @@ describe('ArcDashboard', () => {
     expect(screen.queryByText('ARC viewer')).not.toBeInTheDocument()
     await act(async () => pending.resolve(new Response(crateJson)))
     expect(screen.getByRole('heading', { level: 1, name: 'Facultative CAM in Talinum triangulare' })).toBeVisible()
-    expect(screen.getByRole('region', { name: 'Investigation details' })).toBeVisible()
-    expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('button', { name: 'Expand Description' })).toBeVisible()
     expect(screen.getByRole('link', { name: 'Selected ARC' })).toHaveAttribute('href', 'https://datahub.example/lab/arc')
+    await user.click(screen.getByRole('button', { name: 'Expand Webview' }))
     expect(await screen.findByText('ARC viewer', {}, { timeout: 5000 })).toBeVisible()
     expect(viewer).toHaveBeenCalledWith({ jsonString: expect.stringContaining('Facultative CAM in Talinum triangulare'), embedded: true, repositoryUrl: "https://datahub.example/lab/arc", token: undefined })
     expect(fetch).toHaveBeenCalledOnce()
