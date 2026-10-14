@@ -8,22 +8,26 @@ import { createArcStore } from '../../arc/arcStore'
 import { renderWithTheme } from '../../test/helpers'
 import { ArcDashboardFrame } from '../../components/ArcDashboard/ArcDashboardFrame'
 import story from './SplitDashboard.stories'
+import scrollingStory from './ScrollingSplitDashboard.stories'
 
 vi.mock('@nfdi4plants/arc-web-view', () => ({ WebViewer: () => <label>Search ARC files<input /></label> }))
 
-async function openDashboard() {
+async function openDashboard(content = story.args.content) {
   const store = createArcStore(sampleCrateSource())
   await store.load()
-  renderWithTheme(<ArcProvider store={store}><ArcDashboardFrame content={story.args.content} label={story.args.label} fillHeight={story.args.fillHeight} arcJson={crateJson} /></ArcProvider>)
+  renderWithTheme(<ArcProvider store={store}><ArcDashboardFrame content={content} label={story.args.label} fillHeight={story.args.fillHeight} arcJson={crateJson} /></ArcProvider>)
   await screen.findByRole('textbox', { name: 'Search ARC files' }, { timeout: 5000 })
 }
 
-describe('SplitDashboard', () => {
+describe.each([
+  ['SplitDashboard', story.args.content],
+  ['ScrollingSplitDashboard', scrollingStory.args.content],
+])('%s', (_name, content) => {
   it('shows both viewers and opens investigation details from the compact toolbar', async () => {
-    await openDashboard()
+    await openDashboard(content)
     expect(screen.getByRole('heading', { level: 1, name: 'Facultative CAM in Talinum triangulare' })).toBeVisible()
     expect(screen.getByRole('region', { name: 'Provenance explorer' })).toBeVisible()
-    expect(screen.getByRole('separator')).toHaveAttribute('aria-valuenow', '60')
+    expect(screen.getByRole('separator')).toHaveAttribute('aria-valuenow', '40')
     const toolbar = screen.getByRole('navigation', { name: 'Investigation dashlets' })
     expect(within(toolbar).getAllByRole('heading', { level: 2 }).map(heading => heading.textContent))
       .toEqual(['Description', 'Contacts', 'Organizations', 'Publications', 'Assays', 'Studies'])
@@ -35,7 +39,7 @@ describe('SplitDashboard', () => {
   }, 15000)
 
   it('collapses either viewer, preserves file input, and can open a popup from a collapsed viewer', async () => {
-    await openDashboard()
+    await openDashboard(content)
     const user = userEvent.setup()
     await user.type(screen.getByRole('textbox', { name: 'Search ARC files' }), 'assays')
     await user.click(screen.getByRole('button', { name: 'Collapse Webview' }))
@@ -57,17 +61,17 @@ describe('SplitDashboard', () => {
   }, 15000)
 
   it('resizes with the keyboard and restores the chosen ratio after collapsing a viewer', async () => {
-    await openDashboard()
+    await openDashboard(content)
     const user = userEvent.setup()
-    const divider = screen.getByRole('separator', { name: 'Resize Webview and Graphview' })
+    const divider = screen.getByRole('separator', { name: 'Resize Graphview and Webview' })
     divider.focus()
     await user.keyboard('{ArrowDown}{ArrowDown}')
-    expect(divider).toHaveAttribute('aria-valuenow', '70')
+    expect(divider).toHaveAttribute('aria-valuenow', '50')
     await user.click(screen.getByRole('button', { name: 'Collapse Webview' }))
     await user.click(screen.getByRole('button', { name: 'Restore Webview' }))
-    expect(divider).toHaveAttribute('aria-valuenow', '70')
+    expect(divider).toHaveAttribute('aria-valuenow', '50')
     divider.focus()
     await user.keyboard('{ArrowUp}')
-    expect(divider).toHaveAttribute('aria-valuenow', '65')
+    expect(divider).toHaveAttribute('aria-valuenow', '45')
   }, 15000)
 })

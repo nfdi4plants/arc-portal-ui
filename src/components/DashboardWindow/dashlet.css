@@ -21,7 +21,8 @@
   flex-direction: column;
   min-height: 0;
   overflow-y: auto;
-  overscroll-behavior: contain;
+  /* Continue scrolling the dashboard when this dashlet reaches a vertical edge. */
+  overscroll-behavior: auto;
   scrollbar-gutter: stable;
   padding: var(--dashlet-content-padding);
 }

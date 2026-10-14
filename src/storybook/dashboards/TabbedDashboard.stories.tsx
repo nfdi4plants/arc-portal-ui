@@ -11,11 +11,11 @@ import './viewerDashboard.css'
 import './tabbedDashboard.css'
 
 const views: { id: ViewerWorkspaceMode; title: string }[] = [
-  { id: 'webview', title: 'Webview' }, { id: 'graphview', title: 'Graphview' }, { id: 'compare', title: 'Compare' },
+  { id: 'graphview', title: 'Graphview' }, { id: 'webview', title: 'Webview' }, { id: 'compare', title: 'Compare' },
 ]
 
 function TabbedDashboardLayout({ metadata, provenance, actions, ...props }: DashboardContentProps) {
-  const [view, setView] = useState<ViewerWorkspaceMode>('webview')
+  const [view, setView] = useState<ViewerWorkspaceMode>('graphview')
   const tabButtons = useRef<(HTMLButtonElement | null)[]>([])
   const tabId = useId()
   const panelId = useId()
@@ -52,20 +52,20 @@ function TabbedDashboardLayout({ metadata, provenance, actions, ...props }: Dash
         <InvestigationMenu metadata={metadata} arcJson={props.arcJson} />
       </div>
       <section id={panelId} role="tabpanel" aria-labelledby={`${tabId}-${view}`} className="tabbed-dashboard-viewer-panel">
-        <ViewerWorkspace metadata={metadata} provenance={provenance} arcJson={props.arcJson} mode={view} />
+        <ViewerWorkspace metadata={metadata} provenance={provenance} arcJson={props.arcJson} mode={view} firstViewer="graphview" />
       </section>
     </main>
   )
 }
 
 const meta = {
-  title: 'TabbedDashboard',
+  title: 'Dashboard/TabbedDashboard',
   component: ArcDashboardFrame,
   decorators: [(Story) => <TalinumStory>{() => <Story />}</TalinumStory>],
   argTypes: { content: { control: false, table: { disable: true } }, label: { table: { disable: true } }, fillHeight: { table: { disable: true } } },
   args: { repository: talinumRepository, arcJson: talinumArcJson, content: TabbedDashboardLayout, label: 'TabbedDashboard', fillHeight: false },
   parameters: { docs: { description: {
-    component: 'Webview and Graphview each use the full workspace in their own tab. Compare shows the shared resizable 60/40 vertical split. Investigation opens metadata popup dashlets from a compact menu. Viewer state and the chosen split survive switching views. Uses the bundled Talinum ARC without DataHub requests.',
+    component: 'Graphview opens first, followed by Webview and Compare. Each viewer uses the full workspace in its own tab. Compare shows Graphview above Webview with a resizable 40/60 split. Investigation opens metadata popup dashlets from a compact menu. Viewer state and the chosen split survive switching views. Uses the bundled Talinum ARC without DataHub requests.',
   } } },
 } satisfies Meta<typeof ArcDashboardFrame>
 export default meta

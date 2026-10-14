@@ -6,7 +6,7 @@ import { Dashboard } from './Dashboard'
 const SampleArcDashboard = withTalinumStory(Dashboard)
 
 const meta = {
-  title: 'Dashboard',
+  title: 'Dashboard/ClassicDashboard',
   component: SampleArcDashboard,
   args: {
     repository: talinumRepository,

@@ -29,29 +29,29 @@ function ScrollingDashboardLayout({ metadata, provenance, actions, ...props }: D
         {actions && <div className="viewer-dashboard-actions">{actions}</div>}
         <ArcDetails {...props} metadata={metadata} />
         <nav className="scrolling-dashboard-navigation" aria-label="Viewer navigation">
-          <Button onClick={() => jumpTo(webview.current)}>Jump to Webview</Button>
           <Button onClick={() => jumpTo(graphview.current)}>Jump to Graphview</Button>
+          <Button onClick={() => jumpTo(webview.current)}>Jump to Webview</Button>
           <InvestigationMenu metadata={metadata} arcJson={props.arcJson} />
         </nav>
       </header>
-      <section ref={webview} tabIndex={-1} aria-label="Webview section" className="scrolling-dashboard-viewer">
-        <InvestigationDashlets metadata={metadata} arcJson={props.arcJson} classNamePrefix="scrolling-dashboard" ids={['webview']} interactive />
-      </section>
       <section ref={graphview} tabIndex={-1} aria-label="Graphview section" className="scrolling-dashboard-viewer">
         <PopupGraphview index={provenance} label="Graphview" className="scrolling-dashboard-graphview" expandOnClick={false} />
+      </section>
+      <section ref={webview} tabIndex={-1} aria-label="Webview section" className="scrolling-dashboard-viewer">
+        <InvestigationDashlets metadata={metadata} arcJson={props.arcJson} classNamePrefix="scrolling-dashboard" ids={['webview']} interactive />
       </section>
     </main>
   )
 }
 
 const meta = {
-  title: 'ScrollingDashboard',
+  title: 'Dashboard/ScrollingDashboard',
   component: ArcDashboardFrame,
   decorators: [(Story) => <TalinumStory>{() => <Story />}</TalinumStory>],
   argTypes: { content: { control: false, table: { disable: true } }, label: { table: { disable: true } }, fillHeight: { table: { disable: true } } },
   args: { repository: talinumRepository, arcJson: talinumArcJson, content: ScrollingDashboardLayout, label: 'ScrollingDashboard', fillHeight: false },
   parameters: { docs: { description: {
-    component: 'A continuous scrolling dashboard with a sticky ARC header and Investigation menu. Full-width Webview and Graphview each occupy 75% of the viewport height, with a minimum height of 360px. Jump buttons scroll to a viewer and move keyboard focus there. Both viewers stay mounted and retain popup controls. Uses the bundled Talinum ARC without DataHub requests.',
+    component: 'A continuous scrolling dashboard with a sticky ARC header and Investigation menu. Full-width Graphview comes first, followed by Webview. Each viewer occupies 75% of the viewport height, with a minimum height of 360px. Jump buttons scroll to a viewer and move keyboard focus there. Both viewers stay mounted and retain popup controls. Uses the bundled Talinum ARC without DataHub requests.',
   } } },
 } satisfies Meta<typeof ArcDashboardFrame>
 

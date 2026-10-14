@@ -8,6 +8,11 @@ const preview: Preview = {
   parameters: {
     layout: 'fullscreen',
     controls: { expanded: true },
+    options: {
+      storySort: {
+        order: ['Dashboard', ['Main', 'ScrollingDashboard', 'SplitDashboard', 'TabbedDashboard', 'ScrollingSplitDashboard', 'HubDashboard', 'CombinedDashboard', 'StackedDashboard', 'NewDashboard', 'ClassicDashboard'], '*'],
+      },
+    },
   },
   decorators: [
     (Story) => (
