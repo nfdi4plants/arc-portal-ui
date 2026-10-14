@@ -7,11 +7,11 @@ import { ArcProvider } from '../../arc/ArcProvider'
 import { createArcStore } from '../../arc/arcStore'
 import { renderWithTheme } from '../../test/helpers'
 import { ArcDashboardFrame } from '../../components/ArcDashboard/ArcDashboardFrame'
-import story from './NewDashboard.stories'
+import story from './CircularDashboard.stories'
 
 vi.mock('@nfdi4plants/arc-web-view', () => ({ WebViewer: () => <p>ARC contents preview</p> }))
 
-describe('NewDashboard', () => {
+describe('CircularDashboard', () => {
   it('shows the complete header in the hub and every investigation section without tab switching', async () => {
     const user = userEvent.setup()
     const store = createArcStore(sampleCrateSource())
@@ -33,7 +33,7 @@ describe('NewDashboard', () => {
       </ArcProvider>,
     )
 
-    const dashboard = screen.getByRole('region', { name: 'NewDashboard' })
+    const dashboard = screen.getByRole('region', { name: 'CircularDashboard' })
     const title = within(dashboard).getByRole('heading', { level: 1, name: 'Facultative CAM in Talinum triangulare' })
     const hub = title.closest('.new-dashboard-hub')! as HTMLElement
     expect(within(hub).getByRole('link', { name: 'research/talinum' })).toHaveAttribute('href', 'https://gitlab.example/research/talinum')

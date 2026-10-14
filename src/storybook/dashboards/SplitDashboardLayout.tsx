@@ -5,9 +5,9 @@ import { InvestigationDashlets } from '../../components/ArcDashboard/Investigati
 import { investigationDetailIds } from '../../components/ArcDashboard/InvestigationDashlets/investigationDashletOptions'
 import { ViewerWorkspace } from '../../components/ArcDashboard/ViewerWorkspace/ViewerWorkspace'
 import { PopupArcGame } from '../../components/ArcDashboard/Game/PopupArcGame'
-import './viewerDashboard.css'
+import '../../components/ArcDashboard/viewerDashboard.css'
 import './splitDashboard.css'
-import './scrollingDashboard.css'
+import '../../components/ArcDashboard/ScrollingDashboard/scrollingDashboard.css'
 
 export function SplitDashboardLayout({ metadata, provenance, actions, scrolling = false, ...props }: DashboardContentProps & { scrolling?: boolean }) {
   const [folderRequest, setFolderRequest] = useState<{ path: string }>()

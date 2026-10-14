@@ -17,4 +17,9 @@
 /* The game starts as a compact card, as tall as the tiles in the tile layouts. */
 .scrolling-dashboard-viewer.scrolling-dashboard-game { height: 180px; }
 .scrolling-dashboard-viewer > .popup-dashlet { height: 100%; }
+/* Keep compact viewer controls below the header and investigation menus. */
+.scrolling-dashboard-viewer .popup-dashlet-panel:not([data-expanded]):not([data-preview]) > :is(.popup-dashlet-bar, .popup-dashlet-floating-controls) {
+  isolation: isolate;
+  z-index: 0;
+}
 .scrolling-dashboard-viewer:focus-visible { outline: 2px solid var(--borderColor-accent-emphasis); outline-offset: 2px; }

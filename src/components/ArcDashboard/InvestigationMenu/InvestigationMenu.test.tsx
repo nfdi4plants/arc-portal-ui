@@ -37,4 +37,26 @@ describe('InvestigationMenu', () => {
       expect(investigation).toHaveFocus()
     }
   }, 15000)
+
+  it('shows category counts as right-aligned counter badges in submenu presentation', async () => {
+    const store = createArcStore(sampleCrateSource())
+    await store.load()
+    const metadata = selectInvestigationMetadata(store.getArc()!)
+    renderWithTheme(<DashboardWindow><InvestigationMenu metadata={metadata} arcJson={crateJson} presentation="submenu" /></DashboardWindow>)
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Investigation' }))
+    const items = screen.getAllByRole('menuitem')
+    expect(items).toHaveLength(8)
+    expect(items[0].querySelector('[data-component="CounterLabel"]')).toBeNull()
+    expect(items[0].querySelector('[data-component="ActionList.TrailingVisual"] svg')).not.toBeNull()
+    for (const [index, name, count] of [[1, 'Contacts', 12], [4, 'Assays', 3], [5, 'Studies', 2], [6, 'Runs', 6]] as const) {
+      expect(items[index]).toHaveTextContent(name)
+      const badge = items[index].querySelector('[data-component="CounterLabel"]') as HTMLElement
+      expect(badge).not.toBeNull()
+      expect(badge).toHaveTextContent(String(count))
+      expect(badge.closest('.investigation-category-label')).not.toBeNull()
+      expect(badge.closest('[data-component="ActionList.TrailingVisual"]')).toBeNull()
+      expect(items[index].querySelector('[data-component="ActionList.TrailingVisual"] svg')).not.toBeNull()
+    }
+  })
 })

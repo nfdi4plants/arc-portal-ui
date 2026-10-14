@@ -8,7 +8,7 @@ import type { DashboardContentProps } from '../../components/ArcDashboard/dashbo
 import { InvestigationMenu } from '../../components/ArcDashboard/InvestigationMenu/InvestigationMenu'
 import { ViewerWorkspace, type ViewerWorkspaceMode } from '../../components/ArcDashboard/ViewerWorkspace/ViewerWorkspace'
 import { PopupArcGame } from '../../components/ArcDashboard/Game/PopupArcGame'
-import './viewerDashboard.css'
+import '../../components/ArcDashboard/viewerDashboard.css'
 import './tabbedDashboard.css'
 
 type TabbedView = ViewerWorkspaceMode | 'game'

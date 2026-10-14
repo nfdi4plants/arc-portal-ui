@@ -13,7 +13,7 @@ import tabbed from './TabbedDashboard.stories'
 import hub from './HubDashboard.stories'
 import combined from './CombinedDashboard.stories'
 import stacked from './StackedDashboard.stories'
-import circular from './NewDashboard.stories'
+import circular from './CircularDashboard.stories'
 import './dashboardDesigns.css'
 
 const designs = [
@@ -24,7 +24,7 @@ const designs = [
   { name: 'HubDashboard', content: hub.args.content, fillHeight: false },
   { name: 'CombinedDashboard', content: combined.args.content, fillHeight: false },
   { name: 'StackedDashboard', content: stacked.args.content, fillHeight: false },
-  { name: 'NewDashboard', content: circular.args.content, fillHeight: true },
+  { name: 'CircularDashboard', content: circular.args.content, fillHeight: true },
   { name: 'ClassicDashboard', content: DashboardContent, fillHeight: false },
 ] as const
 

@@ -5,11 +5,11 @@ import { privateTalinumDataHubData, publicTalinumDataHubData, talinumArcJson, ta
 import { NewDashboardContent } from '../../components/ArcDashboard/NewDashboard'
 
 const meta = {
-  title: 'Dashboard/NewDashboard',
+  title: 'Dashboard/CircularDashboard',
   component: ArcDashboardFrame,
   decorators: [(Story) => <TalinumStory>{() => <Story />}</TalinumStory>],
   argTypes: { content: { control: false, table: { disable: true } }, label: { table: { disable: true } }, fillHeight: { table: { disable: true } } },
-  args: { repository: talinumRepository, arcJson: talinumArcJson, content: NewDashboardContent, label: 'NewDashboard', fillHeight: true },
+  args: { repository: talinumRepository, arcJson: talinumArcJson, content: NewDashboardContent, label: 'CircularDashboard', fillHeight: true },
   parameters: {
     docs: {
       description: {

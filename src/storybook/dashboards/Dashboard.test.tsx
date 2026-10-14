@@ -22,7 +22,7 @@ describe('Dashboard main story', () => {
     const navigation = within(screen.getByRole('navigation', { name: 'Dashboard designs' }))
     expect(navigation.getAllByRole('button').map(button => button.textContent)).toEqual([
       'ScrollingDashboard', 'SplitDashboard', 'TabbedDashboard', 'ScrollingSplitDashboard', 'HubDashboard',
-      'CombinedDashboard', 'StackedDashboard', 'NewDashboard', 'ClassicDashboard',
+      'CombinedDashboard', 'StackedDashboard', 'CircularDashboard', 'ClassicDashboard',
     ])
     expect(screen.getByRole('region', { name: 'ScrollingDashboard' })).toBeVisible()
     await user.click(navigation.getByRole('button', { name: 'TabbedDashboard' }))
@@ -35,7 +35,7 @@ describe('Dashboard main story', () => {
     expect(screen.getByRole('separator')).toHaveAttribute('aria-valuetext', 'Graphview 40%, Webview 60%')
     await user.click(navigation.getByRole('button', { name: 'ClassicDashboard' }))
     expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByRole('button', { name: 'Open ARC viewer in popup' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Pop out ARC viewer' })).toBeVisible()
     expect(fetchROCrate).toHaveBeenCalledOnce()
   }, 15000)
 })

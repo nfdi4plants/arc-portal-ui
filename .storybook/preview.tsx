@@ -10,7 +10,7 @@ const preview: Preview = {
     controls: { expanded: true },
     options: {
       storySort: {
-        order: ['Dashboard', ['Main', 'ScrollingDashboard', 'SplitDashboard', 'TabbedDashboard', 'ScrollingSplitDashboard', 'HubDashboard', 'CombinedDashboard', 'StackedDashboard', 'NewDashboard', 'ClassicDashboard'], '*'],
+        order: ['Dashboard', ['Main', 'ScrollingDashboard', 'SplitDashboard', 'TabbedDashboard', 'ScrollingSplitDashboard', 'HubDashboard', 'CombinedDashboard', 'StackedDashboard', 'CircularDashboard', 'ClassicDashboard'], '*'],
       },
     },
   },
