@@ -11,7 +11,7 @@ import type { TelegraphPool, Zone, ZoneSpec } from './telegraph'
 import { clamp, fallMs, flightMs, insideAny, knockback, openIntervals, platformBodyY, platformUnder, safeIntervals, toOwnerShape } from './zones'
 import type { ArenaPlatform, Facing, Interval } from './zones'
 
-// The eight attack kinds. Each one is written once. It takes its damage and timing from the spec,
+// The nine attack kinds. Each one is written once. It takes its damage and timing from the spec,
 // its reach from the arena and its look from the boss archetype. A heavy attack in an arena with
 // platforms sometimes plays a platform variant: the quake and the flood cover the whole floor and
 // spare the platforms, the platform rain, the high beam and a leap onto the player's platform hit
@@ -140,6 +140,11 @@ export interface AttackEnv {
   hover: number
   minX: number
   maxX: number
+  // Theme modifiers of the genome, see BossThemeKind. 1, 0, 0.45 and null without a theme.
+  reach: number
+  extraShots: number
+  aimedChance: number
+  shotArt: ProjectileArt | null
   // Texture key for a projectile of this art kind.
   shotKey(kind: ProjectileArt): string
 }
@@ -166,6 +171,10 @@ const SHOT_ART: Record<BossArchetype, ProjectileArt> = {
   specimenJar: 'droplet',
   reagentGolem: 'flame',
   glitchDaemon: 'bolt',
+}
+
+function shotArt(env: AttackEnv): ProjectileArt {
+  return env.shotArt ?? SHOT_ART[env.archetype]
 }
 
 // Scratch points, read right after the call that filled them.
@@ -351,7 +360,7 @@ const sweep: AttackKind = {
     run.dir = faceToward(env, env.player.position().x)
     run.variant = env.rng.chance(0.5) ? 0 : 1
     run.targetX = env.body.x + run.dir * (env.body.hurtW / 2)
-    run.length = run.spec.heavy ? 150 : 115
+    run.length = (run.spec.heavy ? 150 : 115) * env.reach
     run.top = floor - (run.variant === 0 ? 24 : 64)
     run.bottom = floor - (run.variant === 0 ? 0 : 36)
     show(run, env, {
@@ -399,8 +408,8 @@ const projectileFan: AttackKind = {
     const from = muzzle(env)
     const aim = playerCentre(env)
     const angle = Math.atan2(aim.y - from.y, aim.x - from.x)
-    const count = 5 + 2 * env.rng.int(0, 2)
-    const kind = SHOT_ART[env.archetype]
+    const count = 5 + 2 * env.rng.int(0, 2) + env.extraShots
+    const kind = shotArt(env)
     for (let i = 0; i < count; i++) {
       const a = angle + (i - (count - 1) / 2) * FAN_GAP
       const vx = Math.cos(a) * FAN_SPEED
@@ -431,7 +440,7 @@ const charge: AttackKind = {
     run.dir = faceToward(env, env.player.position().x)
     const edge = body.x + run.dir * (body.hurtW / 2)
     const toWall = run.dir === 1 ? arena.right - edge : edge - arena.left
-    run.length = Math.max(40, run.spec.heavy ? toWall : Math.min(280, toWall))
+    run.length = Math.max(40, run.spec.heavy ? toWall : Math.min(280 * env.reach, toWall))
     run.startX = body.x
     run.targetX = clamp(body.x + run.dir * run.length, env.minX, env.maxX)
     show(run, env, {
@@ -480,7 +489,7 @@ function dropOnLedge(run: AttackRun, env: AttackEnv): void {
   const ledges = arena.platforms
   const p = ledges[rng.int(0, ledges.length - 1)]
   const y = arena.floorY - SKY
-  shoot(run, env, SHOT_ART[env.archetype], {
+  shoot(run, env, shotArt(env), {
     x: p.x + 4 + rng.next() * (p.w - 8),
     y,
     vx: 0,
@@ -499,13 +508,13 @@ function dropRain(run: AttackRun, env: AttackEnv): void {
     dropOnLedge(run, env)
     return
   }
-  const aimed = rng.chance(0.45)
+  const aimed = rng.chance(env.aimedChance)
   let x = aimed ? env.player.position().x + (rng.next() - 0.5) * 48 : arena.left + rng.next() * (arena.right - arena.left)
   for (let tries = 0; insideAny(x, run.safe, SAFE_MARGIN) || x < arena.left || x > arena.right; tries++) {
     if (tries >= 4) return
     x = arena.left + rng.next() * (arena.right - arena.left)
   }
-  shoot(run, env, SHOT_ART[env.archetype], {
+  shoot(run, env, shotArt(env), {
     x,
     y: arena.floorY - SKY,
     vx: 0,
@@ -586,7 +595,7 @@ const beam: AttackKind = {
     }
     const cos = Math.cos(run.angle)
     const sin = Math.sin(run.angle)
-    let length = BEAM_LENGTH
+    let length = BEAM_LENGTH * env.reach
     if (cos > 0.01) length = Math.min(length, (arena.right - ox) / cos)
     else if (cos < -0.01) length = Math.min(length, (ox - arena.left) / -cos)
     if (sin > 0.01) length = Math.min(length, (arena.floorY - 4 - oy) / sin)
@@ -713,6 +722,39 @@ const shockwave: AttackKind = {
   },
 }
 
+// Pillars: columns burst from the floor in a row, one under the player and the others a fixed
+// pitch apart, so the gaps between them are the safe spots. A light version raises three columns
+// around the player.
+const PILLAR = { w: 32, h: 64, pitch: 112 }
+
+const pillars: AttackKind = {
+  begin(run, env) {
+    const { arena } = env
+    const playerX = env.player.position().x
+    run.dir = faceToward(env, playerX)
+    run.waves.length = 0
+    const half = PILLAR.w / 2
+    const reach = run.spec.heavy ? Infinity : PILLAR.pitch
+    const first = playerX - Math.floor((playerX - arena.left - half) / PILLAR.pitch) * PILLAR.pitch
+    for (let x = first; x <= arena.right - half; x += PILLAR.pitch) {
+      if (Math.abs(x - playerX) > reach) continue
+      run.waves.push({ at: 0, x, dir: 1, lifeMs: 0, fired: false })
+      show(run, env, { shape: 'rect', x, y: arena.floorY, w: PILLAR.w, h: PILLAR.h, fill: 'up' })
+    }
+  },
+  windup(run, env, progress) {
+    env.body.lean = -run.dir * 0.1 * progress
+  },
+  fire(run, env) {
+    const floor = env.arena.floorY
+    for (const column of run.waves) {
+      const away: Facing = env.player.position().x >= column.x ? 1 : -1
+      hit(run, env, { kind: 'rect', x: column.x - PILLAR.w / 2, y: floor - PILLAR.h, w: PILLAR.w, h: PILLAR.h }, 260, knockback(away, env.self.facing(), 120, 260))
+    }
+    run.activeMs = 300
+  },
+}
+
 export const ATTACK_KINDS: Record<BossAttackKind, AttackKind> = {
   slam,
   sweep,
@@ -722,4 +764,5 @@ export const ATTACK_KINDS: Record<BossAttackKind, AttackKind> = {
   beam,
   summon,
   shockwave,
+  pillars,
 }

@@ -95,7 +95,7 @@ describe('level history', () => {
 })
 
 describe('level history helpers', () => {
-  const record = (level: number): LevelUpRecord => ({ level, cardId: 'a', cardName: 'Sharpened', rarity: 'common', offered: [], source: 'x' })
+  const record = (level: number): LevelUpRecord => ({ level, cardId: 'a', cardName: 'Impact Factor', rarity: 'common', offered: [], source: 'x' })
 
   it('keeps entries in level order', () => {
     const list = appendLevelUp(appendLevelUp([], record(4)), record(2))
@@ -110,9 +110,9 @@ describe('level history helpers', () => {
   })
 
   it('words a row with the offered alternatives', () => {
-    const row = historyRow({ ...record(4), offered: [{ id: 'w', name: 'Wand' }, { id: 'k', name: 'Keen Eye' }] })
-    expect(row.title).toBe('Lv 4 · Sharpened (common)')
-    expect(row.also).toBe('also offered: Wand, Keen Eye')
+    const row = historyRow({ ...record(4), offered: [{ id: 'w', name: 'Wand' }, { id: 'k', name: 'Quality Control' }] })
+    expect(row.title).toBe('Lv 4 · Impact Factor (common)')
+    expect(row.also).toBe('also offered: Wand, Quality Control')
     expect(historyRow(record(4)).also).toBeNull()
   })
 

@@ -127,6 +127,8 @@ const COMMON: readonly (readonly [TelegraphArt, number, number])[] = [
   ['rect', 64, 128],
   ['rect', 512, 16],
   ['rect', 128, 16],
+  ['rect', 64, 16],
+  ['rect', 32, 64],
   ['circle', 128, 128],
   ['cone', 256, 128],
   ['line', 512, 16],

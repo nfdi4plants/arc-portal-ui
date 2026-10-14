@@ -8,44 +8,99 @@ export interface AttackTemplate {
   cooldownMs: number
 }
 
-// Six attacks per archetype, three of them heavy. A boss draws four to six of them and always
-// keeps at least two heavy ones.
-export const BOSS_ATTACKS: Record<BossArchetype, AttackTemplate[]> = {
-  rootTreant: [
-    { name: 'Root Eruption', kind: 'slam', heavy: true, damage: 18, cooldownMs: 3200 },
-    { name: 'Thorn Volley', kind: 'projectileFan', heavy: false, damage: 8, cooldownMs: 2200 },
-    { name: 'Branch Sweep', kind: 'sweep', heavy: false, damage: 10, cooldownMs: 2000 },
-    { name: 'Bramble Rain', kind: 'rain', heavy: true, damage: 16, cooldownMs: 3600 },
-    { name: 'Sapling Call', kind: 'summon', heavy: false, damage: 6, cooldownMs: 4000 },
-    { name: 'Trunk Charge', kind: 'charge', heavy: true, damage: 20, cooldownMs: 3400 },
-  ],
-  specimenJar: [
-    { name: 'Glass Slam', kind: 'slam', heavy: true, damage: 18, cooldownMs: 3200 },
-    { name: 'Formalin Splash', kind: 'projectileFan', heavy: false, damage: 8, cooldownMs: 2200 },
-    { name: 'Lid Spin', kind: 'sweep', heavy: false, damage: 10, cooldownMs: 2000 },
-    { name: 'Shatter Wave', kind: 'shockwave', heavy: true, damage: 20, cooldownMs: 3600 },
-    { name: 'Specimen Swarm', kind: 'summon', heavy: false, damage: 6, cooldownMs: 4000 },
-    { name: 'Tank Roll', kind: 'charge', heavy: true, damage: 18, cooldownMs: 3400 },
-  ],
-  reagentGolem: [
-    { name: 'Titration Drip', kind: 'rain', heavy: false, damage: 8, cooldownMs: 2000 },
-    { name: 'Acid Beam', kind: 'beam', heavy: true, damage: 20, cooldownMs: 3400 },
-    { name: 'Flask Slam', kind: 'slam', heavy: true, damage: 18, cooldownMs: 3200 },
-    { name: 'Reagent Sweep', kind: 'sweep', heavy: false, damage: 10, cooldownMs: 2000 },
-    { name: 'Catalyst Spawn', kind: 'summon', heavy: false, damage: 6, cooldownMs: 4000 },
-    { name: 'Crucible Charge', kind: 'charge', heavy: true, damage: 20, cooldownMs: 3400 },
-  ],
-  glitchDaemon: [
-    { name: 'Null Pointer', kind: 'beam', heavy: true, damage: 20, cooldownMs: 3400 },
-    { name: 'Packet Fan', kind: 'projectileFan', heavy: false, damage: 8, cooldownMs: 2000 },
-    { name: 'Buffer Overflow', kind: 'shockwave', heavy: true, damage: 18, cooldownMs: 3600 },
-    { name: 'Glitch Dash', kind: 'charge', heavy: false, damage: 10, cooldownMs: 2200 },
-    { name: 'Fork Bomb', kind: 'summon', heavy: false, damage: 6, cooldownMs: 4000 },
-    { name: 'Data Rain', kind: 'rain', heavy: true, damage: 16, cooldownMs: 3600 },
-  ],
+// The building blocks of a boss genome. A heavy slot draws its kind from HEAVY_KINDS, a light slot
+// from LIGHT_KINDS. Damage and cooldown belong to the kind and its weight, the archetype only
+// names the attack.
+export const HEAVY_KINDS: readonly BossAttackKind[] = ['slam', 'rain', 'charge', 'beam', 'shockwave', 'pillars', 'sweep']
+export const LIGHT_KINDS: readonly BossAttackKind[] = ['sweep', 'projectileFan', 'charge', 'rain', 'summon']
+
+const STATS: Record<BossAttackKind, { heavy: [number, number]; light: [number, number] }> = {
+  slam: { heavy: [18, 3200], light: [10, 2200] },
+  sweep: { heavy: [18, 3000], light: [10, 2000] },
+  projectileFan: { heavy: [14, 3200], light: [8, 2200] },
+  charge: { heavy: [20, 3400], light: [10, 2200] },
+  rain: { heavy: [16, 3600], light: [8, 2000] },
+  beam: { heavy: [20, 3400], light: [9, 2400] },
+  summon: { heavy: [8, 4400], light: [6, 4000] },
+  shockwave: { heavy: [20, 3600], light: [10, 2400] },
+  pillars: { heavy: [18, 3600], light: [9, 2400] },
 }
 
-// Every final boss phase adds this attack to the three it draws from its archetype table.
+const NAMES: Record<BossArchetype, Record<BossAttackKind, string>> = {
+  rootTreant: {
+    slam: 'Root Eruption',
+    sweep: 'Branch Sweep',
+    projectileFan: 'Thorn Volley',
+    charge: 'Trunk Charge',
+    rain: 'Bramble Rain',
+    beam: 'Sap Lance',
+    summon: 'Sapling Call',
+    shockwave: 'Root Quake',
+    pillars: 'Taproot Spikes',
+  },
+  specimenJar: {
+    slam: 'Glass Slam',
+    sweep: 'Lid Spin',
+    projectileFan: 'Formalin Splash',
+    charge: 'Tank Roll',
+    rain: 'Brine Drizzle',
+    beam: 'Pipette Jet',
+    summon: 'Specimen Swarm',
+    shockwave: 'Shatter Wave',
+    pillars: 'Test Tube Rack',
+  },
+  reagentGolem: {
+    slam: 'Flask Slam',
+    sweep: 'Reagent Sweep',
+    projectileFan: 'Spatter Shot',
+    charge: 'Crucible Charge',
+    rain: 'Titration Drip',
+    beam: 'Acid Beam',
+    summon: 'Catalyst Spawn',
+    shockwave: 'Exotherm Wave',
+    pillars: 'Burette Columns',
+  },
+  glitchDaemon: {
+    slam: 'Stack Smash',
+    sweep: 'Scanline Swipe',
+    projectileFan: 'Packet Fan',
+    charge: 'Glitch Dash',
+    rain: 'Data Rain',
+    beam: 'Null Pointer',
+    summon: 'Fork Bomb',
+    shockwave: 'Buffer Overflow',
+    pillars: 'Firewall Bars',
+  },
+}
+
+// What a kind does, for the inspect panel.
+export const KIND_TEXT: Record<BossAttackKind, string> = {
+  slam: 'leaps or smashes down on you',
+  sweep: 'a low or high swing in front',
+  projectileFan: 'a fan of shots',
+  charge: 'a dash along the floor',
+  rain: 'drops from above',
+  beam: 'a straight beam',
+  summon: 'calls two minions',
+  shockwave: 'floor waves to both walls',
+  pillars: 'columns burst from the floor',
+}
+
+// The attack an empty slot falls back to, so every boss keeps one heavy and one light attack.
+export const PLAIN_HEAVY: Record<BossArchetype, BossAttackKind> = {
+  rootTreant: 'slam',
+  specimenJar: 'slam',
+  reagentGolem: 'slam',
+  glitchDaemon: 'beam',
+}
+export const PLAIN_LIGHT: BossAttackKind = 'sweep'
+
+export function attackTemplate(archetype: BossArchetype, kind: BossAttackKind, heavy: boolean): AttackTemplate {
+  const [damage, cooldownMs] = STATS[kind][heavy ? 'heavy' : 'light']
+  return { name: NAMES[archetype][kind], kind, heavy, damage, cooldownMs }
+}
+
+// Every final boss phase adds this attack to the ones its step's genome gives it.
 export const SHARED_HEAVY_ATTACK: AttackTemplate = {
   name: 'Crate Collapse',
   kind: 'rain',

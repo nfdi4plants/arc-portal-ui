@@ -1,4 +1,4 @@
-import type { Annotation, DatasetKind, IoKind } from '../../arc/provenance/types'
+import type { Annotation, AnnotationCategory, DatasetKind, IoKind } from '../../arc/provenance/types'
 import type { Rng } from './rng'
 import type { RunNode, RunPlan, Segment } from './run'
 
@@ -49,13 +49,34 @@ export interface MonsterSpec {
   phantom: boolean
 }
 
+// The boss silhouettes. The genome picks one from the most common annotation key of the step, a
+// step without annotations takes the one of its node kind (in the comments).
 export type BossArchetype =
   | 'rootTreant' // source
   | 'specimenJar' // sample
   | 'reagentGolem' // material
   | 'glitchDaemon' // data
 
-export type BossAttackKind = 'slam' | 'sweep' | 'projectileFan' | 'charge' | 'rain' | 'beam' | 'summon' | 'shockwave'
+export type BossAttackKind = 'slam' | 'sweep' | 'projectileFan' | 'charge' | 'rain' | 'beam' | 'summon' | 'shockwave' | 'pillars'
+
+// One boss characteristic per ISA annotation category, see bossGenome.
+export type BossMechanicKind =
+  | 'armoredFront' // characteristic: hits from the front deal 40 percent less
+  | 'enrage' // parameter: below 40 percent hp its attacks recharge 30 percent faster
+  | 'phaseShift' // factor: at half hp it swaps its light attacks for others
+  | 'summoner' // component: calls a minion every few seconds
+  | 'hazard' // protocol: marks a spill on the floor under the mage, which then burns
+  | 'teleport' // performer: blinks to the other side of the mage
+  | 'shieldPulse' // date: raises a shield that blocks every hit for a moment
+  | 'reflect' // comment: sends the mage's shots back while it winds up a heavy attack
+
+// From the units of the step, see bossGenome.
+export type BossThemeKind =
+  | 'tempo' // time units: attacks recharge 15 percent faster
+  | 'heat' // temperature units: flame shots, light attacks hit 15 percent harder
+  | 'reach' // length units: sweeps, charges and beams reach 25 percent further
+  | 'dense' // mass, amount or volume units: 15 percent more hp
+  | 'precise' // other units: fans fire two more shots and drops aim at the mage more often
 
 export interface BossAttackSpec {
   id: string
@@ -67,6 +88,57 @@ export interface BossAttackSpec {
   telegraphMs: number
   damage: number
   cooldownMs: number
+}
+
+export interface BossMechanicSpec {
+  kind: BossMechanicKind
+  // Damage of what the mechanic spawns (the spill, a sent back shot, a minion), already scaled by
+  // the damage multiplier. 0 when it spawns nothing.
+  damage: number
+  // The light attacks after a phase shift. Empty for the other kinds.
+  shiftAttacks: BossAttackSpec[]
+}
+
+// A heavy or light attack slot. An empty slot has no source, and only the first slot of each kind
+// falls back to a plain attack, so every boss has at least one heavy and one light attack.
+export interface BossAttackSlot {
+  source: Annotation | null
+  attack: BossAttackSpec | null
+}
+
+export interface BossMechanicSlot {
+  // The annotation type behind the mechanic, null for an empty slot.
+  category: AnnotationCategory | null
+  sources: Annotation[]
+  mechanic: BossMechanicKind | null
+}
+
+// What a boss is built from: the annotations of the one step that leads into it. Every slot names
+// the annotations that filled it, so the pause inspection can explain the boss.
+export interface BossGenome {
+  segmentIndex: number
+  processName: string
+  annotationCount: number
+  body: {
+    archetype: BossArchetype
+    size: 'small' | 'medium' | 'large'
+    // Draw scale of the body.
+    scale: number
+    // The annotation key most annotations of the step share, null without annotations (then the
+    // node kind picks the body).
+    key: string | null
+    sources: Annotation[]
+  }
+  // Two each. The sources: ontology terms for heavy slots, values with a unit for light slots.
+  heavy: BossAttackSlot[]
+  light: BossAttackSlot[]
+  // Three, one per annotation type on the step, most common first.
+  mechanics: BossMechanicSlot[]
+  theme: { kind: BossThemeKind | null; sources: Annotation[] }
+  // Slots with an annotation behind them, of BOSS_SLOT_COUNT.
+  filledSlots: number
+  // From the quality of the step only: 1 at quality 1, up to about 1.55 at quality 0.
+  damageScale: number
 }
 
 export interface BossSpec {
@@ -87,18 +159,29 @@ export interface BossSpec {
   // The node's own annotations, shown above the boss before heavy attacks.
   tells: Annotation[]
   hp: number
+  // The heavy and light slots of the genome, damage scaled and capped.
   attacks: BossAttackSpec[]
+  mechanics: BossMechanicSpec[]
+  theme: BossThemeKind | null
+  damageScale: number
+  genome: BossGenome
   xp: number
 }
 
 export interface FinalBossPhase {
   segmentIndex: number
   datasetKind: DatasetKind
-  // Archetype of the boss after this segment.
+  // How the phase moves and shoots, the body of its genome.
   archetype: BossArchetype
   quality: number
   telegraphMs: number
   attacks: BossAttackSpec[]
+  // At most two of the genome's mechanics.
+  mechanics: BossMechanicSpec[]
+  theme: BossThemeKind | null
+  damageScale: number
+  // Built from the phase's own segment.
+  genome: BossGenome
 }
 
 export interface FinalBossSpec {

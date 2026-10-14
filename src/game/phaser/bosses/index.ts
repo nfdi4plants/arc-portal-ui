@@ -5,8 +5,10 @@ import type { BossSpec, FinalBossSpec } from '../../contracts/content'
 import type { PlayerHandle } from '../../contracts/player'
 import type { Rng } from '../../contracts/rng'
 import type { RunPlan, Segment } from '../../contracts/run'
+import { describeBoss, describeFinalBoss } from '../../model/content'
 import { createActor } from './actor'
-import type { PhaseConfig } from './actor'
+import type { Actor, PhaseConfig } from './actor'
+import { scaleArt } from './sprites'
 import type { ArenaPlatform } from './zones'
 
 export { arenaPlatforms, PLATFORM_THICKNESS, type ArenaPlatform } from './zones'
@@ -44,22 +46,24 @@ export interface BossHandle extends Combatant {
   destroy(): void
 }
 
-export interface Boss extends BossHandle {
+// Both kinds can be inspected in the pause menu like a mob, see mobs/inspect.ts.
+export interface Boss extends BossHandle, Pick<Actor, 'describe' | 'setInspectable' | 'setHighlight' | 'setRaised'> {
   readonly spec: BossSpec
 }
 
-export interface FinalBoss extends BossHandle {
+export interface FinalBoss extends BossHandle, Pick<Actor, 'describe' | 'setInspectable' | 'setHighlight' | 'setRaised'> {
   readonly spec: FinalBossSpec
   phaseIndex(): number
   onPhaseChange(listener: (phase: number) => void): () => void
 }
 
-// The node boss after a segment. The rewards of annotation quality come ready-made in the spec.
+// The node boss after a segment. Its genome and the rewards of annotation quality come ready-made
+// in the spec. The body is drawn at the size of the genome.
 export function spawnBoss(scene: Phaser.Scene, spec: BossSpec, segment: Segment, deps: BossDeps, arena: Arena): Boss {
   const killer = { kind: 'boss', spec, segment } as const
   const actor = createActor(scene, {
     id: `boss:${spec.nodeId}`,
-    art: deps.art.boss(scene, spec),
+    art: scaleArt(deps.art.boss(scene, spec), spec.genome.body.scale),
     hp: spec.hp,
     phases: [
       {
@@ -72,11 +76,14 @@ export function spawnBoss(scene: Phaser.Scene, spec: BossSpec, segment: Segment,
         weakPoints: spec.weakPoints,
         staggerWindowMs: spec.staggerWindowMs,
         tells: spec.tells,
+        mechanics: spec.mechanics,
+        theme: spec.theme,
       },
     ],
     killerFor: () => killer,
     deps,
     arena,
+    describe: () => describeBoss(spec),
   })
   return Object.assign(actor, { spec })
 }
@@ -95,12 +102,15 @@ function finalPhases(spec: FinalBossSpec, plan: RunPlan): PhaseConfig[] {
     weakPoints: Math.round(3 * phase.quality),
     staggerWindowMs: Math.round(400 + 1200 * phase.quality),
     tells: plan.nodes[phase.segmentIndex + 1]?.annotations ?? [],
+    mechanics: phase.mechanics,
+    theme: phase.theme,
   }))
 }
 
 // The ARC itself. One phase per segment, the hp split evenly, and a 1.2 s invulnerable pause
-// between phases.
+// between phases. The inspection shows the phase it is in.
 export function spawnFinalBoss(scene: Phaser.Scene, spec: FinalBossSpec, plan: RunPlan, deps: BossDeps, arena: Arena): FinalBoss {
+  let phaseOf = () => 0
   const actor = createActor(scene, {
     id: `finalBoss:${spec.title}`,
     art: deps.art.finalBoss(scene, spec),
@@ -110,6 +120,8 @@ export function spawnFinalBoss(scene: Phaser.Scene, spec: FinalBossSpec, plan: R
     mirror: false,
     deps,
     arena,
+    describe: () => describeFinalBoss(spec, phaseOf()),
   })
+  phaseOf = actor.phaseIndex
   return Object.assign(actor, { spec })
 }

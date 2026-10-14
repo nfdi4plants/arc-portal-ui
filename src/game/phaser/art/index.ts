@@ -3,6 +3,7 @@ import type { ScribbleArt, SpriteRef } from '../../contracts/art'
 import type { MonsterSpec } from '../../contracts/content'
 import { textureBytes } from './atlas'
 import { boss } from './bosses'
+import { bossMarker } from './bossMarkers'
 import { finalBoss } from './finalBoss'
 import { FX_KINDS, fx } from './fx'
 import { frameName, TEXTURE_SCALE } from './layout'
@@ -18,7 +19,7 @@ export { monsterWeapon } from './monster'
 export { carrier } from './carrier'
 export type { MonsterWeaponRef } from './monster'
 export { prewarmTelegraphs, releaseTelegraphs } from './telegraph'
-export { CARD_HEIGHT, CARD_WIDTH, RARITY_COLOR, cardArt, doorArt, glowTexture, shieldFragmentArt } from './props'
+export { CARD_HEIGHT, CARD_WIDTH, COIN_SIZE, RARITY_COLOR, TRADER_HEIGHT, TRADER_WIDTH, cardArt, coinArt, doorArt, glowTexture, shieldFragmentArt, traderArt } from './props'
 export type { BossArt, PartRef } from './parts'
 
 // Puts a sprite on the texture of `ref`, standing on its origin (bottom centre), sized in world
@@ -47,5 +48,5 @@ export function prewarmEffects(scene: Phaser.Scene): void {
 }
 
 export function createScribbleArt(): ScribbleArt {
-  return { pixelsPerUnit: TEXTURE_SCALE, monster, boss, finalBoss, playerWeapon, projectile, tiles, telegraph, fx }
+  return { pixelsPerUnit: TEXTURE_SCALE, monster, boss, finalBoss, bossMarker, playerWeapon, projectile, tiles, telegraph, fx }
 }

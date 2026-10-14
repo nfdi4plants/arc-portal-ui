@@ -1,6 +1,24 @@
 import type Phaser from 'phaser'
 import type { PartRef, SpriteRef } from '../../contracts/art'
 
+type BossArtRef = SpriteRef & { parts: Record<string, PartRef> }
+
+function scaled<T extends SpriteRef>(ref: T, k: number): T {
+  const point = (p: { x: number; y: number }) => ({ x: p.x * k, y: p.y * k })
+  return { ...ref, width: ref.width * k, height: ref.height * k, anchors: { weapon: point(ref.anchors.weapon), head: point(ref.anchors.head) } }
+}
+
+// The boss art at another size: the body, every part and where the parts sit. The textures stay
+// the cached ones, the sprites only show them larger or smaller.
+export function scaleArt(art: BossArtRef, k: number): BossArtRef {
+  if (k === 1) return art
+  const parts: Record<string, PartRef> = {}
+  for (const [name, part] of Object.entries(art.parts)) {
+    parts[name] = { ...scaled(part, k), rest: { x: part.rest.x * k, y: part.rest.y * k }, pivot: { x: part.pivot.x * k, y: part.pivot.y * k } }
+  }
+  return { ...scaled(art, k), parts }
+}
+
 // Puts a sprite on the art of `ref`, sized in world units, and starts the boiling animation.
 // Works for the placeholder art (one frame) and the real art (an atlas of variants). The origin is
 // the bottom centre, or the joint of a part, see PartRef.pivot.

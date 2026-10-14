@@ -17,6 +17,7 @@ export const SCENE = {
   finalBoss: 'FinalBoss',
   hud: 'Hud',
   levelUp: 'LevelUp',
+  store: 'Store',
   death: 'Death',
   victory: 'Victory',
   testRoom: 'TestRoom',

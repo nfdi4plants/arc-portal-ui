@@ -1,6 +1,6 @@
 import type Phaser from 'phaser'
 import type { DatasetKind } from '../../arc/provenance/types'
-import type { BossSpec, FinalBossSpec, MonsterSpec } from './content'
+import type { BossMechanicKind, BossSpec, BossThemeKind, FinalBossSpec, MonsterSpec } from './content'
 import type { PlayerWeaponId } from './progression'
 
 export interface SpriteRef {
@@ -29,6 +29,8 @@ export type Theme = DatasetKind
 export type ProjectileArt = 'bolt' | 'droplet' | 'disc' | 'arrow' | 'bomb' | 'flame' | 'orb'
 // 'safe' is the teal spot where an area attack does not hit.
 export type TelegraphArt = 'rect' | 'circle' | 'cone' | 'line' | 'safe'
+// A badge over a boss for one of its mechanics or its theme.
+export type BossMarkerKind = BossMechanicKind | BossThemeKind
 export type FxArt = 'hit' | 'crit' | 'dust' | 'levelUp' | 'death' | 'xp'
 
 export interface TileArt {
@@ -47,6 +49,7 @@ export interface ScribbleArt {
   monster(scene: Phaser.Scene, spec: MonsterSpec): SpriteRef
   boss(scene: Phaser.Scene, spec: BossSpec): SpriteRef & { parts: Record<string, PartRef> }
   finalBoss(scene: Phaser.Scene, spec: FinalBossSpec): SpriteRef & { parts: Record<string, PartRef> }
+  bossMarker(scene: Phaser.Scene, kind: BossMarkerKind): SpriteRef
   playerWeapon(scene: Phaser.Scene, id: PlayerWeaponId, tier: 1 | 2): SpriteRef
   projectile(scene: Phaser.Scene, kind: ProjectileArt): SpriteRef
   tiles(scene: Phaser.Scene, theme: Theme): TileArt

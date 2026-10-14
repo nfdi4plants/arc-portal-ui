@@ -1,13 +1,13 @@
 import Phaser from 'phaser'
 import type { Combatant, CombatWorld, HitEvent, KillerInfo } from '../../contracts/combat'
 import { PALETTE } from '../../contracts/constants'
-import type { Bindings, InputFrame } from '../../contracts/input'
+import type { Action, Bindings, InputFrame } from '../../contracts/input'
 import { preloadCoreAssets } from '../assets'
 import { createCombatWorld } from '../combat'
 import { createInputLayer, type InputLayer } from '../input/InputLayer'
 import type { Segment } from '../../contracts/run'
 import { INSPECT_DIM_DEPTH, PAUSE_DIM_ALPHA } from '../mobs/tuning'
-import { createInspector, mobXp, type Inspector, type Mob } from '../mobs'
+import { createInspector, inspectInfo, isDescription, mobXp, type InspectTarget, type Inspector } from '../mobs'
 import { attachLoadout, type LoadoutWithStatus } from '../player/weapons'
 import { createPlayer, type Player } from '../player/Player'
 import { followView, viewForBox, type View } from '../view'
@@ -15,7 +15,7 @@ import { MOB_INFO_EVENT } from './mobInfoEvent'
 import type { GameplayControl, RunContext } from './context'
 import { PIT_KILLER, type RunDirector } from './RunDirector'
 
-type Hold = 'banner' | 'levelUp' | 'pause' | 'external' | 'over'
+type Hold = 'banner' | 'levelUp' | 'store' | 'pause' | 'external' | 'over'
 
 export interface LevelSetup {
   colliders: Phaser.Types.Physics.Arcade.ArcadeColliderType[]
@@ -62,8 +62,10 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
   protected onBannerFrame(): void {}
   protected onBannerDone(): void {}
   protected onShutdown(): void {}
-  // The mobs the pause menu lets the player inspect, and the step they come from.
-  protected inspectableMobs(): Mob[] {
+  // After the FAIR trade store closed, whichever way the player left it.
+  protected onStoreClosed(): void {}
+  // The mobs and bosses the pause menu lets the player inspect, and the step the mobs come from.
+  protected inspectableMobs(): InspectTarget[] {
     return []
   }
   protected inspectSegment(): Segment | null {
@@ -184,11 +186,23 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
 
   private readInput() {
     this.frame = this.controls.frame()
-    if (this.frame.pressed.has('pause')) this.togglePause()
+    const pressed = this.frame.pressed
+    // The pause key leaves the store, and so does walking away. The press is used up here, so it
+    // does not open the pause menu on the next frame.
+    if (this.holds.has('store')) {
+      if (pressed.has('pause') || pressed.has('left') || pressed.has('right')) this.closeStore()
+      return
+    }
+    if (pressed.has('pause')) this.togglePause()
+  }
+
+  // Went down since the previous step. Valid inside stepWorld.
+  protected pressed(action: Action): boolean {
+    return this.frame.pressed.has(action)
   }
 
   private togglePause() {
-    if (this.holds.has('levelUp') || this.holds.has('over') || this.holds.has('external')) return
+    if (this.holds.has('levelUp') || this.holds.has('store') || this.holds.has('over') || this.holds.has('external')) return
     const paused = !this.holds.has('pause')
     this.setHold('pause', paused)
     this.inspector?.setActive(paused, paused ? this.inspectableMobs() : [])
@@ -237,6 +251,17 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
     }
   }
 
+  protected gainCoins(amount: number) {
+    this.director.addCoins(amount)
+  }
+
+  // Holds the world while the store overlay of node boss `index` is open, like the level-up screen.
+  protected openStore(index: number) {
+    if (this.holds.size > 0) return
+    this.setHold('store', true)
+    this.ctx.openStore(index)
+  }
+
   protected die(killer: KillerInfo) {
     if (this.holds.has('over')) return
     this.setHold('over', true)
@@ -263,15 +288,16 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
   }
 
   // Vertical place of the mob in the camera view, 0 at the top to 1 at the bottom.
-  private focusOf(mob: Mob): number {
+  private focusOf(mob: InspectTarget): number {
     const view = this.cameras.main.worldView
     return (mob.hurtbox().centerY - view.y) / view.height
   }
 
-  private pickMob(mob: Mob | null) {
+  private pickMob(mob: InspectTarget | null) {
     this.inspector?.select(mob)
+    const info = mob ? inspectInfo(mob) : null
     const segment = this.inspectSegment()
-    if (mob && segment) this.game.events.emit(MOB_INFO_EVENT, mob.spec, segment, this.focusOf(mob))
+    if (mob && info && (isDescription(info) || segment)) this.game.events.emit(MOB_INFO_EVENT, info, segment, this.focusOf(mob))
     else this.game.events.emit(MOB_INFO_EVENT)
   }
 
@@ -325,6 +351,22 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
       this.ctx.closeLevelUp()
       this.setHold('levelUp', false)
     }
+  }
+
+  closeStore() {
+    if (!this.holds.has('store')) return
+    this.ctx.closeStore()
+    this.setHold('store', false)
+    this.onStoreClosed()
+  }
+
+  // Only the card applies, like a level-up card without the level: hp, level and XP stay.
+  buyCard(index: number, cardId: string): boolean {
+    this.director.setHp(this.player.hp())
+    if (!this.director.buy(index, cardId)) return false
+    this.player.setBuild(this.director.build)
+    this.loadout.sync(this.director.build)
+    return true
   }
 
   setBindings(bindings: Bindings) {

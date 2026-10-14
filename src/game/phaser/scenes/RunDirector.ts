@@ -5,9 +5,9 @@ import type { PlayerBuild, PowerUpCard } from '../../contracts/progression'
 import { createRng, type Rng } from '../../contracts/rng'
 import type { RunPlan, Segment } from '../../contracts/run'
 import { bossFromNode, finalBossFromPlan } from '../../model/content'
-import { appendLevelUp, sourceText, type LevelUpRecord } from './levelHistory'
-import { addXp, applyCard, createBossCharge, createBuild, rollOffer } from '../../model/progression'
-import type { BossCharge } from '../../model/progression'
+import { appendLevelUp, sourceText, storeSourceText, type LevelUpRecord } from './levelHistory'
+import { addXp, applyCard, buyCard, createBossCharge, createBuild, createLinePicker, priceOf, rollOffer, rollStock, TRADER_LINES } from '../../model/progression'
+import type { BossCharge, TraderMood } from '../../model/progression'
 
 export type RunStage =
   | { kind: 'stretch'; index: number }
@@ -57,7 +57,12 @@ export class RunDirector {
   // Second Wind heals once, then waits for the next boss to fall. It lives here, so leaving a
   // stretch or a boss arena keeps it spent.
   readonly secondWind: BossCharge = createBossCharge()
+  // Coins for the FAIR trade store. They carry over from one stage to the next and a pit costs none.
+  coins = 0
   private readonly hooks: RunDirectorHooks
+  // The stock of the trader after each node boss, rolled on the first visit and fixed from then on.
+  private readonly stocks = new Map<number, PowerUpCard[]>()
+  private readonly traderLines: Record<TraderMood, () => string>
   private history: LevelUpRecord[] = []
   private lastOffer: PowerUpCard[] = []
   private readonly bossSpecs = new Map<number, BossSpec>()
@@ -67,6 +72,14 @@ export class RunDirector {
     this.plan = plan
     this.hooks = hooks
     this.rng = createRng(plan.seed).fork('run')
+    const lines = this.rng.fork('trader')
+    this.traderLines = {
+      greeting: createLinePicker(TRADER_LINES.greeting, lines.fork('greeting')),
+      goodbye: createLinePicker(TRADER_LINES.goodbye, lines.fork('goodbye')),
+      bought: createLinePicker(TRADER_LINES.bought, lines.fork('bought')),
+      poor: createLinePicker(TRADER_LINES.poor, lines.fork('poor')),
+      unusable: createLinePicker(TRADER_LINES.unusable, lines.fork('unusable')),
+    }
   }
 
   start(): void {
@@ -154,6 +167,48 @@ export class RunDirector {
       source: sourceText(stage, this.plan, bossLabel),
     })
     this.lastOffer = []
+  }
+
+  addCoins(amount: number): void {
+    if (amount > 0 && !this.isOver()) this.coins += amount
+  }
+
+  // The cards the trader of node boss `index` still has. Rolled against the build of the first
+  // visit, with a fork of its own, so leaving and coming back shows the same cards.
+  stock(index: number): readonly PowerUpCard[] {
+    let stock = this.stocks.get(index)
+    if (!stock) {
+      stock = rollStock(this.build, this.rng.fork(`store/${index}`))
+      this.stocks.set(index, stock)
+    }
+    return stock
+  }
+
+  traderLine(mood: TraderMood): string {
+    return this.traderLines[mood]()
+  }
+
+  // Buys a card from the trader of node boss `index`. Only the card applies: the level, the XP and
+  // the hp stay as they are. False when the card is not in stock, too dear or of no use now.
+  buy(index: number, cardId: string): boolean {
+    const stock = this.stocks.get(index)
+    const card = stock?.find((entry) => entry.id === cardId)
+    if (!stock || !card) return false
+    const result = buyCard(this.build, this.coins, card)
+    if (!result) return false
+    this.build = result.build
+    this.coins = result.coins
+    stock.splice(stock.indexOf(card), 1)
+    this.history = appendLevelUp(this.history, {
+      level: this.build.level,
+      cardId: card.id,
+      cardName: card.name,
+      rarity: card.rarity,
+      offered: [],
+      source: storeSourceText(this.plan, index, this.bossSpec(index).label),
+      price: priceOf(card),
+    })
+    return true
   }
 
   completeStretch(): void {

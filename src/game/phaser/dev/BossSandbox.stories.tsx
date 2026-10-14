@@ -14,7 +14,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'One arena with the mage and a boss. Click the canvas first. Keys 1 to 4 pick the archetype (source, sample, material, data). Q and W lower and raise the annotation quality in steps of 0.25, which changes the telegraph time, the safe zones, the weak points, the stagger window and the tells. F starts the final boss for the Talinum ARC. P switches between the placeholder and the scribble art. Q, W and F also trigger the mage abilities and W moves up, which this scene accepts.',
+          'One arena with the mage and a boss generated from a step of a planned Talinum run. Click the canvas first. Keys 1 to 9 pick the node boss of that step, S switches to another run seed and so another path. Q and W lower and raise the quality of the step in steps of 0.25: the slots stay, while the telegraph time, the safe zones, the weak points, the stagger bar and the damage multiplier change. F starts the final boss. P switches between the placeholder and the scribble art. The overlay lists every slot of the genome as the pause inspection shows it. Q, W, F and S also trigger mage abilities or moves, which this scene accepts.',
       },
     },
   },

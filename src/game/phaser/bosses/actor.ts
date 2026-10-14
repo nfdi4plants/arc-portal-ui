@@ -2,14 +2,18 @@ import Phaser from 'phaser'
 import type { Annotation } from '../../../arc/provenance/types'
 import type { PartRef, ProjectileArt, SpriteRef } from '../../contracts/art'
 import type { Combatant, HitEvent, KillerInfo, StatusEffect } from '../../contracts/combat'
-import type { BossArchetype, BossAttackSpec } from '../../contracts/content'
+import type { BossArchetype, BossAttackSpec, BossMechanicSpec, BossThemeKind } from '../../contracts/content'
 import { DEPTH, PALETTE } from '../../contracts/constants'
+import type { MonsterDescription } from '../../model/content'
 import { cssColor } from '../color'
 import { addStatus, clearStatus, createStatus, statusTimeScale, tickStatus } from '../combat/status'
 import { createAdds } from './adds'
 import { ATTACK_KINDS, createRun, resetRun } from './attacks'
 import type { AttackEnv, BossBody } from './attacks'
+import { registerInspectable } from '../mobs/inspect'
+import { INSPECT_DIM_DEPTH } from '../mobs/tuning'
 import type { Arena, BossDeps, BossHandle } from './index'
+import { createMechanics } from './mechanics'
 import { createScheduler, OPENING_DELAY_MS, windupMs } from './scheduler'
 import { applyRef, setOriginOf, stillTexture } from './sprites'
 import { staggerBarSize, staggerDurationMs, staggerLocked, staggerProgress } from './stagger'
@@ -28,6 +32,8 @@ export interface PhaseConfig {
   weakPoints: number
   staggerWindowMs: number
   tells: readonly Annotation[]
+  mechanics: readonly BossMechanicSpec[]
+  theme: BossThemeKind | null
 }
 
 export interface ActorConfig {
@@ -40,11 +46,18 @@ export interface ActorConfig {
   mirror?: boolean
   deps: BossDeps
   arena: Arena
+  // What the pause inspection shows about the boss.
+  describe(): MonsterDescription
 }
 
 export interface Actor extends BossHandle {
   phaseIndex(): number
   onPhaseChange(listener: (phase: number) => void): () => void
+  // Pause inspection, the same calls as a mob's.
+  describe(): MonsterDescription
+  setInspectable(on: boolean): void
+  setHighlight(level: number): void
+  setRaised(on: boolean): void
 }
 
 const WEAK_MULTIPLIER = 2
@@ -72,6 +85,14 @@ const EPSILON = 1e-6
 const ARENA_VIEWS = 1.6
 // How far the boss may start from the player, in views. A little under one leaves the body on screen.
 const START_REACH = 0.75
+
+// Theme modifiers, see BossThemeKind.
+const TEMPO_SCALE = 0.85
+const REACH = 1.25
+const PRECISE_SHOTS = 2
+const AIMED_CHANCE = 0.45
+const PRECISE_AIMED_CHANCE = 0.65
+const SHIFT_DELAY_MS = 600
 
 const CREAM = cssColor(PALETTE.cream)
 const OUTLINE = cssColor(PALETTE.outline)
@@ -127,6 +148,8 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
   let pushMs = 0
   let pushDir = 1
   const listeners = new Set<(phase: number) => void>()
+  let lastHeavy = false
+  let highlight = 0
   // A boss is never frozen. A freeze slows its clock instead (addStatus with boss = true).
   const status = createStatus()
   const move = { hopping: false, hopMs: 0, fromX: 0, toX: 0, waitMs: 700, blinkInMs: 2500 }
@@ -224,6 +247,10 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
     staggerState: () => (staggerMs > 0 ? 'staggered' : staggerLocked(run.phase, run.spec.heavy) ? 'locked' : 'filling'),
     isDefeated: () => state === 'defeated',
     destroy,
+    describe: () => config.describe(),
+    setInspectable,
+    setHighlight,
+    setRaised,
     phaseIndex: () => phase,
     onPhaseChange(listener) {
       listeners.add(listener)
@@ -249,6 +276,10 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
     hover: hoverOf(first.archetype),
     minX,
     maxX,
+    reach: 1,
+    extraShots: 0,
+    aimedChance: AIMED_CHANCE,
+    shotArt: null,
     shotKey(kind) {
       let key = shotKeys.get(kind)
       if (!key) {
@@ -259,6 +290,31 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
     },
   }
   body.facing = player.position().x >= body.x ? 1 : -1
+
+  const mechanics = createMechanics({
+    ...env,
+    blink(x) {
+      blinkMs = 220
+      body.x = x
+    },
+    shift(attacks) {
+      const heavies = cfg().attacks.filter((attack) => attack.heavy)
+      scheduler.setAttacks([...heavies, ...attacks], cfg().quality, SHIFT_DELAY_MS)
+      hurtFlashMs = 200
+    },
+  })
+
+  // The theme of the phase: reach, shots and how often the attacks recharge.
+  let themeScale = 1
+  function applyTheme(theme: BossThemeKind | null) {
+    env.reach = theme === 'reach' ? REACH : 1
+    env.extraShots = theme === 'precise' ? PRECISE_SHOTS : 0
+    env.aimedChance = theme === 'precise' ? PRECISE_AIMED_CHANCE : AIMED_CHANCE
+    env.shotArt = theme === 'heat' ? 'flame' : null
+    themeScale = theme === 'tempo' ? TEMPO_SCALE : 1
+  }
+  applyTheme(first.theme)
+  mechanics.set(first.mechanics, first.theme)
 
   function releaseZones() {
     for (const zone of run.zones) zone.release()
@@ -289,6 +345,7 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
   }
 
   function finishAttack() {
+    lastHeavy = run.spec.heavy
     releaseZones()
     run.boxes.length = 0
     run.shots.length = 0
@@ -455,6 +512,7 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
     scheduler.complete()
     scheduler.delay(staggerMs + STAGGER_RECOVER_MS)
     releaseTell()
+    mechanics.clear()
   }
 
   function startTransition() {
@@ -474,6 +532,9 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
     env.archetype = next.archetype
     env.safeZones = next.safeZones
     env.hover = hoverOf(next.archetype)
+    applyTheme(next.theme)
+    mechanics.set(next.mechanics, next.theme)
+    lastHeavy = false
     landFromHop()
     scheduler.setAttacks(next.attacks, next.quality, TRANSITION_MS + OPENING_DELAY_MS / 2)
     hurtFlashMs = 200
@@ -490,6 +551,7 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
     combat.cancelOwnedBy(self)
     adds.clear()
     releaseTell()
+    mechanics.clear()
     hurtFlashMs = 200
     const fx = scene.add
       .sprite(body.x, floorY - body.lift - height * 0.5, '__DEFAULT')
@@ -508,6 +570,9 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
     let damage = hit.damage
     if (isWeakHit(hit.attacker)) damage *= WEAK_MULTIPLIER
     if (staggerMs > 0) damage *= STAGGER_MULTIPLIER
+    // Armour, a raised shield and the mirror. A blocked hit neither flashes nor fills the bar.
+    damage = mechanics.filterHit(hit, damage, staggerMs > 0, run.phase === 'windup' && run.spec.heavy)
+    if (damage <= 0) return 0
     const floor = floorHp()
     hp = Math.max(floor, hp - damage)
     hurtFlashMs = HURT_FLASH_MS
@@ -552,6 +617,8 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
       transitionMs = Math.max(0, transitionMs - dtMs)
       return
     }
+    mechanics.update(dtMs, { idle: staggerMs <= 0 && run.phase === 'none' && !move.hopping, lastHeavy, phaseHp: (hp - floorHp()) / phaseHp })
+    scheduler.setCooldownScale(themeScale * mechanics.cooldownScale())
     if (staggerMs > 0) {
       staggerMs = Math.max(0, staggerMs - dtMs)
       if (pushMs > 0) {
@@ -565,7 +632,7 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
       stepAttack(dtMs)
       return
     }
-    if (!moveIdle(dtMs) || player.isDead()) return
+    if (!moveIdle(dtMs) || player.isDead() || mechanics.busy()) return
     const next = scheduler.next()
     if (next) beginAttack(next)
   }
@@ -612,7 +679,7 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
       sprite.setScale(baseScale.x * (1 + 0.05 * crouch - 0.05 * stretch), baseScale.y * (1 - 0.08 * crouch + 0.08 * stretch + breathe))
       sprite.setRotation(body.lean + wobble)
       sprite.setAlpha(alpha)
-      if (tintChanged) paintTint(sprite, tint)
+      if (tintChanged && highlight <= 0) paintTint(sprite, tint)
     }
 
     for (const limb of limbs) {
@@ -631,7 +698,7 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
       part.setPosition(body.x + limbFacing * (rest.x + pivot.x), y + rest.y + pivot.y)
       part.setRotation(swing + Math.sin(now / 500 + limb.phase) * 0.06)
       part.setAlpha(alpha)
-      if (tintChanged) paintTint(part, tint)
+      if (tintChanged && highlight <= 0) paintTint(part, tint)
     }
 
     const spots = state === 'fighting' ? cfg().weakPoints : 0
@@ -654,7 +721,41 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
     }
 
     if (tellText) tellText.setPosition(body.x, y - height - (dizzy ? 20 : 8)).setAlpha(Math.min(1, tellMs / 300))
+    mechanics.render(now, y - height - (tellText ? 14 : 0) - (dizzy ? 12 : 0), alpha, visible)
     telegraphs.update(now)
+  }
+
+  // Pause inspection. The body sprite takes the pointer, the limbs and badges follow its highlight.
+  function setInspectable(on: boolean) {
+    if (destroyed) return
+    const can = on && state === 'fighting'
+    if (can && !sprite.input?.enabled) sprite.setInteractive({ useHandCursor: true })
+    else if (!can && sprite.input?.enabled) sprite.disableInteractive()
+    if (!on) setHighlight(0)
+  }
+
+  function setHighlight(level: number) {
+    if (destroyed || level === highlight) return
+    highlight = level
+    if (level <= 0) {
+      // The next frame paints the tint of the boss state again.
+      lastTint = -1
+      return
+    }
+    const grey = Math.round(0x18 + 0x40 * level)
+    const tint = (grey << 16) | (grey << 8) | grey
+    sprite.setTint(tint).setTintMode(Phaser.TintModes.ADD)
+    for (const limb of limbs) limb.sprite.setTint(tint).setTintMode(Phaser.TintModes.ADD)
+  }
+
+  // Draws the boss above the pause dim.
+  function setRaised(on: boolean) {
+    if (destroyed) return
+    const lift = on ? INSPECT_DIM_DEPTH + 1 - DEPTH.enemies : 0
+    sprite.setDepth(DEPTH.enemies + lift)
+    for (const limb of limbs) limb.sprite.setDepth(DEPTH.enemies + 1 + lift)
+    for (const s of weakSprites) s.setDepth(DEPTH.enemies + 2 + lift)
+    mechanics.setRaised(on)
   }
 
   function paintTint(target: Phaser.GameObjects.Sprite, tint: number) {
@@ -670,6 +771,7 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
     scene.events.off('postupdate', render)
     scene.events.off('shutdown', destroy)
     adds.destroy()
+    mechanics.destroy()
     tellPool.destroy()
     telegraphs.destroy()
     combat.unregister(self)
@@ -681,6 +783,7 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
     listeners.clear()
   }
 
+  registerInspectable(sprite, self)
   combat.register(self)
   scene.events.on('postupdate', render)
   scene.events.once('shutdown', destroy)

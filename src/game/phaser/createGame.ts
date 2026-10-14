@@ -9,6 +9,7 @@ import { DeathScene } from './scenes/DeathScene'
 import { FinalBossScene } from './scenes/FinalBossScene'
 import { HudScene } from './scenes/HudScene'
 import { LevelUpScene } from './scenes/LevelUpScene'
+import { StoreScene } from './scenes/StoreScene'
 import { StretchScene } from './scenes/StretchScene'
 import { VictoryScene } from './scenes/VictoryScene'
 
@@ -59,6 +60,7 @@ export const createGame: CreateGame = (parent, { bindings }) => {
     new FinalBossScene(ctx),
     new HudScene(ctx),
     new LevelUpScene(ctx),
+    new StoreScene(ctx),
     new DeathScene(ctx),
     new VictoryScene(ctx),
   ]

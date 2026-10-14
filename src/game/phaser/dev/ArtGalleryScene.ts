@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import type { AnnotationCategory, IoKind } from '../../../arc/provenance/types'
-import type { FxArt, ProjectileArt, SpriteRef, TelegraphArt, Theme } from '../../contracts/art'
-import type { BodyKind, BossArchetype, BossSpec, EnemyWeaponKind, FinalBossSpec, MonsterSpec, PassiveKind } from '../../contracts/content'
+import type { BossMarkerKind, FxArt, ProjectileArt, SpriteRef, TelegraphArt, Theme } from '../../contracts/art'
+import type { BodyKind, BossArchetype, BossGenome, BossSpec, EnemyWeaponKind, FinalBossSpec, MonsterSpec, PassiveKind } from '../../contracts/content'
 import { SCENE } from '../../contracts/constants'
 import type { PlayerWeaponId } from '../../contracts/progression'
 import { applySpriteRef, createScribbleArt, monsterWeapon, prewarm, TEXTURE_SCALE, textureBytes } from '../art'
@@ -28,6 +28,21 @@ const TELEGRAPHS: { shape: TelegraphArt; w: number; h: number }[] = [
   { shape: 'line', w: 120, h: 10 },
 ]
 const FX: FxArt[] = ['hit', 'crit', 'dust', 'levelUp', 'death', 'xp']
+const BOSS_MARKERS: BossMarkerKind[] = [
+  'armoredFront',
+  'enrage',
+  'phaseShift',
+  'summoner',
+  'hazard',
+  'teleport',
+  'shieldPulse',
+  'reflect',
+  'tempo',
+  'heat',
+  'reach',
+  'dense',
+  'precise',
+]
 const THEMES: Theme[] = ['study', 'assay', 'run']
 
 const CATEGORY: Record<PassiveKind, AnnotationCategory> = {
@@ -67,6 +82,22 @@ function monsterSpec(
   }
 }
 
+// The art only reads the archetype, so the genome stays empty.
+function emptyGenome(archetype: BossArchetype): BossGenome {
+  return {
+    segmentIndex: 0,
+    processName: 'gallery',
+    annotationCount: 0,
+    body: { archetype, size: 'medium', scale: 1, key: null, sources: [] },
+    heavy: [],
+    light: [],
+    mechanics: [],
+    theme: { kind: null, sources: [] },
+    filledSlots: 0,
+    damageScale: 1,
+  }
+}
+
 function bossSpec(archetype: BossArchetype): BossSpec {
   return {
     nodeId: `gallery:${archetype}`,
@@ -84,6 +115,10 @@ function bossSpec(archetype: BossArchetype): BossSpec {
     tells: [],
     hp: 400,
     attacks: [],
+    mechanics: [],
+    theme: null,
+    damageScale: 1,
+    genome: emptyGenome(archetype),
     xp: 15,
   }
 }
@@ -267,6 +302,13 @@ export class ArtGalleryScene extends Phaser.Scene {
       })
     })
     y = ground + 100
+    // The badges for the mechanic and theme slots of a boss genome.
+    BOSS_MARKERS.forEach((kind, i) => {
+      const x = LEFT + 20 + i * 64
+      this.sprite(this.art.bossMarker(this, kind), x, y + 20)
+      this.text(x, y + 22, kind, 6)
+    })
+    y += 36
     return y + 12
   }
 

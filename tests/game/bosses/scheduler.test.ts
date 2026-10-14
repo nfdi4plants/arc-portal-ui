@@ -78,6 +78,22 @@ describe('createScheduler', () => {
     expect(scheduler.next()?.id).toBe('slow')
   })
 
+  it('shortens the cooldowns of an enraged boss but keeps the gap after the attack', () => {
+    const scheduler = createScheduler(createRng('enrage'))
+    scheduler.setAttacks([attack('slow', false, 3000)], 0)
+    scheduler.setCooldownScale(0.5)
+    scheduler.next()
+    scheduler.complete()
+    scheduler.tick(1499)
+    expect(scheduler.next()).toBeNull()
+    scheduler.tick(1)
+    expect(scheduler.next()?.id).toBe('slow')
+    scheduler.complete()
+    scheduler.tick(LIGHT_GAP_MS - 1)
+    scheduler.setCooldownScale(0.01)
+    expect(scheduler.next()).toBeNull()
+  })
+
   it('picks the same sequence for the same seed', () => {
     expect(simulate(MIXED, 'same', 60_000)).toEqual(simulate(MIXED, 'same', 60_000))
   })

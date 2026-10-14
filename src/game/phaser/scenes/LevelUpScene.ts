@@ -1,14 +1,13 @@
 import Phaser from 'phaser'
 import { PALETTE, SCENE } from '../../contracts/constants'
-import type { Action } from '../../contracts/input'
 import type { PlayerWeaponId, PowerUpCard } from '../../contracts/progression'
 import { hashString } from '../../contracts/rng'
-import { bindingLabel } from '../../model/input'
-import { cardDetails, weaponName, weaponRelation, type WeaponRelation } from '../../model/progression'
-import { applySpriteRef, CARD_HEIGHT, CARD_WIDTH, cardArt, glowTexture, RARITY_COLOR } from '../art'
+import { weaponName, weaponRelation, type WeaponRelation } from '../../model/progression'
+import { CARD_HEIGHT, CARD_WIDTH, glowTexture } from '../art'
 import { cssColor } from '../color'
 import type { View } from '../view'
 import { BuildPanel } from './BuildPanel'
+import { CardNote, createCardFace, fitText, showCardOn, sizeCardFace, type CardFace } from './cardFace'
 import type { RunContext } from './context'
 import { addButton, addText, type Button, onCanvasKey, onClick, overlayView } from './ui'
 
@@ -49,14 +48,7 @@ const BUILD_KEY = 'KeyB'
 const NO_RELATION: WeaponRelation = { kind: 'none' }
 
 interface CardView {
-  box: Phaser.GameObjects.Container
-  texts: Phaser.GameObjects.Text[]
-  glow: Phaser.GameObjects.Image
-  art: Phaser.GameObjects.Sprite
-  name: Phaser.GameObjects.Text
-  description: Phaser.GameObjects.Text
-  meta: Phaser.GameObjects.Text
-  key: Phaser.GameObjects.Text
+  face: CardFace
   // Fixed hit area at the slot, so a card that lifts under the pointer does not flicker.
   zone: Phaser.GameObjects.Zone
   // Outline, ribbon and tag of a weapon card that upgrades or replaces the weapon in its slot.
@@ -72,21 +64,6 @@ interface CardView {
   tilt: number
   phase: number
   hover: number
-  // Skips the text fitting when neither the card nor its size changed.
-  fitKey: string
-}
-
-function fitText(text: Phaser.GameObjects.Text, content: string, width: number, height: number, maxSize: number, minSize: number): void {
-  text.setWordWrapWidth(width).setText(content)
-  for (let size = maxSize; size >= minSize; size -= 0.5) {
-    text.setFontSize(size)
-    if (text.height <= height) return
-  }
-  const words = content.split(' ')
-  while (words.length > 1 && text.height > height) {
-    words.pop()
-    text.setText(`${words.join(' ')}...`)
-  }
 }
 
 // One card choice per level gained, one after the other. The gameplay scene stays held until the
@@ -101,10 +78,7 @@ export class LevelUpScene extends Phaser.Scene {
   private sparks: Phaser.GameObjects.Sprite[] = []
   private sparkAnim = ''
   private sparkNext = 0
-  private panel!: Phaser.GameObjects.Graphics
-  private panelTitle!: Phaser.GameObjects.Text
-  private panelBody!: Phaser.GameObjects.Text
-  private panelFlavor!: Phaser.GameObjects.Text
+  private note!: CardNote
   private cards: CardView[] = []
   private offer: PowerUpCard[] = []
   private locked = true
@@ -159,10 +133,7 @@ export class LevelUpScene extends Phaser.Scene {
       sprite.on(Phaser.Animations.Events.ANIMATION_COMPLETE, () => sprite.setVisible(false))
       return sprite
     })
-    this.panel = this.add.graphics().setVisible(false)
-    this.panelTitle = addText(this, '', 9, { color: PALETTE.navy, bold: true }).setVisible(false)
-    this.panelBody = addText(this, '', 7.5, { color: PALETTE.navy }).setVisible(false)
-    this.panelFlavor = addText(this, '', 7, { color: PALETTE.outline }).setFontStyle('italic').setVisible(false)
+    this.note = new CardNote(this)
     this.buildBlocker = this.add.rectangle(0, 0, 1, 1, PALETTE.navy, 0.6).setOrigin(0, 0).setVisible(false)
     onClick(this, this.buildBlocker, () => this.setBuildOpen(false))
     this.buildPanel = new BuildPanel(this)
@@ -213,16 +184,10 @@ export class LevelUpScene extends Phaser.Scene {
   }
 
   private createCard(index: number, glowKey: string): CardView {
-    const glow = this.add.image(0, 0, glowKey).setTint(PALETTE.yellow).setVisible(false)
-    const art = this.add.sprite(0, 0, '__DEFAULT')
-    const name = addText(this, '', 8.5, { color: PALETTE.navy, bold: true, align: 'center' }).setOrigin(0.5)
-    const description = addText(this, '', 7, { color: PALETTE.outline, align: 'center' }).setOrigin(0.5, 0)
-    const meta = addText(this, '', 5.8, { color: PALETTE.navy, align: 'center' }).setOrigin(0.5)
-    const key = addText(this, String(index + 1), 7.5, { color: PALETTE.navy, bold: true }).setOrigin(0.5)
     const ring = this.add.graphics().setVisible(false)
     const ribbon = addText(this, 'UPGRADE', 6.5, { color: PALETTE.navy, bold: true, align: 'center' }).setOrigin(0.5).setVisible(false)
     const tag = addText(this, '', 5.8, { align: 'center' }).setOrigin(0.5, 0).setStroke(NAVY, 2).setVisible(false)
-    const box = this.add.container(0, 0, [glow, art, ring, name, description, meta, key, ribbon, tag]).setVisible(false)
+    const face = createCardFace(this, glowKey, String(index + 1), [ring, ribbon, tag])
     const zone = this.add.zone(0, 0, 1, 1)
     zone.on('pointerover', () => {
       if (this.locked) return
@@ -236,7 +201,7 @@ export class LevelUpScene extends Phaser.Scene {
       if (this.detailIndex === index && !this.pinned) this.hideDetails()
     })
     onClick(this, zone, () => this.choose(index), CHOOSE_BUTTON)
-    return { box, texts: [name, description, meta, key, ribbon, tag], glow, art, name, description, meta, key, zone, ring, ribbon, tag, relation: NO_RELATION, x: 0, y: 0, w: 1, h: 1, tilt: 0, phase: 0, hover: 0, fitKey: '' }
+    return { face, zone, ring, ribbon, tag, relation: NO_RELATION, x: 0, y: 0, w: 1, h: 1, tilt: 0, phase: 0, hover: 0 }
   }
 
   private nextOffer() {
@@ -262,16 +227,11 @@ export class LevelUpScene extends Phaser.Scene {
     this.introEnd = CARD_START + (this.offer.length - 1) * CARD_STEP + CARD_MS
     this.offer.forEach((card, i) => {
       const view = this.cards[i]
-      applySpriteRef(view.art, cardArt(this, card.rarity, card.kind))
-      view.art.setOrigin(0.5)
-      view.art.anims.setProgress(i / MAX_CARDS)
+      showCardOn(this, view.face, card, i / MAX_CARDS)
       view.tilt = ((hashString(card.id) % 1001) / 500 - 1) * TILT
       view.phase = (hashString(card.id) % 628) / 100
       view.hover = 0
-      view.fitKey = ''
       view.relation = weaponRelation(director.build, card)
-      view.meta.setText(card.slot ? `${card.rarity} · ${card.slot}` : card.rarity)
-      view.glow.setVisible(card.rarity === 'legendary')
     })
     this.layout()
     this.playIntro()
@@ -288,7 +248,7 @@ export class LevelUpScene extends Phaser.Scene {
     this.hovered = -1
     this.syncHighlight()
     this.updateBuildButton()
-    for (const view of this.cards) view.box.setVisible(false)
+    for (const view of this.cards) view.face.box.setVisible(false)
     this.ctx.gameplay?.chooseCard(card ? card.id : null)
     if (this.ctx.director && this.ctx.director.pendingLevelUps > 0) this.nextOffer()
   }
@@ -338,8 +298,9 @@ export class LevelUpScene extends Phaser.Scene {
   private poseCard(i: number) {
     const view = this.cards[i]
     const p = this.locked ? Phaser.Math.Clamp((this.introMs - CARD_START - i * CARD_STEP) / CARD_MS, 0, 1) : 1
+    const face = view.face
     if (p <= 0) {
-      view.box.setVisible(false)
+      face.box.setVisible(false)
       return
     }
     const e = p >= 1 ? 1 : Phaser.Math.Easing.Back.Out(p)
@@ -348,14 +309,14 @@ export class LevelUpScene extends Phaser.Scene {
     const rotation = view.tilt * (1 - view.hover) + wobble
     // Rotated Text objects render with their lower part cut off, so the texts are turned back
     // upright. The tilt is a few degrees, so they still sit on the card.
-    for (const text of view.texts) text.setRotation(-rotation)
-    view.box
+    for (const text of face.texts) text.setRotation(-rotation)
+    face.box
       .setVisible(true)
       .setPosition(view.x, view.y + (1 - e) * view.h * 0.9 + bob * p - view.hover * view.h * 0.04)
       .setRotation(rotation)
       .setScale((0.9 + 0.1 * e) * (1 + 0.07 * view.hover))
       .setAlpha(Math.min(1, p * 4))
-    if (view.glow.visible) view.glow.setAlpha(0.55 + 0.3 * Math.sin(this.clock / 260))
+    if (face.glow.visible) face.glow.setAlpha(0.55 + 0.3 * Math.sin(this.clock / 260))
     if (view.ring.visible) view.ring.setAlpha(0.4 + 0.6 * (0.5 + 0.5 * Math.sin(this.clock / 170 + view.phase)))
   }
 
@@ -392,8 +353,6 @@ export class LevelUpScene extends Phaser.Scene {
     this.hint.setPosition(centre, this.stripTop + 4).setWordWrapWidth(areaW - 24)
     if (!this.sideLayout) this.buildButton.setPosition(8 + 38, top + 14)
     this.skipButton.setPosition(this.areaX + areaW - 8 - 20, top + 14)
-    const s = cardW / CARD_WIDTH
-    const local = (x: number, y: number): [number, number] => [(x - CARD_WIDTH / 2) * s, (y - CARD_HEIGHT / 2) * s]
     for (let i = 0; i < n; i++) {
       const view = this.cards[i]
       const card = this.offer[i]
@@ -401,22 +360,9 @@ export class LevelUpScene extends Phaser.Scene {
       view.y = cardsTop + cardH / 2
       view.w = cardW
       view.h = cardH
-      view.art.setDisplaySize(cardW, cardH)
-      view.glow.setDisplaySize(cardW * 1.7, cardH * 1.5)
       view.zone.setPosition(view.x, view.y).setSize(cardW, cardH)
-      view.name.setPosition(...local(50, 16.5))
-      view.description.setPosition(...local(50, 67))
-      view.meta.setPosition(...local(50, 126))
-      view.key.setPosition(...local(14, 126))
-      const fitKey = `${card.id}:${Math.round(cardW * 4)}`
-      if (view.fitKey !== fitKey) {
-        view.fitKey = fitKey
-        fitText(view.name, card.name, 84 * s, 22 * s, 8.5 * s, 5.5 * s)
-        fitText(view.description, card.description, 82 * s, 46 * s, 7 * s, 4.8 * s)
-        view.meta.setFontSize(5.8 * s)
-        view.key.setFontSize(7.5 * s)
-        this.decorateCard(view, s)
-      }
+      const s = sizeCardFace(view.face, card, cardW)
+      if (s > 0) this.decorateCard(view, s)
     }
     this.enableInput()
     if (this.detailIndex >= 0) this.renderPanel()
@@ -515,10 +461,7 @@ export class LevelUpScene extends Phaser.Scene {
   private hideDetails() {
     this.detailIndex = -1
     this.pinned = false
-    this.panel.setVisible(false)
-    this.panelTitle.setVisible(false)
-    this.panelBody.setVisible(false)
-    this.panelFlavor.setVisible(false)
+    this.note.hide()
     this.hint.setVisible(true)
   }
 
@@ -527,50 +470,16 @@ export class LevelUpScene extends Phaser.Scene {
     const card = this.offer[this.detailIndex]
     const build = this.ctx.director?.build
     if (!card || !build || !this.view) return
-    const lines = cardDetails(build, card.id, (slot) => {
-      const binding = this.ctx.bindings[`ability${slot + 1}` as Action][0]
-      return binding ? bindingLabel(binding) : `slot ${slot + 1}`
-    })
-    const flavor = lines.pop() ?? ''
-    const { height: h } = this.view
     const view = this.cards[this.detailIndex]
-    const panelW = Math.min(this.areaW - 16, view.w * 2.4)
-    const pad = 6
-    const inner = panelW - pad * 2
-    const x = Phaser.Math.Clamp(view.x - panelW / 2, this.areaX + 8, this.areaX + this.areaW - 8 - panelW)
-    const margin = Math.max(6, h * 0.025)
-    const y0 = this.stripTop
-    const room = h - margin - y0 - pad * 2
-    this.panelTitle.setText(card.name).setWordWrapWidth(inner)
-    const body = lines.join('\n')
-    let size = 7.5
-    for (; size >= 5.5; size -= 0.5) {
-      this.panelBody.setWordWrapWidth(inner).setFontSize(size).setText(body)
-      this.panelFlavor.setWordWrapWidth(inner).setFontSize(size - 0.5).setText(flavor)
-      if (this.panelTitle.height + 2 + this.panelBody.height + 3 + this.panelFlavor.height <= room) break
-    }
-    const height = pad * 2 + this.panelTitle.height + 2 + this.panelBody.height + 3 + this.panelFlavor.height
-    const y = Math.min(y0, h - margin - height)
-    this.panelTitle.setPosition(x + pad, y + pad)
-    this.panelBody.setPosition(x + pad, this.panelTitle.y + this.panelTitle.height + 2)
-    this.panelFlavor.setPosition(x + pad, this.panelBody.y + this.panelBody.height + 3)
-    this.drawPanel(x, y, panelW, height, RARITY_COLOR[card.rarity])
-    for (const part of [this.panel, this.panelTitle, this.panelBody, this.panelFlavor]) part.setVisible(true)
+    const margin = Math.max(6, this.view.height * 0.025)
+    this.note.show(card, build, this.ctx.bindings, {
+      anchorX: view.x,
+      width: Math.min(this.areaW - 16, view.w * 2.4),
+      left: this.areaX + 8,
+      right: this.areaX + this.areaW - 8,
+      top: this.stripTop,
+      bottom: this.view.height - margin,
+    })
     this.hint.setVisible(false)
-  }
-
-  // A paper note with a hand-drawn double outline.
-  private drawPanel(x: number, y: number, w: number, h: number, color: number) {
-    const g = this.panel
-    g.clear().fillStyle(0xfffdf6, 1).fillRect(x, y, w, h).fillStyle(color, 1).fillRect(x, y, w, 3)
-    const jitter = () => (Math.random() - 0.5) * 1.6
-    for (let pass = 0; pass < 2; pass++) {
-      g.lineStyle(pass === 0 ? 1.4 : 0.8, PALETTE.outline, pass === 0 ? 1 : 0.6)
-      const corners = [x, y, x + w, y, x + w, y + h, x, y + h]
-      for (let k = 0; k < 4; k++) {
-        const next = (k + 1) % 4
-        g.lineBetween(corners[k * 2] + jitter(), corners[k * 2 + 1] + jitter(), corners[next * 2] + jitter(), corners[next * 2 + 1] + jitter())
-      }
-    }
   }
 }
