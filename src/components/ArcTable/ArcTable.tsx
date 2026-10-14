@@ -1,7 +1,7 @@
 import { useId } from 'react'
 import { Stack, ActionList, ActionMenu, Button, ButtonGroup, IconButton, Label, Link } from '@primer/react'
 import { DataTable, Table, type Column } from '@primer/react/experimental'
-import { GlobeIcon, LinkExternalIcon, LockIcon, TriangleDownIcon } from '@primer/octicons-react'
+import { GlobeIcon, LinkExternalIcon, LockIcon, StarIcon, TriangleDownIcon } from '@primer/octicons-react'
 import type { ArcSummary, SortState } from '../../types/dashboard.ts'
 import type { GitLabPage, GitLabProject } from '../../types/gitlab.ts'
 import { relativeTime } from '../../util/time.ts'
@@ -39,6 +39,10 @@ export function ArcsTable({ arcs, hubNames, sort, onSortChange, now, onOpen, onC
     { id: 'access', header: 'Access', width: 'auto', renderCell: arc => arc.access === 'public'
       ? <Label variant="success"><GlobeIcon size={12} /> Public</Label>
       : <Label variant="attention"><LockIcon size={12} /> Private</Label> },
+    { id: 'stars', header: 'Stars', width: 'auto',
+      renderCell: arc => <span className={styles.stars} aria-label={`${arc.stars} stars`}>
+        <StarIcon size={14} aria-hidden="true" /> {arc.stars}
+      </span> },
     { id: 'lastChange', header: 'Last activity', sortBy: !!sort, width: 'auto',
       renderCell: arc => relativeTime(arc.lastActivityAt, now) },
     { id: 'open', header: () => <span className={styles.hidden}>Open</span>, width: 'auto', align: 'end',
