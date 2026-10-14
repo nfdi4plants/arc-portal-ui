@@ -9,6 +9,14 @@ export const ATTACK_GROUND_SPEED = 0.3
 
 const NO_HELD: ReadonlySet<string> = new Set()
 
+// The horizontal speed a move's lunge leaves the mage with. The lunge pushes only while left or right
+// is held, so an attack without a direction stays in place: on the ground it stops a walk, in the
+// air it keeps the air speed.
+export function lungeVelocity(lunge: number, facing: 1 | -1, leftHeld: boolean, rightHeld: boolean, grounded: boolean, vx: number): number {
+  if (leftHeld !== rightHeld) return facing * lunge
+  return grounded ? 0 : vx
+}
+
 export interface ControlPresses {
   light: boolean
   heavy: boolean

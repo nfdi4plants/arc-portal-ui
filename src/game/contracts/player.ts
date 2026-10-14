@@ -35,7 +35,8 @@ export interface AttackMove {
   // After this many ms of recovery the next attack may cancel the move. A jump or dash ends a move
   // at any time.
   cancelAfterMs: number
-  // Horizontal push at the start of the active phase, world units per second.
+  // Horizontal push at the start of the active phase, world units per second, only while left or
+  // right is held. Without a direction the mage stays in place (lungeVelocity in player/controls.ts).
   lunge?: number
   allowedInAir: boolean
   // A lock that starts when the active phase ends. While it runs the mage takes no movement input

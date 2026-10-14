@@ -5,7 +5,7 @@ import type { AttackMove, AttackVariant } from '../../../src/game/contracts/play
 import { JUMP_VELOCITY, MOTOR, availableJump, createMotorState, plungeBounced } from '../../../src/game/model/input/motor'
 import type { MotorEnv } from '../../../src/game/model/input/motor'
 import { createAttackMachine } from '../../../src/game/phaser/player/attacks'
-import { createControls } from '../../../src/game/phaser/player/controls'
+import { createControls, lungeVelocity } from '../../../src/game/phaser/player/controls'
 
 function move(name: string, timing: Partial<AttackMove>): AttackMove {
   return { name, startupMs: 60, activeMs: 80, recoveryMs: 140, cancelAfterMs: 60, allowedInAir: true, onActive: () => {}, ...timing }
@@ -251,5 +251,22 @@ describe('createControls', () => {
       step(['jump'])
       expect(motor.jumped).toBe(false)
     })
+  })
+})
+
+describe('lungeVelocity', () => {
+  it('lunges towards the facing while a direction is held', () => {
+    expect(lungeVelocity(140, 1, false, true, true, 0)).toBe(140)
+    expect(lungeVelocity(140, -1, true, false, false, 50)).toBe(-140)
+  })
+
+  it('stops a walking mage on the ground without a direction', () => {
+    expect(lungeVelocity(140, 1, false, false, true, 210)).toBe(0)
+    // Both held cancel out, as they do for the motor.
+    expect(lungeVelocity(140, 1, true, true, true, 210)).toBe(0)
+  })
+
+  it('keeps the air speed without a direction', () => {
+    expect(lungeVelocity(140, 1, false, false, false, -90)).toBe(-90)
   })
 })

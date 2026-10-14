@@ -86,6 +86,8 @@ Light presses walk the light string. A light press during a move of the string w
 move's cancel window, and a press up to 250 ms after the move ended (`COMBO_GRACE_MS` in
 `phaser/player/attacks.ts`) still plays the next move, so a steady mash chains the whole string and
 the Triple Combo finisher. A longer pause, a heavy, a dash, a jump or a hit starts the string over.
+A move's lunge pushes the mage forward only while left or right is held. Without a direction the
+attack stays in place on the ground and keeps the air speed in the air.
 
 Heavy pressed in the air plays the weapon's air heavy, mostly a plunge with a landing hit and a
 short landing lock. The first hit of an air heavy (the fall or the landing ring) ends the plunge and

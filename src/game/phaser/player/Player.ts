@@ -11,7 +11,7 @@ import type { InputLayer } from '../input/InputLayer'
 import { applySpriteRef } from '../art'
 import { createAttackMachine } from './attacks'
 import type { AttackPhase } from './attacks'
-import { createControls } from './controls'
+import { createControls, lungeVelocity } from './controls'
 import { bodyOf, isOneWay } from './oneWay'
 import { staffMoveset } from './staffMoveset'
 import { weaponPose } from './weaponPose'
@@ -226,7 +226,7 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
     },
     onActive(slot, comboIndex, move) {
       move.onActive(contextFor(build.weapons[slot].tier))
-      if (move.lunge) motor.vx = motor.facing * move.lunge
+      if (move.lunge) motor.vx = lungeVelocity(move.lunge, motor.facing, held.has('left'), held.has('right'), grounded, motor.vx)
       if (slot === 'heavy' && !grounded && attacks.current()?.variant === 'up') motor.vy = Math.min(motor.vy, -RISING_HOP_SPEED)
       emit('attackActive', { slot, comboIndex, move })
     },
