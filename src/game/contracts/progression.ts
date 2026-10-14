@@ -30,8 +30,14 @@ export type MechanicId =
   | 'familiar'
   | 'extraChoice'
   | 'serialDilution'
+  | 'centrifugeSpin'
+  | 'fumeHood'
+  | 'sampleFreeze'
+  | 'citationNeeded'
+  | 'autoclave'
+  | 'secondWind'
 
-export type LegendaryId = 'theOntology' | 'gitRevert' | 'doiExcalibur' | 'fairPrinciples' | 'peerReview'
+export type LegendaryId = 'theOntology' | 'gitRevert' | 'doiExcalibur' | 'fairPrinciples' | 'peerReview' | 'peerPressure' | 'labCoat'
 
 export interface PlayerStats {
   maxHp: number

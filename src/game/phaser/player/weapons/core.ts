@@ -26,11 +26,19 @@ export const PASSIVE_IDS: readonly PassiveId[] = [
   'familiar',
   'extraChoice',
   'serialDilution',
+  'centrifugeSpin',
+  'fumeHood',
+  'sampleFreeze',
+  'citationNeeded',
+  'autoclave',
+  'secondWind',
   'theOntology',
   'gitRevert',
   'doiExcalibur',
   'fairPrinciples',
   'peerReview',
+  'peerPressure',
+  'labCoat',
 ]
 
 export interface Feature {
@@ -56,6 +64,8 @@ export interface ExtraBox {
   knockback?: Point
   hitStopMs?: number
   maxTargets?: number
+  // The boss stagger multiplier, see HitboxSpec.stagger.
+  stagger?: number
 }
 
 // Secondary hits (echo, chain, reviewer, DOI) belong to a stand-in attacker on the player's team.
@@ -124,6 +134,7 @@ function createExtraAttacks(deps: LoadoutDeps): ExtraAttacks {
         hitStopMs: box.hitStopMs ?? 0,
         maxTargets: box.maxTargets ?? 1,
         tags: box.tags,
+        stagger: box.stagger,
       })
     },
   }

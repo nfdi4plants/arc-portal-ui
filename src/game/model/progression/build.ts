@@ -109,14 +109,6 @@ const thickRobe: Effect = {
   },
 }
 
-const secondWind: Effect = {
-  applies: (build) => build.hp < build.stats.maxHp,
-  apply: (build) => ({
-    ...build,
-    hp: Math.min(build.stats.maxHp, build.hp + Math.round(0.5 * build.stats.maxHp)),
-  }),
-}
-
 function weapon(slot: WeaponSlot, id: PlayerWeaponId): Effect {
   return {
     applies: (build) => !(build.weapons[slot].id === id && build.weapons[slot].tier === 2),
@@ -169,7 +161,6 @@ const EFFECTS = new Map<string, Effect>([
   ['stat.freshBattery', freshBattery],
   ['stat.thickRobe', thickRobe],
   ['stat.longReach', raiseStat('meleeRange', (value) => value * 1.15, hasMeleeWeapon)],
-  ['stat.secondWind', secondWind],
   ['weapon.wand', weapon('light', 'wand')],
   ['weapon.pipettePistol', weapon('light', 'pipettePistol')],
   ['weapon.scalpel', weapon('light', 'scalpel')],
@@ -192,11 +183,19 @@ const EFFECTS = new Map<string, Effect>([
   ['mechanic.familiar', mechanic('familiar')],
   ['mechanic.extraChoice', mechanic('extraChoice', (build) => ({ ...build, offerSize: 4 }))],
   ['mechanic.serialDilution', mechanic('serialDilution')],
+  ['mechanic.centrifugeSpin', mechanic('centrifugeSpin')],
+  ['mechanic.fumeHood', mechanic('fumeHood')],
+  ['mechanic.sampleFreeze', mechanic('sampleFreeze')],
+  ['mechanic.citationNeeded', mechanic('citationNeeded')],
+  ['mechanic.autoclave', mechanic('autoclave')],
+  ['mechanic.secondWind', mechanic('secondWind')],
   ['legendary.theOntology', legendary('theOntology')],
   ['legendary.gitRevert', legendary('gitRevert')],
   ['legendary.doiExcalibur', legendary('doiExcalibur')],
   ['legendary.fairPrinciples', legendary('fairPrinciples')],
   ['legendary.peerReview', legendary('peerReview')],
+  ['legendary.peerPressure', legendary('peerPressure')],
+  ['legendary.labCoat', legendary('labCoat')],
 ])
 
 export const canApply = (build: PlayerBuild, cardId: string): boolean => {

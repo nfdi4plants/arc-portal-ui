@@ -99,6 +99,8 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
   let lastVy = 0
   let flinchMs = 0
   let damageIframesMs = 0
+  // Hits miss while this runs (blockHits).
+  let blockMs = 0
   let dropMs = 0
   let standingOnOneWay = false
   let aim = { x, y }
@@ -346,6 +348,7 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
     aim = frame.aim
     flinchMs = Math.max(0, flinchMs - dt)
     damageIframesMs = Math.max(0, damageIframesMs - dt)
+    blockMs = Math.max(0, blockMs - dt)
     dropMs = Math.max(0, dropMs - dt)
     for (let i = 0; i < abilityCooldowns.length; i++) abilityCooldowns[i] = Math.max(0, abilityCooldowns[i] - dt)
 
@@ -375,7 +378,7 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
       for (let slot = 0; slot < ABILITY_ACTIONS.length; slot++) {
         const handler = abilityHandlers[slot]
         if (!handler || !frame.pressed.has(ABILITY_ACTIONS[slot]) || abilityCooldowns[slot] > 0) continue
-        handler.activate(contextFor(1))
+        if (handler.activate(contextFor(1)) === false) continue
         abilityCooldowns[slot] = handler.cooldownMs
       }
     }
@@ -540,7 +543,7 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
     hurtbox: () => hurtbox.setTo(body.x, body.y, W, H),
     facing: () => motor.facing,
     position: () => ({ x: body.center.x, y: body.bottom }),
-    isInvulnerable: () => motor.dashIframesMs > 0 || damageIframesMs > 0,
+    isInvulnerable: () => motor.dashIframesMs > 0 || damageIframesMs > 0 || blockMs > 0,
     isDead: () => hp <= 0,
     receiveHit(hit) {
       if (hp <= 0 || handle.isInvulnerable()) return 0
@@ -581,6 +584,9 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
       shields = Math.min(MAX_SHIELDS, shields + 1)
     },
     shieldCount: () => shields,
+    blockHits(ms) {
+      blockMs = Math.max(blockMs, ms)
+    },
     heal(amount) {
       if (hp <= 0) return
       hp = Math.min(build.stats.maxHp, hp + amount)

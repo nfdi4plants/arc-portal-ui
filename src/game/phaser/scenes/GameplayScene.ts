@@ -123,6 +123,7 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
       rng: director.rng.fork(`loadout/${this.scene.key}/${data.index ?? 0}`),
       // Sleeping mobs leave the combat world, so the living enemy team is the awake mobs plus whatever they or a boss summon.
       enemies: () => this.combat.livingCombatants('enemy'),
+      secondWind: director.secondWind,
     })
     this.loadout.sync(director.build)
     this.combat.on('kill', (event) => this.onKill(event))

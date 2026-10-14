@@ -1,6 +1,8 @@
 export { ABILITY_IDS, CARDS } from './catalog'
 export { STAT_CAPS, addXp, applyCard, canApply, createBuild, xpForNextLevel } from './build'
 export { rollOffer } from './offer'
+export { createBossCharge } from './charge'
+export type { BossCharge } from './charge'
 export { cardDetails, defaultAbilityLabel } from './details'
 export { FLAVOR } from './flavor'
 export { buildSummary, changeText } from './buildSummary'

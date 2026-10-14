@@ -301,6 +301,7 @@ export class LoadoutSandboxScene extends Phaser.Scene {
         `x ${Math.round(player.position().x)}  y ${Math.round(player.position().y)}`,
         `dealt ${Math.round(dealt)} damage in ${hits} hits`,
         `git revert charge ${loadout.gitRevertCharged() ? 'ready' : 'spent or not owned'}`,
+        `second wind charge ${loadout.secondWindCharged() ? 'ready' : 'spent or not owned'}`,
         `tags ${[...tagCounts].map(([tag, count]) => `${tag} ${count}`).join(', ')}`,
       ].join('\n')
     }

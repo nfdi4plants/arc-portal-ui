@@ -94,7 +94,9 @@ export interface WeaponMoveset {
 
 export interface AbilityHandler {
   cooldownMs: number
-  activate(ctx: AttackContext): void
+  // Returns false when the press did nothing (no target in reach, nothing to heal), so the cooldown
+  // does not start.
+  activate(ctx: AttackContext): boolean | void
 }
 
 export interface PlayerEvents {
@@ -134,4 +136,7 @@ export interface PlayerHandle extends Combatant {
   // up to three at a time.
   grantShield(): void
   shieldCount(): number
+  // Every hit misses the mage for this long, without the blinking of the damage invulnerability.
+  // For abilities that block (Autoclave, Lab Coat).
+  blockHits(ms: number): void
 }

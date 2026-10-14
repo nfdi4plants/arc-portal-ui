@@ -51,13 +51,6 @@ export const CARDS: readonly PowerUpCard[] = [
     kind: 'stat',
   },
   {
-    id: 'stat.secondWind',
-    name: 'Second Wind',
-    description: 'Heal 50% of max HP.',
-    rarity: 'common',
-    kind: 'stat',
-  },
-  {
     id: 'weapon.wand',
     name: 'Wand',
     description: 'Light attack that fires bolts. Picking it again gives Overclocked Wand.',
@@ -181,7 +174,7 @@ export const CARDS: readonly PowerUpCard[] = [
   {
     id: 'mechanic.lifesteal',
     name: 'Lifesteal',
-    description: 'Heal 8% of the damage your attacks and bolts deal. Echo, DOI, Ontology and Peer Review bonus hits do not heal.',
+    description: 'Heal 8% of the damage your attacks, bolts and Lab Coat dash deal. Echo, DOI, Ontology, Peer Review and other ability hits do not heal.',
     rarity: 'rare',
     kind: 'mechanic',
   },
@@ -211,6 +204,54 @@ export const CARDS: readonly PowerUpCard[] = [
     name: 'Familiar',
     description: 'Takes an ability slot. A spark orbits you and shoots the nearest enemy. The ability fires a burst of five bolts.',
     rarity: 'rare',
+    kind: 'mechanic',
+  },
+  {
+    id: 'mechanic.centrifugeSpin',
+    name: 'Centrifuge Spin',
+    description:
+      'Takes an ability slot. You whirl for 0.6 s and hit every enemy within 4 tiles 4 times for 5 damage each (more with damage bonuses), pulling it towards you. Bosses, turrets and boss minions are not pulled. Cooldown 8 s.',
+    rarity: 'uncommon',
+    kind: 'mechanic',
+  },
+  {
+    id: 'mechanic.fumeHood',
+    name: 'Fume Hood',
+    description:
+      'Takes an ability slot. Sets up a fume hood 5 tiles wide in front of you for 4 s. Enemy shots inside it fly at 30% speed, and enemies inside move and attack 30% slower (bosses 15%). Bombs, falling debris and ground waves pass at full speed. Cooldown 12 s.',
+    rarity: 'uncommon',
+    kind: 'mechanic',
+  },
+  {
+    id: 'mechanic.sampleFreeze',
+    name: 'Sample Freeze',
+    description:
+      'Takes an ability slot. Freezes enemies in a 6-tile cone in front of you for 1.5 s: they stop moving and attacking. Bosses are never frozen, they run at half speed for 1.5 s instead. Cooldown 14 s.',
+    rarity: 'rare',
+    kind: 'mechanic',
+  },
+  {
+    id: 'mechanic.citationNeeded',
+    name: 'Citation Needed',
+    description:
+      'Takes an ability slot. Marks the nearest enemy or boss in front of you within 13 tiles for 6 s. Your attacks, shots and Lab Coat dash deal 30% extra damage to it. Other bonus hits (Echo, Ontology, Peer Review, other abilities) get no extra. Without an enemy in reach nothing happens and no cooldown starts. Cooldown 10 s.',
+    rarity: 'uncommon',
+    kind: 'mechanic',
+  },
+  {
+    id: 'mechanic.autoclave',
+    name: 'Autoclave',
+    description:
+      'Takes an ability slot. A steam burst blocks every hit on you for 0.4 s and knocks enemies within 3 tiles away for 8 damage. Bosses, turrets and boss minions are not moved, and the burst does not fill a boss stagger bar. Cooldown 16 s.',
+    rarity: 'rare',
+    kind: 'mechanic',
+  },
+  {
+    id: 'mechanic.secondWind',
+    name: 'Second Wind',
+    description:
+      'Takes an ability slot. Heals 50% of max HP once. Then it is spent until you defeat the next boss, and it also recharges before the final boss. At full HP it does nothing and stays charged.',
+    rarity: 'uncommon',
     kind: 'mechanic',
   },
   {
@@ -255,7 +296,35 @@ export const CARDS: readonly PowerUpCard[] = [
     rarity: 'legendary',
     kind: 'legendary',
   },
+  {
+    id: 'legendary.peerPressure',
+    name: 'Peer Pressure',
+    description:
+      'Takes an ability slot. Every enemy on screen takes 40 damage (more with damage bonuses) and is pushed away from you, and enemy shots on screen vanish. Bosses are not pushed. Bombs, falling debris and ground waves stay. Cooldown 40 s.',
+    rarity: 'legendary',
+    kind: 'legendary',
+  },
+  {
+    id: 'legendary.labCoat',
+    name: 'Lab Coat',
+    description:
+      'Takes an ability slot. A super-dash of about 10 tiles over 0.28 s, the way you hold or face, that hits every enemy it passes for 30 damage (more with damage bonuses and crits). Hits miss you for 0.45 s from its start. Cooldown 30 s.',
+    rarity: 'legendary',
+    kind: 'legendary',
+  },
 ]
 
 // Cards with these ids take the first free slot in abilitySlots when picked.
-export const ABILITY_IDS: readonly (MechanicId | LegendaryId)[] = ['parry', 'familiar', 'gitRevert']
+export const ABILITY_IDS: readonly (MechanicId | LegendaryId)[] = [
+  'parry',
+  'familiar',
+  'gitRevert',
+  'centrifugeSpin',
+  'fumeHood',
+  'sampleFreeze',
+  'citationNeeded',
+  'autoclave',
+  'secondWind',
+  'peerPressure',
+  'labCoat',
+]

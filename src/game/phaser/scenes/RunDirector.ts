@@ -6,7 +6,8 @@ import { createRng, type Rng } from '../../contracts/rng'
 import type { RunPlan, Segment } from '../../contracts/run'
 import { bossFromNode, finalBossFromPlan } from '../../model/content'
 import { appendLevelUp, sourceText, type LevelUpRecord } from './levelHistory'
-import { addXp, applyCard, createBuild, rollOffer } from '../../model/progression'
+import { addXp, applyCard, createBossCharge, createBuild, rollOffer } from '../../model/progression'
+import type { BossCharge } from '../../model/progression'
 
 export type RunStage =
   | { kind: 'stretch'; index: number }
@@ -53,6 +54,9 @@ export class RunDirector {
   elapsedMs = 0
   // Levels gained whose card has not been chosen yet.
   pendingLevelUps = 0
+  // Second Wind heals once, then waits for the next boss to fall. It lives here, so leaving a
+  // stretch or a boss arena keeps it spent.
+  readonly secondWind: BossCharge = createBossCharge()
   private readonly hooks: RunDirectorHooks
   private history: LevelUpRecord[] = []
   private lastOffer: PowerUpCard[] = []
@@ -160,6 +164,7 @@ export class RunDirector {
   defeatBoss(): void {
     const stage = this.stage
     if (stage.kind !== 'boss') return
+    this.secondWind.recharge()
     const next = stage.index + 1
     this.enter(next < this.plan.segments.length ? { kind: 'stretch', index: next } : { kind: 'finalBoss' })
   }
@@ -179,6 +184,7 @@ export class RunDirector {
     else if (stage.kind === 'finalBoss') {
       // A player who barely beat the last node boss would otherwise start the hardest fight nearly dead.
       this.build = { ...this.build, hp: this.build.stats.maxHp }
+      this.secondWind.recharge()
       this.hooks.emit({ type: 'bossEntered', boss: this.finalBossSpec() })
     }
     this.hooks.enter(stage)
