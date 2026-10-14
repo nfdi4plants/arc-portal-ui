@@ -1,4 +1,12 @@
+/* The start screen is a small scene of its own. It keeps the scribble palette of the game in every
+   color mode, so its colors are literals and the Primer parts inside it run in day mode. */
 .root {
+  --ink: #191919;
+  --paper: #f5e6d3;
+  --blue: #4baed6;
+  --teal: #22c3a6;
+  --navy: #253447;
+  --yellow: #f5be00;
   position: relative;
   flex: 1;
   min-width: 0;
@@ -10,27 +18,135 @@
 
 /* The start screen and the settings scroll inside the box when their content is taller. */
 .screen {
+  --scale: 1;
   position: absolute;
   inset: 0;
   box-sizing: border-box;
   display: flex;
   align-items: flex-start;
-  gap: var(--base-size-24, 24px);
-  padding: var(--base-size-16, 16px);
+  gap: calc(var(--scale) * 28px);
+  padding: calc(var(--scale) * 20px);
   overflow-y: auto;
   overscroll-behavior: contain;
+  color: var(--ink);
+  background:
+    radial-gradient(ellipse at 20% 0%, rgb(255 255 255 / 0.7), transparent 60%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.35  0 0 0 0 0.25  0 0 0 0 0.15  0 0 0 0.09 0'/></filter><rect width='160' height='160' filter='url(%23n)'/></svg>"),
+    linear-gradient(#cfeaf3 0%, #f5e6d3 65%);
+}
+
+.screen > * {
+  position: relative;
 }
 
 .screen[data-layout='stacked'] {
   flex-direction: column;
-  gap: var(--base-size-12, 12px);
+  gap: calc(var(--scale) * 12px);
+}
+
+.screen[data-layout='compact'] {
+  align-items: center;
+  gap: calc(var(--scale) * 10px);
+  padding: calc(var(--scale) * 12px);
+  overflow: hidden;
+}
+
+/* Distant hills, shelves and the near hill, stretched over the lower part of the box. */
+.scene {
+  position: absolute;
+  inset: auto 0 0;
+  width: 100%;
+  height: 42%;
+  pointer-events: none;
+}
+
+.scene path {
+  stroke: var(--ink);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.far {
+  fill: #bfe0e8;
+  opacity: 0.85;
+}
+
+.shelf {
+  fill: none;
+  opacity: 0.35;
+  stroke-dasharray: 6 5;
+}
+
+.near {
+  fill: #cdebd3;
+}
+
+.figure {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-width: 0;
+  padding: 0 calc(var(--scale) * 14px) calc(var(--scale) * 10px);
+}
+
+.screen[data-layout='wide'] .figure {
+  align-self: flex-end;
+  margin-bottom: calc(var(--scale) * 8px);
+}
+
+.hill {
+  position: absolute;
+  inset: auto 0 0;
+  height: 22%;
+  min-height: 14px;
+  border: 3px solid var(--ink);
+  border-radius: 50%;
+  background:
+    repeating-linear-gradient(45deg, rgb(25 25 25 / 0.14) 0 1px, transparent 1px 6px),
+    #9fdcb4;
 }
 
 .mage {
+  position: relative;
   flex: none;
   width: auto;
   max-width: 100%;
   object-fit: contain;
+  transform-origin: 50% 100%;
+  animation: bob 2.4s ease-in-out infinite;
+}
+
+.sparkle {
+  position: absolute;
+  top: 8%;
+  right: 4%;
+  width: calc(var(--scale) * 22px);
+  fill: var(--yellow);
+  stroke: var(--ink);
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+  animation: twinkle 1.8s ease-in-out infinite;
+}
+
+@keyframes bob {
+  50% {
+    transform: translateY(-3%);
+  }
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: scale(0.6) rotate(0deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1) rotate(20deg);
+  }
 }
 
 .content {
@@ -38,7 +154,7 @@
   flex: 1;
   flex-direction: column;
   align-items: flex-start;
-  gap: var(--base-size-12, 12px);
+  gap: calc(var(--scale) * 12px);
   min-width: 0;
   text-align: left;
 }
@@ -48,13 +164,75 @@
   width: 100%;
 }
 
-.fullWidth {
+.screen[data-layout='compact'] .content {
+  gap: calc(var(--scale) * 6px);
+}
+
+.logo {
+  margin: 0;
+  font-family: ui-rounded, 'Arial Rounded MT Bold', 'Marker Felt', 'Chalkboard SE', 'Trebuchet MS', system-ui, sans-serif;
+  font-size: calc(var(--scale) * 4.25rem);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  color: var(--yellow);
+  -webkit-text-stroke: 0.1em var(--ink);
+  paint-order: stroke fill;
+  text-shadow: 0.06em 0.07em 0 var(--ink);
+  transform: rotate(-3deg);
+  transform-origin: 0 100%;
+}
+
+.logoTail {
+  color: var(--paper);
+}
+
+.screen[data-layout='compact'] .logo {
+  font-size: calc(var(--scale) * 2.5rem);
+}
+
+.quest {
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--navy);
+}
+
+.summary {
+  margin: 0;
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: max(0.7rem, calc(var(--scale) * 0.9rem));
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--navy);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+/* A parchment card with a scribbled outline and a light hatching. */
+.card {
+  box-sizing: border-box;
   align-self: stretch;
+  padding: calc(var(--scale) * 14px) calc(var(--scale) * 18px);
+  color: var(--ink);
+  background:
+    repeating-linear-gradient(135deg, rgb(25 25 25 / 0.045) 0 1px, transparent 1px 7px),
+    #fbf1e2;
+  border: 3px solid var(--ink);
+  border-radius: 14px 4px 16px 5px / 5px 16px 4px 14px;
+  box-shadow: 4px 5px 0 var(--ink);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--scale) * 10px);
 }
 
 .hint {
   margin: 0;
-  color: var(--fgColor-muted);
+  color: #4a4a4a;
 }
 
 .facts {
@@ -65,7 +243,7 @@
 }
 
 .facts dt {
-  color: var(--fgColor-muted);
+  color: #5c5a56;
 }
 
 .facts dd {
@@ -74,6 +252,108 @@
 }
 
 .path {
+  align-self: stretch;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--scale) * 12px);
+}
+
+/* Game-style buttons: thick outline, an offset shadow and a press that sinks into it. */
+.game.game {
+  --button-default-bgColor-rest: var(--paper);
+  --button-default-bgColor-hover: #fff7ea;
+  --button-default-bgColor-active: var(--paper);
+  --button-primary-bgColor-rest: var(--yellow);
+  --button-primary-bgColor-hover: #ffd23a;
+  --button-primary-bgColor-active: var(--yellow);
+  color: var(--ink);
+  font-weight: 800;
+  background: var(--button-default-bgColor-rest);
+  border: 3px solid var(--ink);
+  border-radius: 12px 5px 13px 6px / 6px 13px 5px 12px;
+  box-shadow: 3px 4px 0 var(--ink);
+  transition: transform 80ms, box-shadow 80ms;
+}
+
+.game.game:hover {
+  background: var(--button-default-bgColor-hover);
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 5px 0 var(--ink);
+}
+
+.game.game:active {
+  transform: translate(3px, 4px);
+  box-shadow: 0 0 0 var(--ink);
+}
+
+.game.game:focus-visible {
+  outline: 3px solid var(--navy);
+  outline-offset: 3px;
+}
+
+.start.start {
+  --button-primary-fgColor-rest: var(--ink);
+  height: auto;
+  min-height: 0;
+  line-height: 1.25;
+  padding: calc(var(--scale) * 10px) calc(var(--scale) * 28px);
+  font-size: calc(var(--scale) * 1.6rem);
+  background: var(--yellow);
+  box-shadow: 5px 6px 0 var(--ink);
+}
+
+.start.start:hover {
+  background: #ffd23a;
+  box-shadow: 6px 7px 0 var(--ink);
+}
+
+.screen[data-layout='compact'] .start.start {
+  padding: calc(var(--scale) * 5px) calc(var(--scale) * 18px);
+  font-size: max(0.9rem, calc(var(--scale) * 1.15rem));
+  box-shadow: 3px 4px 0 var(--ink);
+}
+
+/* Friendly messages in the style of a speech bubble. */
+.message {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-sizing: border-box;
+  max-width: 100%;
+  margin: 0;
+  padding: calc(var(--scale) * 10px) calc(var(--scale) * 14px);
+  font-size: max(0.75rem, calc(var(--scale) * 0.9rem));
+  color: var(--ink);
+  background: #fff7ea;
+  border: 3px solid var(--ink);
+  border-radius: 14px 5px 15px 6px / 6px 15px 5px 14px;
+  box-shadow: 3px 4px 0 var(--ink);
+}
+
+.message strong {
+  color: var(--navy);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mage,
+  .sparkle {
+    animation: none;
+  }
+
+  .sparkle {
+    opacity: 1;
+  }
+
+  .game.game {
+    transition: none;
+  }
+}
+
+.fullWidth {
   align-self: stretch;
 }
 
@@ -159,4 +439,13 @@
 .overlay:focus-visible {
   outline: 3px solid var(--borderColor-accent-emphasis);
   outline-offset: -3px;
+}
+
+/* On a narrow box the buttons come before the long path card, so Start run stays in view. */
+.screen[data-layout='stacked'] .actions {
+  order: 1;
+}
+
+.screen[data-layout='stacked'] .card {
+  order: 2;
 }

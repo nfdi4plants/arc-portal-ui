@@ -25,7 +25,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'The ARC Mage inside a Dashlet frame. The start screen previews one path through the provenance of the bundled Talinum ARC. Start run boots the game, Settings rebinds the controls.',
+          'ARCade inside a Dashlet frame. The start screen previews one path through the provenance of the bundled Talinum ARC. Start run boots the game, Settings rebinds the controls.',
       },
     },
   },
@@ -37,6 +37,13 @@ type Story = StoryObj<typeof meta>
 export const Default: Story = {}
 
 export const SmallBox: Story = { args: { maxWidth: 480, height: 320 } }
+
+export const SmallTile: Story = {
+  args: { maxWidth: 280, height: 200 },
+  parameters: {
+    docs: { description: { story: 'Boxes under 360 by 260 pixels show the compact title card: the logo, the mage, a one-line summary and Start run.' } },
+  },
+}
 
 // The box fills the preview, so the device chosen in the viewport toolbar sets the size of the dashlet.
 function ViewportBox() {

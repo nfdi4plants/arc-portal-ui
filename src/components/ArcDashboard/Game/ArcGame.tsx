@@ -1,5 +1,6 @@
 import { AlertIcon } from '@primer/octicons-react'
-import { Banner, Button, Heading, Stack, Text } from '@primer/react'
+import { Banner, Button, Heading, Stack, Text, ThemeProvider } from '@primer/react'
+import type { CSSProperties } from 'react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react'
 import type { ProvenanceIndex } from '../../../arc/provenance/types'
 import mageUrl from '../../../game/assets/ARCMage.png'
@@ -35,8 +36,12 @@ const BINDING_SLOTS = [0, 1]
 // not taller than wide. The measure is in em so a larger font size keeps the text readable.
 const SIDE_BY_SIDE_MIN_EM = 28
 // Share of the box height the mage illustration takes.
-const MAGE_HEIGHT_WIDE = 0.6
-const MAGE_HEIGHT_STACKED = 0.2
+const MAGE_HEIGHT_WIDE = 0.55
+const MAGE_HEIGHT_STACKED = 0.17
+const MAGE_HEIGHT_COMPACT = 0.5
+// Boxes smaller than this many em in either direction get the compact title card.
+const COMPACT_MAX_WIDTH_EM = 22.5
+const COMPACT_MAX_HEIGHT_EM = 16.25
 
 const FINE_POINTER = '(any-pointer: fine)'
 
@@ -54,6 +59,7 @@ interface Box {
   width: number
   height: number
   stacked: boolean
+  compact: boolean
 }
 
 // The size of the element, kept up to date by a ResizeObserver. It is null until the element has
@@ -68,10 +74,11 @@ function useBox(ref: RefObject<HTMLElement | null>): Box | null {
       if (width === 0 || height === 0) return
       const em = parseFloat(getComputedStyle(element).fontSize) || 16
       const stacked = width < height || width < SIDE_BY_SIDE_MIN_EM * em
+      const compact = width < COMPACT_MAX_WIDTH_EM * em || height < COMPACT_MAX_HEIGHT_EM * em
       setBox((current) =>
-        current && current.width === width && current.height === height && current.stacked === stacked
+        current && current.width === width && current.height === height && current.stacked === stacked && current.compact === compact
           ? current
-          : { width, height, stacked },
+          : { width, height, stacked, compact },
       )
     }
     measure()
@@ -80,6 +87,25 @@ function useBox(ref: RefObject<HTMLElement | null>): Box | null {
     return () => observer.disconnect()
   }, [ref])
   return box
+}
+
+// Hand-drawn hills and shelves behind the start screen. Static, so it costs nothing after the first paint.
+function Scene() {
+  return (
+    <svg className={styles.scene} viewBox="0 0 400 100" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+      <path className={styles.far} d="M0 62 Q30 38 62 52 T118 46 Q150 30 190 50 T262 42 Q310 28 346 48 T400 40 V100 H0Z" />
+      <path className={styles.shelf} d="M20 40 H96 M150 34 H240 M290 38 H378" />
+      <path className={styles.near} d="M0 82 Q44 62 92 76 T180 70 Q240 56 300 74 T400 68 V100 H0Z" />
+    </svg>
+  )
+}
+
+function Sparkle() {
+  return (
+    <svg className={styles.sparkle} viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+      <path d="M10 1 L12 8 L19 10 L12 12 L10 19 L8 12 L1 10 L8 8Z" />
+    </svg>
+  )
 }
 
 const sameBinding = (a: Binding, b: Binding) =>
@@ -283,14 +309,25 @@ export default function ArcGame({ index, arcTitle }: { index: ProvenanceIndex; a
     }
   }, [capture, updateBindings])
 
-  const layout = box?.stacked ? 'stacked' : 'wide'
-  const mageStyle = box ? { height: Math.round(box.height * (box.stacked ? MAGE_HEIGHT_STACKED : MAGE_HEIGHT_WIDE)) } : undefined
+  const compact = box?.compact ?? false
+  const layout = compact ? 'compact' : box?.stacked ? 'stacked' : 'wide'
+  const mageShare = compact ? MAGE_HEIGHT_COMPACT : box?.stacked ? MAGE_HEIGHT_STACKED : MAGE_HEIGHT_WIDE
+  const mageStyle = box ? { height: Math.round(box.height * mageShare) } : undefined
+  // One scale factor for the logo and the buttons, derived from what the box can hold.
+  const scale = !box
+    ? 1
+    : compact
+      ? Math.min(box.width / 300, box.height / 200)
+      : box.stacked
+        ? Math.min(box.width / 420, box.height / 700)
+        : Math.min(box.width / 900, box.height / 560)
+  const sceneStyle = { '--scale': Math.max(0.5, Math.min(1.5, scale)) } as CSSProperties
 
   let screen
   if (mode === 'playing') {
     screen = (
       <div className={styles.play}>
-        <div ref={host} className={styles.host} role="group" aria-label="ARC Mage game" />
+        <div ref={host} className={styles.host} role="group" aria-label="ARCade game" />
         {loadFailed ? (
           <div className={styles.status}>
             <Banner variant="critical" title="The game could not be loaded" description="Reload the page to try again." />
@@ -317,8 +354,9 @@ export default function ArcGame({ index, arcTitle }: { index: ProvenanceIndex; a
         .join(' ')
 
     screen = (
-      <div className={styles.screen} data-layout={layout}>
-        <div className={styles.content}>
+      <div className={styles.screen} data-layout={layout} style={sceneStyle}>
+        <Scene />
+        <div className={`${styles.content} ${styles.card}`}>
           <Stack direction="horizontal" align="center" justify="space-between" wrap="wrap" gap="condensed" className={styles.fullWidth}>
             <Heading as="h2" variant="medium">Controls</Heading>
             <Stack direction="horizontal" gap="condensed">
@@ -372,57 +410,89 @@ export default function ArcGame({ index, arcTitle }: { index: ProvenanceIndex; a
     )
   } else {
     const totalAnnotations = plan?.segments.reduce((sum, segment) => sum + segment.annotations.length, 0) ?? 0
+    const actions = finePointer ? (
+      <div className={styles.actions}>
+        <Button variant="primary" className={`${styles.game} ${styles.start}`} onClick={() => setMode('playing')}>Start run</Button>
+        {!compact && (
+          <>
+            <Button className={styles.game} onClick={() => setSeed(newSeed())}>New path</Button>
+            <Button className={styles.game} onClick={() => setMode('settings')}>Settings</Button>
+          </>
+        )}
+      </div>
+    ) : (
+      <>
+        <p className={styles.message}>
+          <strong>Keyboard required</strong>
+          <span>ARCade needs a keyboard and a mouse.</span>
+        </p>
+        {!compact && (
+          <div className={styles.actions}>
+            <Button className={styles.game} onClick={() => setSeed(newSeed())}>New path</Button>
+          </div>
+        )}
+      </>
+    )
     screen = (
-      <div className={styles.screen} data-layout={layout}>
-        {plan && mageImage && <img className={styles.mage} src={mageImage} alt="" style={mageStyle} />}
+      <div className={styles.screen} data-layout={layout} style={sceneStyle}>
+        <Scene />
+        {plan && mageImage && (
+          <div className={styles.figure}>
+            <span className={styles.hill} aria-hidden="true" />
+            <img className={styles.mage} src={mageImage} alt="" style={mageStyle} />
+            <Sparkle />
+          </div>
+        )}
         <div className={styles.content}>
-          <Heading as="h2" variant="medium">ARC Mage</Heading>
+          <h2 className={styles.logo} aria-label="ARCade">
+            <span aria-hidden="true">ARC<span className={styles.logoTail}>ade</span></span>
+          </h2>
           {plan ? (
-            <>
-              <Text as="p" className={styles.hint}>
-                Fight along one path through {arcTitle}. Every annotation on the way is a monster and every node after a step is a boss.
-              </Text>
-              <dl className={styles.facts}>
-                <dt>Path</dt>
-                <dd>{plan.nodes[0].id} &rarr; {plan.nodes[plan.nodes.length - 1].id}</dd>
-                <dt>Steps</dt>
-                <dd>{plan.segments.length}</dd>
-                <dt>Annotations</dt>
-                <dd>{totalAnnotations}</dd>
-                <dt>Seed</dt>
-                <dd><code>{plan.seed}</code></dd>
-              </dl>
-              <div className={styles.path}>
-                <BarList
-                  title="Annotations per step"
-                  max={plan.segments.length}
-                  items={plan.segments.map((segment) => ({
-                    key: String(segment.index),
-                    label: segment.processName,
-                    count: segment.annotations.length,
-                    title: `${segment.processName}: ${segment.fromNodeId} to ${segment.toNodeId}`,
-                  }))}
-                />
-              </div>
-              {finePointer ? (
-                <Stack direction="horizontal" gap="condensed" wrap="wrap">
-                  <Button variant="primary" onClick={() => setMode('playing')}>Start run</Button>
-                  <Button onClick={() => setSeed(newSeed())}>New path</Button>
-                  <Button onClick={() => setMode('settings')}>Settings</Button>
-                </Stack>
-              ) : (
-                <>
-                  <Banner variant="warning" title="Keyboard required" description="The ARC Mage needs a keyboard and a mouse." />
-                  <Button onClick={() => setSeed(newSeed())}>New path</Button>
-                </>
-              )}
-            </>
+            compact ? (
+              <>
+                <p className={styles.summary} title={`${plan.segments.length} steps, ${totalAnnotations} monsters, quest: ${arcTitle}`}>
+                  {plan.segments.length} steps &middot; {totalAnnotations} monsters &middot; quest: {arcTitle}
+                </p>
+                {actions}
+              </>
+            ) : (
+              <>
+                <p className={styles.quest} title={arcTitle}>Quest: {arcTitle}</p>
+                <div className={styles.card}>
+                  <Text as="p" className={styles.hint}>
+                    Fight along one path through {arcTitle}. Every annotation on the way is a monster and every node after a step is a boss.
+                  </Text>
+                  <dl className={styles.facts}>
+                    <dt>Path</dt>
+                    <dd>{plan.nodes[0].id} &rarr; {plan.nodes[plan.nodes.length - 1].id}</dd>
+                    <dt>Steps</dt>
+                    <dd>{plan.segments.length}</dd>
+                    <dt>Annotations</dt>
+                    <dd>{totalAnnotations}</dd>
+                    <dt>Seed</dt>
+                    <dd><code>{plan.seed}</code></dd>
+                  </dl>
+                  <div className={styles.path}>
+                    <BarList
+                      title="Annotations per step"
+                      max={plan.segments.length}
+                      items={plan.segments.map((segment) => ({
+                        key: String(segment.index),
+                        label: segment.processName,
+                        count: segment.annotations.length,
+                        title: `${segment.processName}: ${segment.fromNodeId} to ${segment.toNodeId}`,
+                      }))}
+                    />
+                  </div>
+                </div>
+                {actions}
+              </>
+            )
           ) : (
-            <Banner
-              variant="info"
-              title="No provenance yet"
-              description="This ARC has no provenance yet. Annotate a study or assay table to open the path for the ARC Mage."
-            />
+            <p className={styles.message}>
+              <strong>No provenance yet</strong>
+              <span>This ARC has no provenance yet. Annotate a study or assay table to open the path for ARCade.</span>
+            </p>
           )}
         </div>
       </div>
@@ -431,7 +501,7 @@ export default function ArcGame({ index, arcTitle }: { index: ProvenanceIndex; a
 
   return (
     <div ref={root} className={styles.root}>
-      {screen}
+      {mode === 'playing' ? screen : <ThemeProvider colorMode="day">{screen}</ThemeProvider>}
     </div>
   )
 }

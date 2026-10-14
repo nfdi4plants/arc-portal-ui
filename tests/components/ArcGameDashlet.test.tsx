@@ -142,7 +142,7 @@ it('pauses the game while the canvas has no focus or the dashlet is scrolled out
   const lastPause = () => vi.mocked(handle.send).mock.calls.filter(([command]) => command.type === 'pause').at(-1)?.[0]
   expect(lastPause()).toEqual({ type: 'pause', paused: true })
 
-  const game = screen.getByRole('group', { name: 'ARC Mage game' })
+  const game = screen.getByRole('group', { name: 'ARCade game' })
   act(() => void game.dispatchEvent(new FocusEvent('focusin', { bubbles: true })))
   expect(lastPause()).toEqual({ type: 'pause', paused: false })
   expect(screen.queryByRole('button', { name: 'Click to play' })).not.toBeInTheDocument()
@@ -186,7 +186,7 @@ it('asks for a keyboard and a mouse on a touch-only device', async () => {
   stubPointer(false)
   renderWithTheme(<ArcGameDashlet index={index} arcTitle="Talinum" />)
 
-  expect(await screen.findByText('The ARC Mage needs a keyboard and a mouse.')).toBeInTheDocument()
+  expect(await screen.findByText('ARCade needs a keyboard and a mouse.')).toBeInTheDocument()
   expect(screen.getByText('Extraction')).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Start run' })).not.toBeInTheDocument()
 })
@@ -196,7 +196,7 @@ it('explains that an ARC without provenance has no path', async () => {
   renderWithTheme(<ArcGameDashlet index={index} arcTitle="Talinum" />)
 
   expect(
-    await screen.findByText('This ARC has no provenance yet. Annotate a study or assay table to open the path for the ARC Mage.'),
+    await screen.findByText('This ARC has no provenance yet. Annotate a study or assay table to open the path for ARCade.'),
   ).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Start run' })).not.toBeInTheDocument()
 })
@@ -280,4 +280,18 @@ it('keeps exactly one live game under StrictMode', async () => {
   unmount()
 
   expect(live.destroy).toHaveBeenCalledTimes(1)
+})
+
+it('shows a compact title card in a small box', async () => {
+  vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({ width: 280, height: 200 } as DOMRect)
+  try {
+    renderWithTheme(<ArcGameDashlet index={index} arcTitle="Talinum" />)
+
+    expect(await screen.findByText('2 steps · 4 monsters · quest: Talinum')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Start run' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Annotations per step' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Settings' })).not.toBeInTheDocument()
+  } finally {
+    vi.restoreAllMocks()
+  }
 })

@@ -15,7 +15,7 @@ export function ArcGameDashlet({
   ...props
 }: ArcGameDashletProps) {
   return (
-    <Dashlet {...props} label={label ?? props.title ?? 'ARC Mage'} height={height} className={`arc-game-dashlet${className ? ` ${className}` : ''}`}>
+    <Dashlet {...props} label={label ?? props.title ?? 'ARCade'} height={height} className={`arc-game-dashlet${className ? ` ${className}` : ''}`}>
       <ArcGame index={index} arcTitle={arcTitle} />
     </Dashlet>
   )
