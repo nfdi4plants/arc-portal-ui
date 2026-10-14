@@ -13,17 +13,16 @@ const filters = (overrides: Partial<DashboardFilters> = {}): DashboardFilters =>
 const titles = (items: typeof catalogue) => items.map(arc => arc.title)
 
 describe('applyFilters', () => {
-  it('combines hub, group and access with AND', () => {
-    expect(titles(applyFilters(catalogue, filters({ hubId: 'a' })))).toEqual(['Rice drought', 'Wheat yield'])
-    expect(titles(applyFilters(catalogue, filters({ hubId: 'a', access: 'public' })))).toEqual(['Rice drought'])
-    expect(titles(applyFilters(catalogue, filters({ groupKey: 'b/x', hubId: 'a' })))).toEqual([])
+  it('combines working group and search with AND', () => {
+    expect(titles(applyFilters(catalogue, filters({ groupKey: 'a/x' })))).toEqual(['Rice drought'])
+    expect(titles(applyFilters(catalogue, filters({ groupKey: 'a/x', query: 'wheat' })))).toEqual([])
+    expect(titles(applyFilters(catalogue, filters({ groupKey: 'b/x', query: 'crop lab' })))).toEqual(['Maize'])
   })
 
-  it('can ignore the hub or group filter while keeping the rest', () => {
-    const active = filters({ hubId: 'a', groupKey: 'a/x', access: 'public' })
-    expect(titles(applyFilters(catalogue, active, undefined, { ignore: 'hub' }))).toEqual(['Rice drought'])
-    expect(titles(applyFilters(catalogue, filters({ hubId: 'b', access: 'private' }), undefined, { ignore: 'hub' }))).toEqual(['Wheat yield'])
-    expect(titles(applyFilters(catalogue, filters({ groupKey: 'a/y', hubId: 'b' }), undefined, { ignore: 'group' }))).toEqual(['Maize'])
+  it('combines DataHUB selection and search with AND', () => {
+    expect(titles(applyFilters(catalogue, filters({ hubId: 'a' })))).toEqual(['Rice drought', 'Wheat yield'])
+    expect(titles(applyFilters(catalogue, filters({ hubId: 'a', query: 'wheat' })))).toEqual(['Wheat yield'])
+    expect(titles(applyFilters(catalogue, filters({ hubId: 'a', groupKey: 'b/x' })))).toEqual([])
   })
 
   it('applies the search query', () => {

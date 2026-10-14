@@ -43,28 +43,17 @@ export interface ArcDetails {
 export type DetailsMap = Map<string, ArcDetails | 'unavailable'>
 
 export type Access = 'public' | 'private'
-export type FilterKind = 'hub' | 'group' | 'access' | 'query' | 'recent'
-
-export interface HeadlineNumbers {
-  total: number
-  public: number
-  private: number
-  hubs: number
-  /** 'counting' while any ARC in the set still lacks details; null before details load. */
-  people: number | 'counting' | null
-  /** True when some ARCs' details could not be loaded. */
-  peopleIncomplete: boolean
-}
+export type FilterKind = 'hub' | 'group' | 'query' | 'recent'
 
 export interface CountItem { key: string; label: string; count: number }
-
-export interface MonthCount { month: string; count: number }
 
 export interface HubState {
   hub: GitLabInstance
   status: 'loading' | 'loaded' | 'failed'
   /** Keeps the last successful value during a reload. */
   arcs: ArcSummary[]
+  /** Undefined while loading; null when the fast count is unavailable. */
+  projectCount?: number | null
   error?: string
   /** Set when the membership list could not be loaded; "My ARCs" then shows an error. */
   membershipError?: string
@@ -75,7 +64,6 @@ export interface HubState {
 export interface DashboardFilters {
   hubId?: string
   groupKey?: string
-  access?: Access
   query: string
   /** Only ARCs changed within the last 30 days. */
   recent: boolean
@@ -96,6 +84,8 @@ export interface DataHubConnection {
 
 /** Shared fetch callbacks receive the GitLab instance URL and optional token/signal. */
 export interface DataHubFetchers {
+  /** Fast count, capped at 10,000; null if pagination headers are unavailable. */
+  fetchProjectCount?: (source: string, options?: GitLabRequestOptions) => Promise<Result<number | null>>
   fetchProjects: (source: string, options?: GitLabRequestOptions) => Promise<Result<GitLabProject[]>>
   fetchGroups: (source: string, options?: Omit<ListGroupsOptions, 'page' | 'perPage'>) => Promise<Result<GitLabGroup[]>>
   fetchMemberProjectIds: (source: string, options?: GitLabRequestOptions) => Promise<Result<number[]>>

@@ -1,7 +1,7 @@
 .panel { padding: 16px; background: var(--bgColor-default); border: 1px solid var(--borderColor-default); border-radius: 6px; min-width: 0; }
 .title { font-size: 14px; margin: 0 0 12px; }
 .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-.row { display: grid; grid-template-columns: 38% minmax(0, 1fr) 2.5ch; align-items: center; gap: 12px; width: 100%;
+.row { display: grid; grid-template-columns: 38% minmax(0, 1fr) 7ch; align-items: center; gap: 12px; width: 100%;
   padding: 2px 4px; font: inherit; font-size: 13px; color: inherit; text-align: left; background: none; border: 0; border-radius: 6px; }
 button.row { cursor: pointer; }
 button.row:hover { background: var(--bgColor-neutral-muted); }
@@ -9,6 +9,7 @@ button.row[aria-pressed='true'] { background: var(--bgColor-accent-muted); outli
 .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .track { height: 8px; background: var(--bgColor-neutral-muted); border-radius: 4px; overflow: hidden; }
 .bar { display: block; height: 100%; background: var(--bgColor-accent-emphasis); border-radius: 4px; }
+.capped { background: linear-gradient(90deg, var(--bgColor-attention-emphasis), var(--bgColor-done-emphasis)); }
 .count { text-align: right; color: var(--fgColor-muted); }
 .dimmed { opacity: .45; }
 .more { margin: 8px 0 0; font-size: 12px; color: var(--fgColor-muted); }

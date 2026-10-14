@@ -1,10 +1,10 @@
 import '@primer/primitives/dist/css/functional/themes/light.css'
 import '@primer/css/dist/primer.css'
-import { BaseStyles } from '@primer/react'
+import { BaseStyles, Spinner } from '@primer/react'
 import { useState } from 'react'
 import { ThemeProvider } from '@primer/react/next'
 import DataHubDashboard from './components/DataHubDashboard/DataHubDashboard.tsx'
-import { getContributors, getLatestCommit, listAllGroups, listAllProjects, listMemberProjectIds } from './api/gitlab/index.ts'
+import { DashboardConfigurationProvider } from './components/DataHubDashboard/DashboardConfigurationProvider.tsx'
 import { AuthenticationProvider } from './auth/AuthenticationProvider.tsx'
 import { useAuthentication } from './auth/context.ts'
 import { Navbar } from './components/Navbar/Navbar.tsx'
@@ -28,6 +28,10 @@ type PageState =
 
 function Portal() {
   const { accounts } = useAuthentication()
+  const checking = Object.values(accounts).some(account => account.checking)
+  const [authenticationReady, setAuthenticationReady] = useState(() => !checking)
+  // Release the initial gate once; later login checks keep the dashboard mounted.
+  if (!checking && !authenticationReady) setAuthenticationReady(true)
   const [pageState, setPageState] = useState<PageState>({ type: "datahub-dashboard" })
   const tokens = Object.fromEntries(Object.entries(accounts)
     .filter(([, account]) => account.session)
@@ -36,21 +40,23 @@ function Portal() {
   return <>
     <Navbar />
     {
-      pageState.type === "arc-dashboard" ? (
+      !authenticationReady ? (
+        <main role="status" aria-label="Checking saved logins" aria-busy="true" style={{ padding: 32 }}>
+          <Spinner size="small" /> Checking saved logins…
+        </main>
+      ) : pageState.type === "arc-dashboard" ? (
         <ArcDashboard name={pageState.data.name} url={pageState.data.url}
           source={pageState.data.dataHub.url} projectId={pageState.data.projectId} token={tokens[pageState.data.dataHub.id]}
           onBack={() => setPageState({ type: "datahub-dashboard" })} />
       ) :
       <DataHubDashboard
-        onArcClick={(url, name, projectId, dataHub) => setPageState({ type: "arc-dashboard", data: { url, name, projectId, dataHub } })}
-        fetchProjects={listAllProjects} fetchGroups={listAllGroups} fetchMemberProjectIds={listMemberProjectIds}
-        fetchContributors={getContributors} fetchLatestCommit={getLatestCommit} tokens={tokens} />
+        onArcClick={(url, name, projectId, dataHub) => setPageState({ type: "arc-dashboard", data: { url, name, projectId, dataHub } })} />
     }
   </>
 }
 
 export default function App() {
   return <ThemeProvider><BaseStyles>
-    <AuthenticationProvider><Portal /></AuthenticationProvider>
+    <DashboardConfigurationProvider><AuthenticationProvider><Portal /></AuthenticationProvider></DashboardConfigurationProvider>
   </BaseStyles></ThemeProvider>
 }

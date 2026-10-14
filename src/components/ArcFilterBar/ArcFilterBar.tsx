@@ -1,36 +1,42 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { HistoryIcon, SearchIcon, XIcon } from '@primer/octicons-react'
-import { Button, IconButton, TextInput, Token } from '@primer/react'
+import { Button, IconButton, SkeletonBox, TextInput, Token } from '@primer/react'
 import type { FilterKind } from '../../types/dashboard.ts'
 import styles from './ArcFilterBar.module.css'
 
 export interface ArcFilterBarProps {
   query: string
-  onQueryChange: (query: string) => void
+  onSearch: (query: string) => void
   recent: boolean
   onRecentToggle: () => void
   chips: { kind: FilterKind; label: string }[]
   onRemoveChip: (kind: FilterKind) => void
   onClearAll: () => void
   shown: number
-  total: number
+  total: number | null
+  allowRecent?: boolean
+  loading?: boolean
+  unavailable?: boolean
   /** Slot for the "More columns" menu. */
   moreColumns?: ReactNode
 }
 
 export function ArcFilterBar({
-  query, onQueryChange, recent, onRecentToggle, chips, onRemoveChip, onClearAll, shown, total, moreColumns,
+  query, onSearch, recent, onRecentToggle, chips, onRemoveChip, onClearAll, shown, total, allowRecent = true, loading, unavailable, moreColumns,
 }: ArcFilterBarProps) {
+  const [queryInput, setQueryInput] = useState(query)
   return (
     <div className={styles.bar}>
-      <div className={styles.search}>
+      <form className={styles.search} role="search" aria-label="Search ARCs"
+        onSubmit={event => { event.preventDefault(); onSearch(queryInput.trim()) }}>
         <TextInput className={styles.input} type="search" aria-label="Search ARCs" leadingVisual={SearchIcon}
-          placeholder="Search ARCs by title, group, topic, person…" value={query}
-          onChange={event => onQueryChange(event.target.value)} />
-        <IconButton icon={HistoryIcon} size="small" variant="invisible" aria-label="Only recently changed ARCs"
-          aria-pressed={recent} onClick={onRecentToggle} />
+          placeholder="Search ARCs by name, path, description…" value={queryInput}
+          onChange={event => setQueryInput(event.target.value)} />
+        <Button type="submit" variant="primary">Search</Button>
+        {allowRecent && <IconButton type="button" icon={HistoryIcon} size="small" variant="invisible" aria-label="Only recently changed ARCs"
+          aria-pressed={recent} onClick={onRecentToggle} />}
         {moreColumns}
-      </div>
+      </form>
       <div className={styles.filters}>
         <span className={styles.label}>Filters:</span>
         {chips.length === 0 && <span className={styles.hint}>No filters. Click a card, a bar, or search to narrow down.</span>}
@@ -43,7 +49,11 @@ export function ArcFilterBar({
           </span>
         ))}
         {chips.length >= 2 && <Button variant="invisible" size="small" onClick={onClearAll}>Clear all</Button>}
-        <span role="status" className={styles.count}>Showing <strong>{shown}</strong> of {total} ARCs</span>
+        <span role="status" className={styles.count} aria-label={loading ? 'Loading ARC results' : undefined}>
+          {loading ? <SkeletonBox height="16px" width="140px" /> : unavailable ? 'ARC count unavailable'
+            : total === null ? <>Showing <strong>{shown}</strong> ARCs on this page</>
+              : <>Showing <strong>{shown}</strong> of {total} ARCs</>}
+        </span>
       </div>
     </div>
   )

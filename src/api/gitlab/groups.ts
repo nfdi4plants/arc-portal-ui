@@ -27,6 +27,10 @@ export async function listAllGroups(source: string, options: Omit<ListGroupsOpti
 export async function getGroupProjects(source: string, idOrPath: number | string, options: GroupProjectsOptions = {}): Promise<Result<GitLabPage<GitLabProject>>> {
   if (!validIdentifier(idOrPath)) return Failure('A valid group ID or path is required.')
   const params = new URLSearchParams({ include_subgroups: 'true', with_shared: 'false', order_by: 'name', sort: 'asc' })
+  if (options.search !== undefined) params.set('search', options.search)
+  if (options.orderBy !== undefined) params.set('order_by', options.orderBy)
+  if (options.sort !== undefined) params.set('sort', options.sort)
+  if (options.visibility !== undefined) params.set('visibility', options.visibility)
   return requestPage(source, `groups/${encodeURIComponent(String(idOrPath))}/projects`, params,
     { perPage: 10, ...options }, isProject, 'project')
 }

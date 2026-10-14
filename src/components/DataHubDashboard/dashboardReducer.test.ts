@@ -5,13 +5,12 @@ const reduce = (state: DashboardState, ...actions: Parameters<typeof dashboardRe
   actions.reduce(dashboardReducer, state)
 
 const withAllFilters = reduce(initialDashboardState,
-  { type: 'toggleHub', value: 'a' }, { type: 'toggleGroup', value: 'a/x' }, { type: 'toggleAccess', value: 'private' })
+  { type: 'toggleHub', value: 'a' }, { type: 'toggleGroup', value: 'a/x' })
 
 describe('dashboardReducer', () => {
   it.each([
     ['toggleHub', 'hubId', 'a'],
     ['toggleGroup', 'groupKey', 'a/x'],
-    ['toggleAccess', 'access', 'public'],
   ] as const)('%s sets and then clears %s', (type, field, value) => {
     const action = { type, value } as Parameters<typeof dashboardReducer>[1]
     const once = reduce(initialDashboardState, action)
@@ -28,15 +27,14 @@ describe('dashboardReducer', () => {
 
   it('clearFilters resets filters, the query and recent', () => {
     const state = reduce(initialDashboardState,
-      { type: 'toggleHub', value: 'a' }, { type: 'toggleGroup', value: 'a/x' }, { type: 'toggleAccess', value: 'private' },
+      { type: 'toggleHub', value: 'a' }, { type: 'toggleGroup', value: 'a/x' },
       { type: 'setQuery', query: 'rice' }, { type: 'toggleRecent' }, { type: 'clearFilters' })
     expect(state.filters).toEqual({ query: '', recent: false })
   })
 
   it.each([
-    ['hub', 'hubId', { groupKey: 'a/x', access: 'private' }],
-    ['group', 'groupKey', { hubId: 'a', access: 'private' }],
-    ['access', 'access', { hubId: 'a', groupKey: 'a/x' }],
+    ['hub', 'hubId', { groupKey: 'a/x' }],
+    ['group', 'groupKey', { hubId: 'a' }],
   ] as const)('removeFilter(%s) clears only that filter', (kind, field, remaining) => {
     const state = reduce(withAllFilters, { type: 'removeFilter', kind })
     expect(state.filters[field]).toBeUndefined()

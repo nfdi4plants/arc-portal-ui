@@ -7,6 +7,16 @@ const source = 'https://gitlab.example/gitlab'
 const group = { id: 1, name: 'Plants', full_path: 'research/plants', visibility: 'public' }
 
 describe('GitLab authentication and groups', () => {
+  it('searches and sorts one group project page without additional lookups', async () => {
+    const fetchCall = vi.fn<typeof fetch>().mockResolvedValue(projectResponse([project()], { 'X-Next-Page': '3' }))
+    await getGroupProjects(source, 2, { page: 2, perPage: 25, search: 'plant',
+      orderBy: 'last_activity_at', sort: 'desc', fetchCall })
+    expect(Object.fromEntries(new URL(String(fetchCall.mock.calls[0][0])).searchParams)).toEqual({
+      include_subgroups: 'true', with_shared: 'false', order_by: 'last_activity_at',
+      sort: 'desc', search: 'plant', page: '2', per_page: '25',
+    })
+    expect(fetchCall).toHaveBeenCalledTimes(1)
+  })
   it('validates a token through the current-user endpoint', async () => {
     const user = { id: 7, name: 'Jane Doe', username: 'jane' }
     const fetchCall = vi.fn<typeof fetch>().mockResolvedValue(Response.json(user))

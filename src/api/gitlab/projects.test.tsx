@@ -14,6 +14,16 @@ beforeEach(() => {
 function requestedUrl() { return new URL(String(fetchMock.mock.calls.at(-1)![0])) }
 
 describe('GitLab projects API', () => {
+  it('requests one recent-activity search page without following pagination', async () => {
+    fetchMock.mockResolvedValue(projectResponse([project()], { 'X-Next-Page': '3' }))
+    await listProjects(source, { fetchCall: fetchMock, page: 2, perPage: 25,
+      search: 'plants', lastActivityAfter: '2026-09-14T12:00:00.000Z', orderBy: 'last_activity_at', sort: 'desc' })
+    expect(Object.fromEntries(requestedUrl().searchParams)).toEqual({
+      page: '2', per_page: '25', search: 'plants', last_activity_after: '2026-09-14T12:00:00.000Z',
+      order_by: 'last_activity_at', sort: 'desc',
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
   it.each(['https://one.example/', 'https://two.example/gitlab///'])('uses the explicit source and preserves subpaths: %s', async instance => {
     await listProjects(instance, { fetchCall: fetchMock })
     expect(requestedUrl().href).toBe(`${instance.replace(/\/+$/, '')}/api/v4/projects?page=1&per_page=20`)
