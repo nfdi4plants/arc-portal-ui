@@ -1,3 +1,5 @@
+import { dataHubRepositoryUrl } from '../../../api/gitlab'
+import type { DashboardProps } from '../dashboardTypes'
 import { Text } from '@primer/react'
 import { PlayIcon, WorkflowIcon, BeakerIcon, BookIcon, BrowserIcon, DatabaseIcon, FileIcon, OrganizationIcon, PeopleIcon } from '@primer/octicons-react'
 import { lazy, Suspense, type RefObject } from 'react'
@@ -16,7 +18,7 @@ const ArcViewer = lazy(() => import('../ArcViewer/ArcViewer'))
 
 export type { InvestigationDashletId } from './investigationDashletOptions'
 
-export function InvestigationDashlets({ metadata, arcJson, classNamePrefix, ids, interactive = false, collapsed, onToggleCollapsed, externalPopup }: {
+export function InvestigationDashlets({ metadata, arcJson, repository, repositoryUrl, token, classNamePrefix, ids, interactive = false, collapsed, onToggleCollapsed, externalPopup }: Pick<DashboardProps, 'repository' | 'repositoryUrl' | 'token'> & {
   metadata: InvestigationMetadata
   arcJson: string
   classNamePrefix: string
@@ -83,7 +85,7 @@ export function InvestigationDashlets({ metadata, arcJson, classNamePrefix, ids,
       id: 'webview', title: investigationDashletTitles.webview,
       symbol: <BrowserIcon size={48} />,
       description: "Browse the ARC's files, metadata, and annotation tables.",
-      content: <Suspense fallback={<Text as="p" role="status">Loading ARC viewer…</Text>}><ArcViewer jsonString={arcJson} embedded /></Suspense>,
+      content: <Suspense fallback={<Text as="p" role="status">Loading ARC viewer…</Text>}><ArcViewer jsonString={arcJson} repositoryUrl={repositoryUrl ?? (repository ? dataHubRepositoryUrl(repository) : undefined)} token={token} embedded /></Suspense>,
     },
   ]
 

@@ -52,7 +52,7 @@ function TabbedDashboardLayout({ metadata, provenance, actions, ...props }: Dash
         <InvestigationMenu metadata={metadata} arcJson={props.arcJson} />
       </div>
       <section id={panelId} role="tabpanel" aria-labelledby={`${tabId}-${view}`} className="tabbed-dashboard-viewer-panel">
-        <ViewerWorkspace metadata={metadata} provenance={provenance} arcJson={props.arcJson} mode={view} />
+        <ViewerWorkspace repository={props.repository} repositoryUrl={props.repositoryUrl} token={props.token} metadata={metadata} provenance={provenance} arcJson={props.arcJson} mode={view} />
       </section>
     </main>
   )
