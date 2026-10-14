@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Banner, SkeletonBox, Stack } from '@primer/react'
+import { Banner, SegmentedControl, SkeletonBox, Stack } from '@primer/react'
 import { useAuthentication } from '../../auth/context.ts'
 import { defaultDataHub } from '../../config/gitlab.ts'
 import { PROJECT_COUNT_LIMIT } from '../../api/gitlab/projectCount.ts'
@@ -25,6 +25,7 @@ export interface DataHubDashboardProps {
 interface ProjectView {
   hubId: string
   group?: DashboardGroup
+  repositories: 'all' | 'your' | 'mostStarred'
   query: string
   recentAfter?: string
   sort: SortState
@@ -36,15 +37,18 @@ function DataHubDashboard({ onArcClick, now = () => new Date() }: DataHubDashboa
   const { accounts } = useAuthentication()
   const initialHub = dataHubs.find(hub => hub.id === defaultDataHub.id) ?? dataHubs[0]
   const [view, setView] = useState<ProjectView>(() => ({
-    hubId: initialHub?.id ?? '', query: '', sort: { column: 'lastChange', direction: 'DESC' }, page: 1,
+    hubId: initialHub?.id ?? '', repositories: 'all', query: '', sort: { column: 'lastChange', direction: 'DESC' }, page: 1,
   }))
   const [refreshKey, setRefreshKey] = useState(0)
   const [searchResetKey, setSearchResetKey] = useState(0)
   const { hubs, retry } = useDataHubs(refreshKey)
   const groups = useGroups(refreshKey)
   const projects = useProjectsPage({ hubId: view.hubId, groupId: view.group?.group.id }, {
-    page: view.page, search: view.query, orderBy: view.sort.column === 'title' ? 'name' : 'last_activity_at',
-    sort: view.sort.direction === 'ASC' ? 'asc' : 'desc', lastActivityAfter: view.recentAfter,
+    page: view.page, search: view.query,
+    orderBy: view.repositories === 'mostStarred' ? 'star_count'
+      : view.sort.column === 'title' ? 'name' : view.group ? 'last_activity_at' : 'updated_at',
+    sort: view.repositories === 'mostStarred' ? 'desc' : view.sort.direction === 'ASC' ? 'asc' : 'desc',
+    lastActivityAfter: view.recentAfter, membership: view.repositories === 'your' ? true : undefined,
   }, refreshKey)
   const current = now()
   const hubNames = useMemo(() => new Map(dataHubs.map(hub => [hub.id, hub.name])), [dataHubs])
@@ -69,10 +73,13 @@ function DataHubDashboard({ onArcClick, now = () => new Date() }: DataHubDashboa
   const loggedIn = dataHubs.some(hub => !!accounts[hub.id]?.session)
   const chips: { kind: FilterKind; label: string }[] = [{ kind: 'hub', label: 'DataHUB: ' + (hubNames.get(view.hubId) ?? view.hubId) }]
   if (view.group) chips.push({ kind: 'group', label: 'Group: ' + view.group.group.full_path })
+  if (view.repositories !== 'all') chips.push({ kind: 'repositories',
+    label: view.repositories === 'your' ? 'Your repositories' : 'Most Starred repositories' })
   if (view.query) chips.push({ kind: 'query', label: 'Search: “' + view.query + '”' })
   if (view.recentAfter) chips.push({ kind: 'recent', label: 'Active in the last 30 days' })
   const clearAll = () => {
-    setView(previous => ({ ...previous, hubId: initialHub?.id ?? '', group: undefined, query: '', recentAfter: undefined, page: 1 }))
+    setView(previous => ({ ...previous, hubId: initialHub?.id ?? '', group: undefined, repositories: 'all',
+      query: '', recentAfter: undefined, page: 1 }))
     setSearchResetKey(key => key + 1)
   }
   const removeChip = (kind: FilterKind) => {
@@ -82,6 +89,7 @@ function DataHubDashboard({ onArcClick, now = () => new Date() }: DataHubDashboa
       ...(kind === 'group' ? { group: undefined } : {}),
       ...(kind === 'query' ? { query: '' } : {}),
       ...(kind === 'recent' ? { recentAfter: undefined } : {}),
+      ...(kind === 'repositories' ? { repositories: 'all' as const } : {}),
     }))
   }
   return <main className={styles.main}>
@@ -99,9 +107,20 @@ function DataHubDashboard({ onArcClick, now = () => new Date() }: DataHubDashboa
           onToggle={hubId => setView(previous => ({ ...previous, hubId, group: undefined, page: 1 }))} />
         <WorkingGroupChart groups={groups} loggedIn={loggedIn} refreshKey={refreshKey} activeKey={view.group?.key}
           onSelect={group => setView(previous => ({ ...previous, hubId: group.hub.id,
-            group: previous.group?.key === group.key ? undefined : group, recentAfter: undefined, page: 1 }))} />
+            group: previous.group?.key === group.key ? undefined : group, repositories: 'all', recentAfter: undefined, page: 1 }))} />
       </div>
       <Stack>
+        <div className={styles.repositoryFilters}>
+          <span className={styles.repositoryLabel}>Repositories</span>
+          <SegmentedControl aria-label="Repositories" size="small" onChange={index => setView(previous => ({ ...previous,
+            repositories: (['all', 'your', 'mostStarred'] as const)[index], group: undefined,
+            sort: { column: 'lastChange', direction: 'DESC' }, page: 1 }))}>
+            <SegmentedControl.Button selected={view.repositories === 'all'}>All</SegmentedControl.Button>
+            <SegmentedControl.Button selected={view.repositories === 'your'}>Your</SegmentedControl.Button>
+            <SegmentedControl.Button selected={view.repositories === 'mostStarred'}>Most Starred</SegmentedControl.Button>
+          </SegmentedControl>
+          {view.group && <span className={styles.repositoryHint}>Choosing an option clears the organisation filter.</span>}
+        </div>
         <ArcFilterBar key={searchResetKey} query={view.query}
           onSearch={query => setView(previous => ({ ...previous, query, page: 1 }))} recent={!!view.recentAfter}
           allowRecent={!view.group} onRecentToggle={() => setView(previous => ({ ...previous, page: 1,
@@ -114,10 +133,11 @@ function DataHubDashboard({ onArcClick, now = () => new Date() }: DataHubDashboa
         </section>}
         {projects.status === 'error' && <Banner variant="critical" title="Could not load ARCs" description={projects.error}
           primaryAction={<Banner.PrimaryAction onClick={projects.retry}>Retry ARCs</Banner.PrimaryAction>} />}
-        {projects.status === 'success' && <ArcsTable arcs={arcs} hubNames={hubNames} sort={view.sort} now={current}
+        {projects.status === 'success' && <ArcsTable arcs={arcs} hubNames={hubNames}
+          sort={view.repositories === 'mostStarred' ? undefined : view.sort} now={current}
           pagination={projects.result.data} onPageChange={page => setView(previous => ({ ...previous, page }))}
           onSortChange={sort => setView(previous => ({ ...previous, sort, page: 1 }))}
-          onClearFilters={view.group || view.query || view.recentAfter ? clearAll : undefined}
+          onClearFilters={view.group || view.repositories !== 'all' || view.query || view.recentAfter ? clearAll : undefined}
           onOpen={arc => onArcClick(arc.url, arc.title, arc.projectId, projects.hub!)} />}
         {!initialHub && <p>No DataHUBs configured.</p>}
       </Stack>

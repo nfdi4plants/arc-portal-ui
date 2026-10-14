@@ -31,6 +31,18 @@ describe('GitLab projects API', () => {
     expect(new Headers(fetchMock.mock.calls[0][1]?.headers).has('PRIVATE-TOKEN')).toBe(false)
   })
 
+  it('requests one authenticated membership page ordered by last update', async () => {
+    await listProjects(source, { fetchCall: fetchMock, token: 'runtime-token', membership: true,
+      orderBy: 'updated_at', sort: 'desc', page: 2, perPage: 25 })
+    expect(requestedUrl().pathname).toBe('/api/v4/projects')
+    expect(Object.fromEntries(requestedUrl().searchParams)).toEqual({
+      membership: 'true', order_by: 'updated_at', sort: 'desc', page: '2', per_page: '25',
+    })
+    expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get('PRIVATE-TOKEN')).toBe('runtime-token')
+    expect(fetchMock.mock.calls[0][1]?.method ?? 'GET').toBe('GET')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it('requests public projects in descending star order, including archives, even after login', async () => {
     await getTopStarredProjects(source, { fetchCall: fetchMock, token: 'runtime-token' })
     expect(Object.fromEntries(requestedUrl().searchParams)).toEqual({
