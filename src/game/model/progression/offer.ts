@@ -1,4 +1,4 @@
-import type { PowerUpCard, Rarity, RollOffer } from '../../contracts/progression'
+import type { PlayerBuild, PowerUpCard, Rarity, RollOffer } from '../../contracts/progression'
 import { canApply } from './build'
 import { CARDS } from './catalog'
 
@@ -16,18 +16,32 @@ for (const card of [...CARDS].sort(byId)) {
   CARDS_BY_RARITY[card.rarity].push(card)
 }
 
-// Cumulative thresholds: 0.5% legendary, 7.5% rare, 22% uncommon, 70% common.
-function rollRarity(r: number): Rarity {
-  if (r < 0.005) return 'legendary'
-  if (r < 0.08) return 'rare'
-  if (r < 0.3) return 'uncommon'
+// Legendary odds per card: 0.5% normally. Until the first legendary is taken, every level-up after
+// the first adds LEGENDARY_PITY_STEP, up to LEGENDARY_PITY_MAX, so most runs see one early.
+const LEGENDARY_BASE = 0.005
+const LEGENDARY_PITY_STEP = 0.04
+const LEGENDARY_PITY_MAX = 0.3
+
+export function legendaryChance(build: PlayerBuild): number {
+  if (build.legendaries.length > 0) return LEGENDARY_BASE
+  return Math.min(LEGENDARY_PITY_MAX, LEGENDARY_BASE + LEGENDARY_PITY_STEP * Math.max(0, build.level - 2))
+}
+
+// Below the legendary chance the roll is legendary. The rest splits 7.5 : 22 : 70 into rare,
+// uncommon and common, which is 7.5%, 22% and 70% at the base legendary chance.
+function rollRarity(r: number, legendary: number): Rarity {
+  if (r < legendary) return 'legendary'
+  const rest = ((r - legendary) / (1 - legendary)) * 0.995
+  if (rest < 0.075) return 'rare'
+  if (rest < 0.295) return 'uncommon'
   return 'common'
 }
 
 export const rollOffer: RollOffer = (build, rng) => {
   const offer: PowerUpCard[] = []
+  const legendary = legendaryChance(build)
   for (let slot = 0; slot < build.offerSize; slot++) {
-    const start = STEP_DOWN.indexOf(rollRarity(rng.next()))
+    const start = STEP_DOWN.indexOf(rollRarity(rng.next(), legendary))
     let candidates: PowerUpCard[] = []
     for (const rarity of STEP_DOWN.slice(start)) {
       candidates = CARDS_BY_RARITY[rarity].filter((card) => !offer.includes(card) && canApply(build, card.id))

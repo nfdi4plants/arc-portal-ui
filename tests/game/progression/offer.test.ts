@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { PlayerBuild, Rarity } from '../../../src/game/contracts/progression'
 import { createRng } from '../../../src/game/contracts/rng'
 import { applyCard, canApply, createBuild, rollOffer } from '../../../src/game/model/progression'
+import { legendaryChance } from '../../../src/game/model/progression/offer'
 
 const offeredIds = (build: PlayerBuild, rolls: number, seed: string): Set<string> => {
   const rng = createRng(seed)
@@ -61,5 +62,28 @@ describe('rollOffer', () => {
     expect(Math.abs(share('rare') - 0.075)).toBeLessThanOrEqual(0.005)
     expect(counts.legendary).toBeGreaterThan(0)
     expect(share('legendary')).toBeLessThan(0.01)
+  })
+
+  it('raises the legendary chance each level until the first legendary is taken', () => {
+    const atLevel = (level: number) => ({ ...createBuild(), level })
+    expect(legendaryChance(atLevel(2))).toBeCloseTo(0.005)
+    expect(legendaryChance(atLevel(5))).toBeGreaterThan(legendaryChance(atLevel(4)))
+    expect(legendaryChance(atLevel(50))).toBeCloseTo(0.3)
+    const holder = { ...applyCard(createBuild(), 'legendary.gitRevert'), level: 8 }
+    expect(legendaryChance(holder)).toBeCloseTo(0.005)
+  })
+
+  it('offers a legendary in most runs by level 6 when none was taken', () => {
+    let runsWithOne = 0
+    for (let run = 0; run < 1000; run++) {
+      const rng = createRng(`pity-${run}`)
+      for (let level = 2; level <= 6; level++) {
+        if (rollOffer({ ...createBuild(), level }, rng).some((card) => card.rarity === 'legendary')) {
+          runsWithOne += 1
+          break
+        }
+      }
+    }
+    expect(runsWithOne).toBeGreaterThan(600)
   })
 })
