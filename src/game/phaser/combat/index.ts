@@ -83,6 +83,8 @@ export function createCombatWorld(scene: Phaser.Scene, options: CombatWorldOptio
       knockback: mirrorKnockback(attack.spec.knockback, attack.facing),
       tags: [...(attack.spec.tags ?? [])],
     }
+    // Targets react more mildly to shots than to strikes, so every projectile hit says it is one.
+    if ('sprite' in attack && !event.tags.includes('projectile')) event.tags.push('projectile')
     const taken = target.receiveHit(event)
     if (typeof taken === 'number') event.damage = taken
     hitStopMs = Math.max(hitStopMs, attack.spec.hitStopMs)
