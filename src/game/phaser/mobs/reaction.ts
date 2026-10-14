@@ -30,3 +30,10 @@ export function hitReaction(input: ReactionInput): Reaction {
   if (input.body === 'turret' && !input.heavy) staggerMs = 0
   return { knockbackScale, launch: Math.round(launch), staggerMs: Math.round(staggerMs) }
 }
+
+// A light shot only hurts the mob: no stun, stagger or push, so firing from afar does not lock
+// mobs down the way a strike up close does. A heavy shot (the mage stands still to fire it) reacts
+// like a heavy strike.
+export function shrugsOff(tags: readonly string[]): boolean {
+  return tags.includes('projectile') && !tags.includes('heavy')
+}

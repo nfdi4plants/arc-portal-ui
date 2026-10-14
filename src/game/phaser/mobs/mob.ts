@@ -1,10 +1,11 @@
 import Phaser from 'phaser'
 import type { SpriteRef } from '../../contracts/art'
-import type { Combatant, CombatWorld, HitEvent } from '../../contracts/combat'
+import type { Combatant, CombatWorld, HitEvent, StatusEffect } from '../../contracts/combat'
 import { DEPTH, PALETTE } from '../../contracts/constants'
 import type { EnemyWeaponKind, MonsterSpec } from '../../contracts/content'
 import { SUMMONED_SUFFIX } from '../../model/content'
-import { MINION_ID_SUFFIX, applySpriteRef } from '../art'
+import { MINION_ID_SUFFIX, applySpriteRef, monsterWeapon } from '../art'
+import { addStatus, clearStatus, createStatus, statusTimeScale, tickStatus } from '../combat/status'
 import { bodyOf, isOneWay } from '../player/oneWay'
 import { aimVelocity, lobFlightS, lobVelocity } from './aim'
 import type { Vec } from './aim'
@@ -19,7 +20,7 @@ import { approach, blinkDestination } from './motion'
 import { createFlimmer } from './phantom'
 import type { Flimmer } from './phantom'
 import { dropShieldFragment } from './pickups'
-import { hitReaction } from './reaction'
+import { hitReaction, shrugsOff } from './reaction'
 import { createStance, stanceMods, stepStance } from './stance'
 import type { StanceMods } from './stance'
 import {
@@ -58,6 +59,7 @@ import {
   MINION_HP_SHARE,
   PATROL_RADIUS,
   PROJECTILE_KNOCKBACK,
+  PROVOKE_MS,
   RANGED,
   SQUASH_MS,
   STAGGER_RECOVER_MS,
@@ -65,6 +67,8 @@ import {
   WANDER_RADIUS,
 } from './tuning'
 import type { Mob, MobDeps } from './types'
+import { WEAPON_KICK_MS, meleeLunge, poseWeapon } from './weaponPose'
+import type { WeaponPose, WeaponPoseInput } from './weaponPose'
 
 const xpByMob = new WeakMap<Combatant, number>()
 // Bodies of awake mobs per combat world, so a hit-stop can hold all of them in place.
@@ -73,7 +77,9 @@ let nextId = 1
 
 const NEUTRAL: StanceMods = { speed: 1, cooldown: 1, damageTaken: 1 }
 const ZERO: Vec = { x: 0, y: 0 }
-const TINT = { hit: 0xffffff, windup: 0xff7a3d, blink: 0xbfe9ff, aggressive: 0xff9d90, defensive: 0x93b4ff } as const
+const TINT = { hit: 0xffffff, windup: 0xff7a3d, blink: 0xbfe9ff, aggressive: 0xff9d90, defensive: 0x93b4ff, frozen: 0x8fd0ff, slowed: 0xc6e4f5 } as const
+// How fast a frozen mob brakes to a stop, world units per second squared.
+const FREEZE_BRAKE = 2400
 
 // A phantom's body is almost invisible. It shows fully while it attacks, briefly when it is hit and
 // halfway during the pause inspection, so the player can tell what they hit and what the panel means.
@@ -98,6 +104,11 @@ const DIVE_FACTOR = 2.6
 const DIVE_MS = 900
 const STEPS_PER_PROBE = 3
 const RANGED_RECOVER_MS = 250
+// Squash of a light shot, which hurts without stunning or pushing.
+const SHOT_SQUASH = 0.35
+// A ranged weapon turns at most this far up or down to point at the player, in radians.
+const AIM_UP = -1.1
+const AIM_DOWN = 1
 // World units a mob must be inside the view edge before it may start an attack.
 const ON_SCREEN_MARGIN = 12
 
@@ -198,6 +209,29 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
   const baseScaleX = sprite.scaleX
   const baseScaleY = sprite.scaleY
 
+  // The weapon is a sprite of its own held at the hand, so it can swing. It shares the body's
+  // depth, alpha and tint and is drawn after it, in front.
+  const weaponRef = monsterWeapon(scene, spec)
+  const hand = ref.anchors.weapon
+  const weaponSprite = scene.add.sprite(x, startFeetY, weaponRef.textureKey).setDepth(DEPTH.enemies)
+  applySpriteRef(weaponSprite, weaponRef)
+  weaponSprite.setOrigin(weaponRef.originX, weaponRef.originY)
+  if (phantom) weaponSprite.setAlpha(PHANTOM_ALPHA)
+  const weaponScaleX = weaponSprite.scaleX
+  const weaponScaleY = weaponSprite.scaleY
+  const pose: WeaponPose = { angle: weaponRef.rest, dx: 0, dy: 0, scale: 1, visible: true }
+  const poseInput: WeaponPoseInput = {
+    kind: weapon.kind,
+    stage: 'rest',
+    t: 0,
+    length: weaponRef.length,
+    rest: weaponRef.rest,
+    aim: 0,
+    // The melee hitbox spans from the body to halfW + range, so the strike reaches its far end.
+    lunge: isMelee(weapon.kind) ? meleeLunge(halfW + weapon.range, hand.x, weaponRef.tip, weaponRef.length) : 0,
+    sway: 0,
+  }
+
   // A one-way platform only stops a body that was above it on the previous step.
   const processCollision = (a: unknown, b: unknown): boolean => {
     const other = bodyOf(a === body ? b : a)
@@ -224,6 +258,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     contactMs: 0,
     attackCdMs: rng.int(0, Math.min(800, weapon.cooldownMs)),
     phaseMs: 0,
+    phaseTotalMs: 1,
     targetVx: 0,
     wanderMs: rng.int(300, 1500),
     hopMs: rng.int(200, 900),
@@ -241,6 +276,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     blinkCy: 0,
     chatterMs: 0,
     staggerMs: 0,
+    provokedMs: 0,
     squashMs: 0,
     tiltDir: 1,
     squashAmount: 0,
@@ -249,7 +285,11 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     stepMs: 0,
     airMs: 0,
     deathFrom: 1,
+    // The share of its own speed the mob runs at: 0 while frozen, below 1 while slowed.
+    timeScale: 1,
   }
+  // Freezes and slows from the mage's abilities.
+  const status = createStatus()
   let facing: 1 | -1 = 1
   let flipped = false
   let asleep = false
@@ -318,7 +358,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     st.dx = st.px - cx()
     const dyc = st.pcy - cy()
     const range = stats.aggroRange * (aggro ? AGGRO_RELEASE : 1)
-    aggro = !player.isDead() && st.dx * st.dx + dyc * dyc <= range * range
+    aggro = !player.isDead() && (st.provokedMs > 0 || st.dx * st.dx + dyc * dyc <= range * range)
   }
 
   // True when the walker has to stop or turn at the edge ahead of it. The probes refresh every few steps.
@@ -394,7 +434,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
   }
 
   function thinkGround(dt: number) {
-    const speed = stats.speed * mods.speed
+    const speed = stats.speed * mods.speed * st.timeScale
     if (st.stunMs > 0 || st.blinkMs > 0 || phase !== 'idle') {
       st.targetVx = 0
       return
@@ -510,7 +550,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
   }
 
   function thinkFlying(dt: number) {
-    const speed = stats.speed * mods.speed
+    const speed = stats.speed * mods.speed * st.timeScale
     const seconds = dt / 1000
     if (st.stunMs > 0 || st.blinkMs > 0) {
       body.setVelocity(approach(body.velocity.x, 0, 600 * seconds), approach(body.velocity.y, 0, 600 * seconds))
@@ -591,6 +631,13 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     body.setVelocity(approach(body.velocity.x, vx * slow, 900 * seconds), vy * slow)
   }
 
+  // A frozen mob stops where it is. A flyer hangs in the air, a walker still falls.
+  function holdFrozen(dt: number) {
+    const brake = FREEZE_BRAKE * (dt / 1000)
+    body.velocity.x = approach(body.velocity.x, 0, brake)
+    if (flies) body.velocity.y = approach(body.velocity.y, 0, brake)
+  }
+
   function applyGroundVelocity(dt: number) {
     // Slimes and imps commit to a hop, everyone else steers a little in the air.
     const airAccel = spec.body === 'slime' || spec.body === 'imp' ? 0 : 500
@@ -627,6 +674,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
         fire()
         phase = 'recover'
         st.phaseMs = isMelee(weapon.kind) ? MELEE[weapon.kind].recoverMs : RANGED_RECOVER_MS
+        st.phaseTotalMs = st.phaseMs
       }
       return
     }
@@ -640,6 +688,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     faceTarget()
     phase = 'windup'
     st.phaseMs = windupMs()
+    st.phaseTotalMs = st.phaseMs
   }
 
   // Mobs stay awake well beyond the screen edge, and ranged weapons reach further than a small
@@ -678,8 +727,15 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
   function fireRanged(kind: RangedKind) {
     const tune = RANGED[kind]
     faceTarget()
-    const anchor = ref.anchors.weapon
-    const origin = { x: cx() + facing * anchor.x, y: feetY() + anchor.y }
+    // The shot leaves from the weapon's business end where the windup left it.
+    aimWeapon()
+    poseInput.stage = 'windup'
+    poseInput.t = 1
+    poseWeapon(pose, poseInput)
+    const origin = {
+      x: cx() + facing * (hand.x + pose.dx + Math.cos(pose.angle) * weaponRef.tip),
+      y: feetY() + hand.y + pose.dy + Math.sin(pose.angle) * weaponRef.tip,
+    }
     const playerVelocity = weapon.calibrated ? player.velocity() : ZERO
     projectileRef ??= art.projectile(scene, tune.art)
     const size = { w: tune.size.w * weapon.scale, h: tune.size.h * weapon.scale }
@@ -934,16 +990,25 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     const flicker = Math.floor(st.clockMs / 60) % 2 === 0
     let code = 0
     if (st.flashMs > 0) code = 1
+    else if (status.freezeMs > 0) code = 6
     else if ((phase === 'windup' || charge === 'windup') && flicker) code = 2
     else if (st.blinkMs > 0 && flicker) code = 3
+    else if (status.slowMs > 0) code = 7
     else if (stance) code = stance.aggressive ? 4 : 5
     if (code === tintCode) return
     tintCode = code
-    if (code === 0) sprite.clearTint()
-    else if (code === 1) sprite.setTint(TINT.hit).setTintMode(Phaser.TintModes.FILL)
-    else if (code === 2) sprite.setTint(TINT.windup).setTintMode(Phaser.TintModes.FILL)
-    else if (code === 3) sprite.setTint(TINT.blink).setTintMode(Phaser.TintModes.FILL)
-    else sprite.setTint(code === 4 ? TINT.aggressive : TINT.defensive).setTintMode(Phaser.TintModes.MULTIPLY)
+    paint(sprite, code)
+    paint(weaponSprite, code)
+  }
+
+  function paint(target: Phaser.GameObjects.Sprite, code: number) {
+    if (code === 0) target.clearTint()
+    else if (code === 1) target.setTint(TINT.hit).setTintMode(Phaser.TintModes.FILL)
+    else if (code === 2) target.setTint(TINT.windup).setTintMode(Phaser.TintModes.FILL)
+    else if (code === 3) target.setTint(TINT.blink).setTintMode(Phaser.TintModes.FILL)
+    else if (code === 6) target.setTint(TINT.frozen).setTintMode(Phaser.TintModes.MULTIPLY)
+    else if (code === 7) target.setTint(TINT.slowed).setTintMode(Phaser.TintModes.MULTIPLY)
+    else target.setTint(code === 4 ? TINT.aggressive : TINT.defensive).setTintMode(Phaser.TintModes.MULTIPLY)
   }
 
   function updateDizzy() {
@@ -992,10 +1057,52 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     }
   }
 
+  // Points a ranged weapon at the player, within what a hand can turn.
+  function aimWeapon() {
+    const hx = cx() + facing * hand.x
+    const hy = feetY() + hand.y
+    poseInput.aim = clamp(Math.atan2(st.pcy - hy, Math.abs(st.px - hx)), AIM_UP, AIM_DOWN)
+  }
+
+  // Follows the attack phases: the windup rears back, the strike runs while the melee hitbox is
+  // live (or the shot kicks), the rest of the recovery returns to rest.
+  function syncWeapon() {
+    poseInput.sway = Math.sin(st.clockMs * 0.004)
+    if (phase === 'windup') {
+      poseInput.stage = 'windup'
+      poseInput.t = 1 - st.phaseMs / st.phaseTotalMs
+      if (!isMelee(weapon.kind)) aimWeapon()
+    } else if (phase === 'recover') {
+      const strikeMs = Math.min(st.phaseTotalMs, isMelee(weapon.kind) ? MELEE[weapon.kind].activeMs : WEAPON_KICK_MS)
+      const elapsed = st.phaseTotalMs - st.phaseMs
+      if (elapsed < strikeMs) {
+        poseInput.stage = 'strike'
+        poseInput.t = elapsed / strikeMs
+      } else {
+        poseInput.stage = 'recover'
+        poseInput.t = (elapsed - strikeMs) / Math.max(1, st.phaseTotalMs - strikeMs)
+      }
+    } else if (charge === 'windup' || charge === 'run') {
+      poseInput.stage = 'brace'
+      poseInput.aim = 0
+    } else if (swoop === 'dive') {
+      poseInput.stage = 'brace'
+      poseInput.aim = clamp(Math.atan2(st.diveVy, Math.abs(st.diveVx)), AIM_UP, AIM_DOWN)
+    } else poseInput.stage = 'rest'
+    poseWeapon(pose, poseInput)
+    weaponSprite.setPosition(cx() + facing * (hand.x + pose.dx), feetY() + hand.y + pose.dy)
+    // A negative x scale mirrors the weapon around the hand, and mirroring flips the turn.
+    weaponSprite.setRotation(facing * pose.angle)
+    weaponSprite.setScale(facing * weaponScaleX * pose.scale, weaponScaleY * pose.scale)
+    if (weaponSprite.visible !== pose.visible) weaponSprite.setVisible(pose.visible)
+  }
+
   // Phantom
 
   function phantomAlpha(): number {
     if (phase !== 'idle' || charge !== 'none' || swoop === 'dive' || st.blinkMs > 0) return 1
+    // A frozen phantom shows, so the player sees what the freeze caught.
+    if (status.freezeMs > 0) return PHANTOM_REVEAL_ALPHA
     if (highlight > 0 || raised) return PHANTOM_INSPECT_ALPHA
     if (st.revealMs > 0 || st.flashMs > 0) return PHANTOM_REVEAL_ALPHA
     return PHANTOM_ALPHA
@@ -1006,6 +1113,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     if (next === shownAlpha) return
     shownAlpha = next
     sprite.setAlpha(next)
+    weaponSprite.setAlpha(next)
   }
 
   // Dust on every other footstep and where a hop or a fall ends, at a low alpha.
@@ -1055,7 +1163,9 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
       return
     }
     const grey = Math.round(0x18 + 0x40 * level)
-    sprite.setTint((grey << 16) | (grey << 8) | grey).setTintMode(Phaser.TintModes.ADD)
+    const tint = (grey << 16) | (grey << 8) | grey
+    sprite.setTint(tint).setTintMode(Phaser.TintModes.ADD)
+    weaponSprite.setTint(tint).setTintMode(Phaser.TintModes.ADD)
     tintCode = -2
   }
 
@@ -1064,6 +1174,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     if (destroyed) return
     raised = on
     sprite.setDepth(on ? INSPECT_DIM_DEPTH + 1 : DEPTH.enemies)
+    weaponSprite.setDepth(on ? INSPECT_DIM_DEPTH + 1 : DEPTH.enemies)
     flimmer?.setDepth(on ? INSPECT_DIM_DEPTH + 2 : DEPTH.enemies + 1)
     if (phantom) applyPhantomAlpha()
   }
@@ -1098,6 +1209,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
       st.deathFrom = Math.max(shownAlpha, PHANTOM_REVEAL_ALPHA)
       shownAlpha = st.deathFrom
       sprite.setAlpha(shownAlpha)
+      weaponSprite.setAlpha(shownAlpha)
       flimmer?.setVisible(false)
     }
     playFx(scene, art, 'death', cx(), feetY() - H / 2, Math.max(ref.width, ref.height) * 1.1)
@@ -1113,6 +1225,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     hideDizzy()
     dropBubble()
     sprite.setVisible(false)
+    weaponSprite.setVisible(false)
     flimmer?.setVisible(false)
   }
 
@@ -1144,11 +1257,14 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     st.stunMs = Math.max(0, st.stunMs - dt)
     st.flashMs = Math.max(0, st.flashMs - dt)
     st.staggerMs = Math.max(0, st.staggerMs - dt)
+    st.provokedMs = Math.max(0, st.provokedMs - dt)
     st.squashMs = Math.max(0, st.squashMs - dt)
 
     if (dead) {
       st.deathMs += dt
-      sprite.setAlpha(st.deathFrom * clamp(1 - st.deathMs / DEATH_MS, 0, 1))
+      const alpha = st.deathFrom * clamp(1 - st.deathMs / DEATH_MS, 0, 1)
+      sprite.setAlpha(alpha)
+      weaponSprite.setAlpha(alpha)
       updateMinions(dt)
       refreshTint()
       applySquash()
@@ -1161,21 +1277,26 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
       return
     }
 
+    tickStatus(status, dt)
+    st.timeScale = statusTimeScale(status)
+    const frozen = st.timeScale <= 0
     if (stance && stepStance(stance, dt)) mods = stanceMods(stance)
-    if (passive === 'summoner' && aggro && !summoned) summon()
-    if (passive === 'blink') updateBlink(dt)
+    if (!frozen && passive === 'summoner' && aggro && !summoned) summon()
+    if (!frozen && passive === 'blink') updateBlink(dt)
     // Before updateAttack, so a bomb launched in this step stays where it is. The combat world
-    // moves its projectile for the first time on the next step.
+    // moves its projectile for the first time on the next step. Bombs in flight keep flying.
     updateBombs(dt)
-    if (armed) updateAttack(dt)
+    // A slow stretches windups, recoveries and cooldowns along with the walk.
+    if (armed && !frozen) updateAttack(dt * st.timeScale)
 
-    if (flies) thinkFlying(dt)
+    if (frozen) holdFrozen(dt)
+    else if (flies) thinkFlying(dt)
     else {
       thinkGround(dt)
       applyGroundVelocity(dt)
     }
 
-    if (st.staggerMs <= 0) touchPlayer(dt)
+    if (st.staggerMs <= 0 && !frozen) touchPlayer(dt)
     if (launched) checkLanding(dt)
     if (passive === 'chatter') updateChatter(dt)
     if (minions.length > 0) updateMinions(dt)
@@ -1183,6 +1304,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     applySquash()
     updateDizzy()
     syncSprite()
+    syncWeapon()
     if (phantom) updatePhantom(dt)
   }
 
@@ -1194,11 +1316,14 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     if (dead) return
     if (next) {
       cancelAttacks()
+      clearStatus(status)
+      st.timeScale = 1
       hideDizzy()
       st.staggerMs = 0
       dropBubble()
       leaveWorld()
       sprite.setActive(false)
+      weaponSprite.setActive(false)
       flimmer?.setVisible(false)
       return
     }
@@ -1210,6 +1335,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     awake.add(body)
     combat.register(mob)
     sprite.setActive(true)
+    weaponSprite.setActive(true)
     flimmer?.setVisible(true)
     applyInspect()
   }
@@ -1230,6 +1356,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     for (const collider of colliders) collider.destroy()
     body.destroy()
     sprite.destroy()
+    weaponSprite.destroy()
     ghost?.destroy()
     flimmer?.destroy()
     for (const star of dizzyStars ?? []) star.destroy()
@@ -1262,6 +1389,15 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
         die()
         return damage
       }
+      if (shrugsOff(hit.tags)) {
+        st.flashMs = HIT_FLASH_MS
+        st.revealMs = PHANTOM_REVEAL_MS
+        st.provokedMs = PROVOKE_MS
+        st.squashMs = SQUASH_MS
+        st.squashAmount = SHOT_SQUASH
+        st.tiltDir = hit.knockback.x >= 0 ? 1 : -1
+        return damage
+      }
       const reaction = hitReaction({
         size: spec.size,
         body: spec.body,
@@ -1271,6 +1407,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
       })
       st.flashMs = HIT_FLASH_MS
       st.revealMs = PHANTOM_REVEAL_MS
+      st.provokedMs = PROVOKE_MS
       st.stunMs = Math.max(HIT_STUN_MS, reaction.staggerMs)
       st.squashMs = SQUASH_MS
       st.squashAmount = reaction.staggerMs > 0 ? 1 : 0.5
@@ -1296,6 +1433,12 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
       }
       return damage
     },
+    // A freeze breaks the attack in progress. Bombs already thrown keep flying.
+    applyStatus(effect: StatusEffect) {
+      if (dead || asleep) return
+      addStatus(status, effect, false)
+      if (status.freezeMs > 0) interruptAttack()
+    },
     update,
     setAsleep,
     setInspectable,
@@ -1311,5 +1454,6 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
   combat.register(mob)
   scene.events.once('shutdown', onShutdown)
   syncSprite()
+  syncWeapon()
   return mob
 }

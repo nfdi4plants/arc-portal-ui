@@ -1,46 +1,43 @@
 import Phaser from 'phaser'
-import type { ScribbleArt } from '../../contracts/art'
+import type { ScribbleArt, SpriteRef } from '../../contracts/art'
 import type { CombatWorld, HitEvent } from '../../contracts/combat'
 import { DEPTH, MAGE_FRAME, MAGE_TEXTURE, PALETTE, PLAYER_HEIGHT } from '../../contracts/constants'
 import type { Action, InputFrame } from '../../contracts/input'
 import type { AbilityHandler, AttackContext, PlayerEvents, PlayerHandle, WeaponMoveset } from '../../contracts/player'
 import type { PlayerBuild, PlayerWeaponId, WeaponSlot } from '../../contracts/progression'
-import { EMPTY_MOTOR_INPUT, JUMP_VELOCITY, MOTOR, availableJump, canDash, createMotorState, runSpeed, stepMotor } from '../../model/input/motor'
+import { EMPTY_MOTOR_INPUT, JUMP_VELOCITY, MOTOR, createMotorState, plungeBounced, runSpeed } from '../../model/input/motor'
 import type { MotorEnv, MotorInput, MotorState } from '../../model/input/motor'
 import type { InputLayer } from '../input/InputLayer'
 import { applySpriteRef } from '../art'
 import { createAttackMachine } from './attacks'
 import type { AttackPhase } from './attacks'
+import { createControls, lungeVelocity } from './controls'
 import { bodyOf, isOneWay } from './oneWay'
 import { staffMoveset } from './staffMoveset'
+import { heldSlot, holdOf, weaponPose } from './weaponPose'
+import type { PosedAttack, WeaponHold, WeaponPose } from './weaponPose'
 import { airHeavyOf, dashHeavyOf, dashLightOf, upHeavyOf, upLightOf } from './weapons/variants'
 
 export const PLAYER_HURTBOX = { width: 18, height: 42 }
 const DAMAGE_IFRAMES_MS = 700
 const FLINCH_MS = 180
 const DROP_THROUGH_MS = 150
-const ATTACK_GROUND_SPEED = 0.3
 const ABILITY_ACTIONS: readonly Action[] = ['ability1', 'ability2', 'ability3', 'ability4']
 const GHOST_COUNT = 6
 const MAX_SHIELDS = 3
 const GHOST_LIFE_MS = 180
 const GHOST_INTERVAL_MS = 28
-// An attack pressed this long after a dash ended still plays the dash variant.
-const DASH_ATTACK_GRACE_MS = 80
 // The fall speed a hovering move holds the mage at.
 const HOVER_FALL_SPEED = 30
 // An up heavy in the air rises a little instead of plunging.
 const RISING_HOP_SPEED = 260
-// The bounce after an air heavy hit launches at this share of a jump's speed. Height scales with
-// the square, so the peak is 0.55^2 = about 30% of a full jump (3.5 tiles), roughly 1 tile.
-export const PLUNGE_BOUNCE_FACTOR = 0.55
-const NO_HELD: ReadonlySet<string> = new Set()
 // The swing smear: alpha of each copy, newest first. Light moves use the first three.
 const SMEAR_ALPHA = [0.25, 0.17, 0.1, 0.05]
 const SMEAR_LIGHT_COUNT = 3
 const SMEAR_FADE_MS = 90
 // Weapons that shoot. Their moves get no smear, only their projectile art.
 const RANGED_WEAPONS: ReadonlySet<PlayerWeaponId> = new Set(['wand', 'pipettePistol', 'centrifugeDisc'])
+const WEAPON_SLOTS: readonly WeaponSlot[] = ['light', 'heavy']
 
 export interface PlayerDeps {
   combat: CombatWorld
@@ -102,6 +99,8 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
   let lastVy = 0
   let flinchMs = 0
   let damageIframesMs = 0
+  // Hits miss while this runs (blockHits).
+  let blockMs = 0
   let dropMs = 0
   let standingOnOneWay = false
   let aim = { x, y }
@@ -111,8 +110,7 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
   const movesets = new Map<PlayerWeaponId, WeaponMoveset>([['staff', staffMoveset]])
   const listeners = new Map<keyof PlayerEvents, Set<(payload: never) => void>>()
   const hurtbox = new Phaser.Geom.Rectangle(0, 0, W, H)
-  const attackPressed = { light: false, heavy: false }
-  const attackEnv = { grounded: false, attackSpeed: 1, canStart: false, dashing: false, up: false }
+  const presses = { light: false, heavy: false, up: false }
   // Used on the down + jump step, so the jump press does not reach the motor.
   const dropPressed = new Set<string>()
   const dropInput: { held: ReadonlySet<string>; pressed: ReadonlySet<string>; released: ReadonlySet<string> } = {
@@ -129,14 +127,6 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
   const mergedFrame: InputFrame = { held: mergedPressed, pressed: mergedPressed, released: mergedReleased, aim: { x, y } }
   // The held set of the step an attack started in, kept past the step for attackStarted listeners.
   const attackHeld = new Set<Action>()
-  // What the motor reads during an attack lock: no direction held, while jump and dash presses
-  // still fill their buffers, so a jump pressed at the end of the lock fires when it ends.
-  const lockedInput: { held: ReadonlySet<string>; pressed: ReadonlySet<string>; released: ReadonlySet<string> } = {
-    held: NO_HELD,
-    pressed: NO_HELD,
-    released: NO_HELD,
-  }
-  let sinceDashMs = Infinity
   // The dash speed a dash attack with keepsMomentum carries, 0 for any other attack.
   let momentumVx = 0
   let lockShown = false
@@ -171,15 +161,27 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
   const smears = Array.from({ length: SMEAR_ALPHA.length }, () =>
     scene.add.image(0, 0, MAGE_TEXTURE).setOrigin(0.5, 1).setTint(PALETTE.cream).setVisible(false),
   )
-  const showWeapon = () => {
-    const { id, tier } = build.weapons.light
-    if (weaponShown === `${id}:${tier}`) return
-    weaponShown = `${id}:${tier}`
-    applySpriteRef(weapon, deps.art.playerWeapon(scene, id, tier))
+  // The art and hold of both slots, looked up when the build changes. A heavy move swaps the
+  // sprite to the heavy weapon and back, so the render loop only compares texture keys.
+  const weaponRefs: Record<WeaponSlot, SpriteRef | null> = { light: null, heavy: null }
+  const weaponHolds: Record<WeaponSlot, WeaponHold> = { light: 'swing', heavy: 'swing' }
+  const showWeapon = (slot: WeaponSlot) => {
+    const ref = weaponRefs[slot]
+    if (!ref || weaponShown === ref.textureKey) return
+    weaponShown = ref.textureKey
+    applySpriteRef(weapon, ref)
     weaponScaleX = Math.abs(weapon.scaleX)
     for (const smear of smears) smear.setTexture(weapon.texture.key, weapon.frame.name).setScale(weapon.scaleX, weapon.scaleY)
   }
-  showWeapon()
+  const readWeapons = () => {
+    for (const slot of WEAPON_SLOTS) {
+      const { id, tier } = build.weapons[slot]
+      weaponRefs[slot] = deps.art.playerWeapon(scene, id, tier)
+      weaponHolds[slot] = holdOf(id)
+    }
+  }
+  readWeapons()
+  showWeapon('light')
   const container = scene.add.container(x, y, [...smears, weapon, mage]).setDepth(DEPTH.player)
 
   // A fixed pool for the dash smear, reused in turn.
@@ -230,13 +232,13 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
         if (move.keepsMomentum) momentumVx = motor.dashDir * speed * MOTOR.dashSpeedFactor
         else motor.vx = motor.dashDir * speed
         motor.dashMs = 0
-        sinceDashMs = Infinity
+        controls.endDashGrace()
       }
       emit('attackStarted', { slot, comboIndex, move, held: attackHeld, variant })
     },
     onActive(slot, comboIndex, move) {
       move.onActive(contextFor(build.weapons[slot].tier))
-      if (move.lunge) motor.vx = motor.facing * move.lunge
+      if (move.lunge) motor.vx = lungeVelocity(move.lunge, motor.facing, held.has('left'), held.has('right'), grounded, motor.vx)
       if (slot === 'heavy' && !grounded && attacks.current()?.variant === 'up') motor.vy = Math.min(motor.vy, -RISING_HOP_SPEED)
       emit('attackActive', { slot, comboIndex, move })
     },
@@ -244,6 +246,8 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
       move.onLand?.(contextFor(build.weapons[slot].tier))
     },
   })
+
+  const controls = createControls(motor, motorEnv, attacks)
 
   // Velocity the current move takes over from the motor: a plunge falls straight, a dash attack
   // keeps the dash speed, a hover holds the fall.
@@ -344,6 +348,7 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
     aim = frame.aim
     flinchMs = Math.max(0, flinchMs - dt)
     damageIframesMs = Math.max(0, damageIframesMs - dt)
+    blockMs = Math.max(0, blockMs - dt)
     dropMs = Math.max(0, dropMs - dt)
     for (let i = 0; i < abilityCooldowns.length; i++) abilityCooldowns[i] = Math.max(0, abilityCooldowns[i] - dt)
 
@@ -369,50 +374,23 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
       input = dropInput
     }
 
-    motorEnv.actionsLocked = false
-    motorEnv.speedScale = 1
-    if (attacks.canCancel()) {
-      const wantsJump = (input.pressed.has('jump') || motor.jumpBufferMs > 0) && availableJump(motor, motorEnv) !== null
-      const wantsDash = (input.pressed.has('dash') || motor.dashBufferMs > 0) && canDash(motor, motorEnv)
-      if (wantsJump || wantsDash) attacks.cancel()
-    }
-    // A dash and an attack pressed on the same step: the dash starts first and the attack waits in
-    // the buffer for the next step, where it plays the dash variant.
-    const dashStarting =
-      controllable && (input.pressed.has('dash') || motor.dashBufferMs > 0) && !attacks.isLocked() && canDash(motor, motorEnv)
-    attackPressed.light = controllable && frame.pressed.has('light')
-    attackPressed.heavy = controllable && frame.pressed.has('heavy')
-    attackEnv.grounded = grounded
-    attackEnv.attackSpeed = build.stats.attackSpeed
-    attackEnv.canStart = controllable && !dashStarting
-    attackEnv.dashing = motor.dashMs > 0 || sinceDashMs < DASH_ATTACK_GRACE_MS || dashStarting
-    attackEnv.up = frame.held.has('up') && !frame.held.has('down')
-    attacks.step(dt, attackPressed, attackEnv)
-
-    const locked = attacks.lockRemainingMs() > 0
-    if (locked && !lockShown) showLock()
-    lockShown = locked
-    if (locked && controllable) {
-      lockedInput.pressed = input.pressed
-      lockedInput.released = input.released
-      input = lockedInput
-    }
-
     if (controllable) {
       for (let slot = 0; slot < ABILITY_ACTIONS.length; slot++) {
         const handler = abilityHandlers[slot]
         if (!handler || !frame.pressed.has(ABILITY_ACTIONS[slot]) || abilityCooldowns[slot] > 0) continue
-        handler.activate(contextFor(1))
+        if (handler.activate(contextFor(1)) === false) continue
         abilityCooldowns[slot] = handler.cooldownMs
       }
     }
 
-    motorEnv.actionsLocked = attacks.isLocked()
-    motorEnv.speedScale = attacks.phase() !== 'idle' && grounded ? ATTACK_GROUND_SPEED : 1
-    stepMotor(motor, input, motorEnv, dt, motor)
+    presses.light = frame.pressed.has('light')
+    presses.heavy = frame.pressed.has('heavy')
+    presses.up = frame.held.has('up') && !frame.held.has('down')
+    controls.step(input, presses, controllable, build.stats.attackSpeed, dt)
+    const locked = attacks.lockRemainingMs() > 0
+    if (locked && !lockShown) showLock()
+    lockShown = locked
     steerAttack()
-    if (motor.dashMs > 0) sinceDashMs = 0
-    else sinceDashMs += dt
     if (motor.dashed) {
       emit('dashed', { direction: motor.dashDir })
       ghostMs = 0
@@ -479,6 +457,8 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
     }
   }
 
+  const pose: WeaponPose = { x: 0, y: 0, angle: 0, poke: 0, visible: true }
+  const posed: PosedAttack = { heavy: false, variant: 'ground', plunge: false, spin: false, hold: 'swing' }
   const onRender = (_time: number, delta: number) => {
     if (destroyed) return
     container.setPosition(body.center.x, body.bottom)
@@ -504,29 +484,27 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
 
     const attack = attacks.current()
     const phase = attacks.phase()
-    let poke = 0
-    if (attack && phase === 'startup') poke = -0.4
-    else if (attack && phase === 'active') poke = 1
-    else if (attack && phase === 'recovery') poke = 0.4
     const heavy = attack?.slot === 'heavy'
-    const variant = attack?.variant
-    const up = variant === 'up'
+    const up = attack?.variant === 'up'
+    if (attack) {
+      posed.heavy = heavy
+      posed.variant = attack.variant
+      posed.plunge = attack.move.plunge !== undefined
+      posed.spin = attack.move.spin === true
+      posed.hold = weaponHolds[attack.slot]
+    }
+    // The move's own clock stops in hit-stop, so a spin stops with it.
+    const { poke } = weaponPose(attack ? posed : null, phase, attacks.moveElapsedMs(), pose)
 
     mage.setPosition(0, bob)
     mage.setScale(baseScale * squashX * motor.facing, baseScale * squashY * breathe)
     mage.setRotation(lean + (poke > 0 && !up ? poke * 0.08 * motor.facing : 0))
 
-    weapon.setPosition(motor.facing * (up ? 4 : 8 + poke * 8), -12 + bob - (up ? Math.max(0, poke) * 8 : 0))
+    showWeapon(heldSlot(attack))
+    weapon.setVisible(pose.visible)
+    weapon.setPosition(motor.facing * pose.x, pose.y + bob)
     weapon.scaleX = weaponScaleX * motor.facing
-    // Angles from upright, positive tips the weapon forward.
-    let angle: number
-    if (up) angle = phase === 'startup' ? -0.6 : phase === 'active' ? -0.05 : 0.15
-    else if (attack?.move.plunge && phase === 'active') angle = 2.8
-    // The move's own clock stops in hit-stop, so the spin stops with it.
-    else if (variant === 'dash' && heavy && phase === 'active') angle = (attacks.moveElapsedMs() * 0.03) % (Math.PI * 2)
-    else if (heavy) angle = phase === 'startup' ? -0.6 : phase === 'active' ? 2 : 1.2
-    else angle = 0.35 + Math.max(0, poke) * 1.1
-    weapon.setRotation(angle * motor.facing)
+    weapon.setRotation(pose.angle * motor.facing)
     updateSmear(attack !== null && phase === 'active' && !RANGED_WEAPONS.has(build.weapons[attack.slot].id), heavy, delta)
 
     if (motor.dashMs > 0) {
@@ -565,7 +543,7 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
     hurtbox: () => hurtbox.setTo(body.x, body.y, W, H),
     facing: () => motor.facing,
     position: () => ({ x: body.center.x, y: body.bottom }),
-    isInvulnerable: () => motor.dashIframesMs > 0 || damageIframesMs > 0,
+    isInvulnerable: () => motor.dashIframesMs > 0 || damageIframesMs > 0 || blockMs > 0,
     isDead: () => hp <= 0,
     receiveHit(hit) {
       if (hp <= 0 || handle.isInvulnerable()) return 0
@@ -598,13 +576,17 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
       build = next
       hp = Math.min(next.hp, next.stats.maxHp)
       readBuild()
-      showWeapon()
+      readWeapons()
+      showWeapon(heldSlot(attacks.current()))
     },
     hp: () => hp,
     grantShield() {
       shields = Math.min(MAX_SHIELDS, shields + 1)
     },
     shieldCount: () => shields,
+    blockHits(ms) {
+      blockMs = Math.max(blockMs, ms)
+    },
     heal(amount) {
       if (hp <= 0) return
       hp = Math.min(build.stats.maxHp, hp + amount)
@@ -623,6 +605,8 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
       motor.vx = 0
       motor.vy = 0
       motor.dashMs = 0
+      motor.plungeUsed = false
+      motor.plungeChain = 0
       grounded = false
       container.setPosition(tx, ty)
     },
@@ -655,6 +639,10 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
         body.setVelocity(motor.vx, motor.vy)
       }
     },
+    discardBufferedInput() {
+      carriedPressed.clear()
+      carriedReleased.clear()
+    },
     debugState: () => ({ motor, grounded, attackPhase: attacks.phase(), flinchMs, damageIframesMs }),
     destroy() {
       if (destroyed) return
@@ -676,8 +664,9 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
   // motor, so a bounce during hit-stop applies when the freeze ends.
   const stopBounceListener = deps.combat.on('hit', (event) => {
     if (event.attacker !== handle || destroyed || !attacks.onOwnHit()) return
-    handle.setVelocity(motor.vx, -JUMP_VELOCITY * PLUNGE_BOUNCE_FACTOR)
-    motor.jumpHeld = false
+    // Serial Dilution chains the air heavies, each bounce lower than the one before.
+    const factor = plungeBounced(motor, build.mechanics.includes('serialDilution'))
+    handle.setVelocity(motor.vx, -JUMP_VELOCITY * factor)
     squashX = 0.82
     squashY = 1.2
     puffDust()

@@ -40,9 +40,6 @@ function statLines(build: PlayerBuild, cardId: string): string[] {
     const gained = after.stats.maxHp - build.stats.maxHp
     return [`Max HP: ${build.stats.maxHp} -> ${after.stats.maxHp}`, `Heals ${gained} HP (now ${after.hp}/${after.stats.maxHp}).`]
   }
-  if (cardId === 'stat.secondWind') {
-    return [`HP: ${build.hp}/${build.stats.maxHp} -> ${after.hp}/${after.stats.maxHp}`, `Heals ${after.hp - build.hp} HP.`]
-  }
   const line = STAT_LINES[cardId]
   if (!line) return []
   const now = line.read(build.stats)

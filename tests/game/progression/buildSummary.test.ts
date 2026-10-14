@@ -20,16 +20,16 @@ describe('changeText', () => {
 describe('buildSummary weapons', () => {
   it('shows the staff in both slots at the base values', () => {
     const [light, heavy] = buildSummary(createBuild()).weapons
-    expect(light).toMatchObject({ name: 'Staff', slot: 'light', damageText: '12', reachText: '50' })
-    expect(heavy).toMatchObject({ name: 'Staff', slot: 'heavy', damageText: '30', reachText: '62' })
+    expect(light).toMatchObject({ name: 'Staff', slot: 'light', damageText: '14.7', reachText: '76' })
+    expect(heavy).toMatchObject({ name: 'Staff', slot: 'heavy', damageText: '36', reachText: '70' })
   })
 
   it('adds the damage, attack speed and range bonus to the weapon lines', () => {
     const build = pick(createBuild(), 'stat.sharpened', 'stat.sharpened', 'stat.quickHands', 'stat.longReach')
     const [light] = buildSummary(build).weapons
-    expect(light.damageText).toBe('12 -> 15.9 (+32%)')
-    expect(light.speedText).toBe('4.3 -> 4.8 (+12%)')
-    expect(light.reachText).toBe('50 -> 57 (+15%)')
+    expect(light.damageText).toBe('14.7 -> 19.4 (+32%)')
+    expect(light.speedText).toBe('2.6 -> 2.9 (+12%)')
+    expect(light.reachText).toBe('76 -> 87 (+15%)')
   })
 
   it('names a tier 2 weapon and keeps shots ranged', () => {
@@ -88,8 +88,8 @@ describe('buildSummary stats', () => {
 
 describe('buildSummary mechanics and legendaries', () => {
   it('lists the names of the owned ones', () => {
-    const summary = buildSummary(pick(createBuild(), 'mechanic.doubleJump', 'mechanic.pogo', 'legendary.peerReview'))
-    expect(summary.mechanics).toEqual(['Double Jump', 'Pogo'])
+    const summary = buildSummary(pick(createBuild(), 'mechanic.doubleJump', 'mechanic.wallJump', 'legendary.peerReview'))
+    expect(summary.mechanics).toEqual(['Double Jump', 'Wall Jump'])
     expect(summary.legendaries).toEqual(['Peer Review'])
   })
 

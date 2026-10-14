@@ -5,8 +5,9 @@ import { DEPTH, PALETTE } from '../../../contracts/constants'
 export interface FxPool {
   // A teal line between two world points that fades out. The line wobbles a little.
   line(x1: number, y1: number, x2: number, y2: number, durationMs: number): void
-  // Plays an art effect once, centred on a world point. `size` multiplies its natural size.
-  burst(x: number, y: number, kind: FxArt, size?: number): void
+  // Plays an art effect once, centred on a world point. `size` multiplies its natural size, and a
+  // `tint` paints it in one colour (the frost of Sample Freeze, say).
+  burst(x: number, y: number, kind: FxArt, size?: number, tint?: number): void
   update(dtMs: number): void
   destroy(): void
 }
@@ -64,11 +65,13 @@ export function createFxPool(scene: Phaser.Scene, art: ScribbleArt, burstCount =
         py = qy
       }
     },
-    burst(x, y, kind, size = 1) {
+    burst(x, y, kind, size = 1, tint) {
       const sprite = sprites[nextSprite]
       nextSprite = (nextSprite + 1) % burstCount
       const key = (animKeys[kind] ??= art.fx(scene, kind))
       sprite.setPosition(x, y).setScale(unit * size).setVisible(true)
+      if (tint === undefined) sprite.clearTint()
+      else sprite.setTint(tint).setTintMode(Phaser.TintModes.FILL)
       sprite.play({ key, repeat: 0 })
     },
     update(dtMs) {

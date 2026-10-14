@@ -42,7 +42,7 @@ const heavyTiming = (startupMs: number, activeMs: number, recoveryMs: number, ca
 // ungrouped, so a hit on the mage does not make the disc vanish in flight.
 const DISC_SPEED = 320
 const DISC_REACH = 160
-const DISC_DAMAGE = 20
+const DISC_DAMAGE = 30
 
 const disc = (damage: number, lifetimeMs: number, velocity: { x: number; y: number }, tags: string[]): Shot => ({
   art: 'disc',
@@ -84,7 +84,8 @@ function spinDrop(tier: 1 | 2): AttackMove {
   const roller = tier === 2 ? { damage: 16, speed: 320, ms: 700 } : { damage: 12, speed: 300, ms: 550 }
   return move(
     'Spin Drop',
-    variantTiming(90, 70, 200, 140, { hover: { ms: 160 } }),
+    // The lock roots the mage after the throw, which earns the discs their 'heavy' stagger.
+    variantTiming(90, 70, 200, 140, { hover: { ms: 160 }, lockMs: 150 }),
     (ctx) => {
       const feet = ctx.player.position()
       const from = { x: feet.x, y: feet.y - 10 }
@@ -152,7 +153,7 @@ export const discMoveset: WeaponMoveset = {
     return [
       move(
         'Disc throw',
-        heavyTiming(200, 80, 300, 180),
+        heavyTiming(280, 80, 480, 360),
         (ctx) => {
           for (const height of heights) throwDisc(ctx, height, DISC_DAMAGE)
         },
@@ -212,10 +213,10 @@ function pendulum(tier: 1 | 2): AttackMove {
 }
 
 function uppercut(tier: 1 | 2): AttackMove {
-  const damage = tier === 2 ? 34 : 30
+  const damage = tier === 2 ? 38 : 34
   return move(
     'Uppercut',
-    variantTiming(260, 110, 300, 200),
+    variantTiming(320, 110, 420, 300),
     (ctx, self) => {
       overheadBox(ctx, 90, 50, activeMs(ctx, self), damage, { x: 80, y: -520 }, 90, HEAVY_TAGS)
       const feet = ctx.player.position()
@@ -233,10 +234,11 @@ export const beakerMoveset: WeaponMoveset = {
   upHeavy: memoTier(uppercut),
   moves: memoMoves((slot, tier) => {
     if (slot === 'light') return []
+    // The beaker head lands about 60 units ahead of the feet at the strike (tier 2).
     const smash: MeleeHit = {
       x: -6,
       y: -62,
-      w: 60,
+      w: 64,
       h: 62,
       damage: tier === 2 ? 30 : 28,
       knockback: { x: 240, y: -280 },
@@ -330,6 +332,8 @@ function flameJet(tier: 1 | 2): AttackMove {
     'Flame Jet',
     variantTiming(70, 0, 200, 140, {
       plunge: JET,
+      // The fire patch staggers ('heavy'), so the landing roots the mage briefly.
+      landingLockMs: 150,
       onLand(ctx) {
         const feet = ctx.player.position()
         const width = patch.width * ctx.rangeScale
@@ -502,10 +506,10 @@ function shieldCharge(tier: 1 | 2): AttackMove {
 const LID_MS = 300
 
 function lidLift(tier: 1 | 2): AttackMove {
-  const damage = tier === 2 ? 32 : 24
+  const damage = tier === 2 ? 36 : 28
   return move(
     'Lid Lift',
-    variantTiming(70, LID_MS + 60, 240, 180),
+    variantTiming(120, LID_MS + 60, 380, 300),
     (ctx) => {
       const speed = ctx.player.getBuild().stats.attackSpeed
       const scale = ctx.rangeScale

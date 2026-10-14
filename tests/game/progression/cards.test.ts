@@ -1,17 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import type { PowerUpKind } from '../../../src/game/contracts/progression'
-import { applyCard, canApply, CARDS, createBuild } from '../../../src/game/model/progression'
+import { ABILITY_IDS, applyCard, canApply, CARDS, createBuild, rollOffer } from '../../../src/game/model/progression'
+import { createRng } from '../../../src/game/contracts/rng'
 
 const countOf = (kind: PowerUpKind) => CARDS.filter((card) => card.kind === kind).length
 
 describe('catalog', () => {
-  it('has eight stat cards, eight weapon cards, 14 mechanics and five legendaries', () => {
+  it('has seven stat cards, eight weapon cards, 20 mechanics and seven legendaries', () => {
     expect({
       stat: countOf('stat'),
       weapon: countOf('weapon'),
       mechanic: countOf('mechanic'),
       legendary: countOf('legendary'),
-    }).toEqual({ stat: 8, weapon: 8, mechanic: 14, legendary: 5 })
+    }).toEqual({ stat: 7, weapon: 8, mechanic: 20, legendary: 7 })
   })
 
   it('gives every catalog card an effect that applyCard accepts', () => {
@@ -57,11 +58,6 @@ describe('stat cards', () => {
     expect(build.stats.maxHp).toBe(115)
     expect(build.hp).toBe(75)
   })
-
-  it('heals half of max HP, and is not offered at full HP', () => {
-    expect(canApply(createBuild(), 'stat.secondWind')).toBe(false)
-    expect(applyCard({ ...createBuild(), hp: 40 }, 'stat.secondWind').hp).toBe(90)
-  })
 })
 
 describe('weapon cards', () => {
@@ -103,6 +99,41 @@ describe('mechanic cards', () => {
 
   it('raises the offer to four cards with extraChoice', () => {
     expect(applyCard(createBuild(), 'mechanic.extraChoice').offerSize).toBe(4)
+  })
+})
+
+describe('ability cards', () => {
+  const abilityCards = CARDS.filter((card) => (ABILITY_IDS as readonly string[]).includes(card.id.slice(card.id.indexOf('.') + 1)))
+
+  it('has a card for every ability id, and each says it takes a slot', () => {
+    expect(abilityCards).toHaveLength(ABILITY_IDS.length)
+    for (const card of abilityCards) expect(card.description, card.id).toMatch(/^Takes an ability slot\. /)
+    for (const card of CARDS) if (card.description.startsWith('Takes an ability slot.')) expect(abilityCards).toContain(card)
+  })
+
+  it('offers Second Wind at full HP and heals nothing on pick', () => {
+    const build = createBuild()
+    expect(canApply(build, 'mechanic.secondWind')).toBe(true)
+    const picked = applyCard({ ...build, hp: 40 }, 'mechanic.secondWind')
+    expect(picked.hp).toBe(40)
+    expect(picked.abilitySlots).toEqual(['secondWind', null, null, null])
+  })
+
+  it('fills the slots in pick order and refuses a fifth ability', () => {
+    let build = createBuild()
+    for (const id of ['mechanic.centrifugeSpin', 'mechanic.fumeHood', 'legendary.labCoat', 'mechanic.sampleFreeze']) build = applyCard(build, id)
+    expect(build.abilitySlots).toEqual(['centrifugeSpin', 'fumeHood', 'labCoat', 'sampleFreeze'])
+    for (const card of abilityCards) expect(canApply(build, card.id), card.id).toBe(false)
+    expect(applyCard(build, 'mechanic.autoclave')).toBe(build)
+  })
+
+  it('leaves ability cards out of offers once the four slots are full', () => {
+    let build = createBuild()
+    for (const id of ['mechanic.citationNeeded', 'mechanic.autoclave', 'legendary.peerPressure', 'mechanic.secondWind']) build = applyCard(build, id)
+    const rng = createRng('full-slots')
+    for (let i = 0; i < 50; i++) {
+      for (const card of rollOffer({ ...build, level: 2 + (i % 10) }, rng)) expect(abilityCards).not.toContain(card)
+    }
   })
 })
 

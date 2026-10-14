@@ -123,8 +123,8 @@ describe('weaponStats table against the real movesets', () => {
 
   it('derives the per-second numbers from the moves', () => {
     const wand = weaponStats('wand', 'light', 1)
-    expect(wand.attacksPerSecond).toBeCloseTo(3000 / 620)
-    expect(wand.damagePerHit).toBeCloseTo((9 + 9 + 14) / 3)
+    expect(wand.attacksPerSecond).toBeCloseTo(3000 / 1220)
+    expect(wand.damagePerHit).toBeCloseTo((13 + 13 + 20) / 3)
     const petri = weaponStats('petriShield', 'heavy', 2)
     expect(petri.attacksPerSecond).toBeCloseTo(1000 / 1050)
     expect(petri.reach).toBe(60)

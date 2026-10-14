@@ -24,6 +24,26 @@ function releaseWebGlContext(game: Phaser.Game): void {
   }
 }
 
+// Phaser maps pointer events through a cached canvas rectangle that it re-measures only every
+// 500 ms of running loop. When the dashlet scrolls, moves or animates between those checks, hover
+// and clicks land beside the buttons. Pointer events fire before the mouse and touch events Phaser
+// listens to, and the parent hears them first in the capture phase, so every event Phaser reads
+// sees a fresh rectangle.
+function keepPointerBoundsFresh(game: Phaser.Game, parent: HTMLElement): () => void {
+  const measure = () => {
+    const scale = game.scale
+    if (!game.canvas) return
+    scale.updateBounds()
+    const bounds = scale.canvasBounds
+    if (bounds.width > 0 && bounds.height > 0) scale.displayScale.set(scale.baseSize.width / bounds.width, scale.baseSize.height / bounds.height)
+  }
+  const events = ['pointerdown', 'pointermove', 'pointerup', 'pointerover'] as const
+  for (const event of events) parent.addEventListener(event, measure, true)
+  return () => {
+    for (const event of events) parent.removeEventListener(event, measure, true)
+  }
+}
+
 export const createGame: CreateGame = (parent, { bindings }) => {
   const ctx = new RunContext(bindings, (event) => control.emit(event))
   // The dashlet wants the keys right away, without a click on the canvas first.
@@ -45,6 +65,7 @@ export const createGame: CreateGame = (parent, { bindings }) => {
   const game = new Phaser.Game(baseGameConfig(parent, scenes))
   ctx.attach(game)
   const loopPause = createLoopPause(game)
+  const stopBounds = keepPointerBoundsFresh(game, parent)
   const control = createGameHandle({
     command(command) {
       switch (command.type) {
@@ -71,6 +92,7 @@ export const createGame: CreateGame = (parent, { bindings }) => {
     focus,
     destroy: () => {
       loopPause.setPaused(false)
+      stopBounds()
       releaseWebGlContext(game)
       game.destroy(true)
     },

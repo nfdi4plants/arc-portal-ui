@@ -125,6 +125,8 @@ export class LevelUpScene extends Phaser.Scene {
   private sideLayout = false
   private buildPanel!: BuildPanel
   private buildButton!: Button
+  // Closes the offer without a card, for a player who wants none of them.
+  private skipButton!: Button
   private buildBlocker!: Phaser.GameObjects.Rectangle
   private buildOpen = false
 
@@ -166,6 +168,8 @@ export class LevelUpScene extends Phaser.Scene {
     this.buildPanel = new BuildPanel(this)
     this.buildButton = addButton(this, 'Your build (B)', 76, 14, () => this.setBuildOpen(!this.buildOpen))
     this.buildButton.setVisible(false)
+    this.skipButton = addButton(this, 'Skip', 40, 14, () => this.choose(null))
+    this.skipButton.setVisible(false)
     onCanvasKey(this, (code, event) => {
       if (code === 'Tab') event.preventDefault()
       if (this.locked) return
@@ -274,17 +278,18 @@ export class LevelUpScene extends Phaser.Scene {
     this.updateBuildButton()
   }
 
-  private choose(index: number) {
-    if (this.locked) return
-    const card = this.offer[index]
-    if (!card) return
+  // null skips the offer.
+  private choose(index: number | null) {
+    if (this.locked || this.offer.length === 0) return
+    const card = index === null ? null : this.offer[index]
+    if (card === undefined) return
     this.offer = []
     this.hideDetails()
     this.hovered = -1
     this.syncHighlight()
     this.updateBuildButton()
     for (const view of this.cards) view.box.setVisible(false)
-    this.ctx.gameplay?.chooseCard(card.id)
+    this.ctx.gameplay?.chooseCard(card ? card.id : null)
     if (this.ctx.director && this.ctx.director.pendingLevelUps > 0) this.nextOffer()
   }
 
@@ -386,6 +391,7 @@ export class LevelUpScene extends Phaser.Scene {
     this.stripTop = top + head + 6 + cardH * 1.2 + 8
     this.hint.setPosition(centre, this.stripTop + 4).setWordWrapWidth(areaW - 24)
     if (!this.sideLayout) this.buildButton.setPosition(8 + 38, top + 14)
+    this.skipButton.setPosition(this.areaX + areaW - 8 - 20, top + 14)
     const s = cardW / CARD_WIDTH
     const local = (x: number, y: number): [number, number] => [(x - CARD_WIDTH / 2) * s, (y - CARD_HEIGHT / 2) * s]
     for (let i = 0; i < n; i++) {
@@ -450,6 +456,7 @@ export class LevelUpScene extends Phaser.Scene {
     if (this.buildOpen) this.buildBlocker.setInteractive({ useHandCursor: true })
     else this.buildBlocker.disableInteractive()
     this.buildButton.setVisible(!side && !this.locked && this.offer.length > 0 && !this.buildOpen)
+    this.skipButton.setVisible(!this.locked && this.offer.length > 0 && !this.buildOpen)
   }
 
   // The card's own marks: the ribbon and outline of an upgrade and the tag of a replacement.

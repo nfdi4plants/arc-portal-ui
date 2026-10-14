@@ -53,9 +53,9 @@ const row = (name: string, hits: number[], timeMs: number, reach?: number): Row 
 const twice = (damage: number) => [damage, damage]
 const dual = (damage: number) => [damage * 0.75, damage * 0.75]
 
-const STAFF_LIGHT = [row('Staff jab', [10], 200, 42), row('Staff jab', [10], 200, 42), row('Staff thrust', [16], 300, 50)]
+const STAFF_LIGHT = [row('Staff jab', [12], 350, 72), row('Staff jab', [12], 350, 72), row('Staff thrust', [20], 440, 76)]
 // The staff is the only weapon in both slots, so its heavy half has an entry of its own.
-const STAFF_HEAVY: Entry = { slot: 'heavy', rows: [[row('Staff slam', [30], 600, 62)], [row('Staff slam', [30], 600, 62)]], notes: ['Slow overhead slam', 'Slow overhead slam'] }
+const STAFF_HEAVY: Entry = { slot: 'heavy', rows: [[row('Staff slam', [36], 760, 70)], [row('Staff slam', [36], 760, 70)]], notes: ['Slow overhead slam', 'Slow overhead slam'] }
 
 const TABLE: Record<PlayerWeaponId, Entry> = {
   staff: {
@@ -66,28 +66,28 @@ const TABLE: Record<PlayerWeaponId, Entry> = {
   wand: {
     slot: 'light',
     rows: [
-      [row('Bolt', [9], 180), row('Bolt', [9], 180), row('Bolt volley', [14], 260)],
-      [row('Bolt', twice(9), 180), row('Bolt', twice(9), 180), row('Bolt volley', twice(14), 260)],
+      [row('Bolt', [13], 380), row('Bolt', [13], 380), row('Bolt volley', [20], 460)],
+      [row('Bolt', twice(13), 380), row('Bolt', twice(13), 380), row('Bolt volley', twice(20), 460)],
     ],
     notes: ['Fires bolts at the cursor', 'Two bolts per shot'],
   },
   pipettePistol: {
     slot: 'light',
     rows: [
-      [row('Droplet', [8], 130), row('Droplet', [8], 130), row('Droplet', [8], 130), row('Droplet', [10], 190)],
-      [row('Droplet', [8], 130), row('Droplet', [8], 130), row('Droplet', [8], 130), row('Droplet', [10], 190)],
+      [row('Droplet', [14], 330), row('Droplet', [14], 330), row('Droplet', [14], 330), row('Droplet', [17], 390)],
+      [row('Droplet', [14], 330), row('Droplet', [14], 330), row('Droplet', [14], 330), row('Droplet', [17], 390)],
     ],
     notes: ['Rapid droplets at the cursor', 'Droplets pierce one enemy'],
   },
   scalpel: {
     slot: 'light',
     rows: [
-      [row('Scalpel cut', [8], 145, 32), row('Scalpel cut', [8], 145, 32), row('Scalpel cut', [8], 145, 32), row('Scalpel slash', [12], 220, 32)],
+      [row('Scalpel cut', [12], 320, 52), row('Scalpel cut', [12], 320, 52), row('Scalpel cut', [12], 320, 52), row('Scalpel slash', [20], 390, 52)],
       [
-        row('Scalpel cut', dual(8), 145, 32),
-        row('Scalpel cut', dual(8), 145, 32),
-        row('Scalpel cut', dual(8), 145, 32),
-        row('Scalpel slash', dual(12), 220, 32),
+        row('Scalpel cut', dual(12), 320, 52),
+        row('Scalpel cut', dual(12), 320, 52),
+        row('Scalpel cut', dual(12), 320, 52),
+        row('Scalpel slash', dual(20), 390, 52),
       ],
     ],
     notes: ['Very fast string of four', 'Every cut hits twice'],
@@ -95,19 +95,19 @@ const TABLE: Record<PlayerWeaponId, Entry> = {
   sequenceWhip: {
     slot: 'light',
     rows: [
-      [row('Whip lash', [11], 250, 74), row('Whip crack', [14], 310, 74)],
-      [row('Whip lash', [11], 250, 74), row('Whip crack', [14], 310, 74)],
+      [row('Whip lash', [13], 390, 74), row('Whip crack', [17], 470, 74)],
+      [row('Whip lash', [13], 390, 74), row('Whip crack', [17], 470, 74)],
     ],
     notes: ['Long reach, pushes enemies away', 'Pulls enemies in'],
   },
   centrifugeDisc: {
     slot: 'heavy',
-    rows: [[row('Disc throw', [20, 12], 460)], [row('Disc throw', [20, 12, 20, 12], 460)]],
+    rows: [[row('Disc throw', [30, 18], 720)], [row('Disc throw', [30, 18, 30, 18], 720)]],
     notes: ['Boomerang, hits again on return', 'Throws a high and a low disc'],
   },
   beakerHammer: {
     slot: 'heavy',
-    rows: [[row('Beaker smash', [28, 9], 700, 54)], [row('Beaker smash', [30, 13], 700, 54)]],
+    rows: [[row('Beaker smash', [28, 9], 700, 58)], [row('Beaker smash', [30, 13], 700, 58)]],
     notes: ['Overhead smash with ground waves', 'Harder smash, bigger waves'],
   },
   bunsenStaff: {

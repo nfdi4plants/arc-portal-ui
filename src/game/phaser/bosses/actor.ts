@@ -1,16 +1,18 @@
 import Phaser from 'phaser'
 import type { Annotation } from '../../../arc/provenance/types'
 import type { PartRef, ProjectileArt, SpriteRef } from '../../contracts/art'
-import type { Combatant, HitEvent, KillerInfo } from '../../contracts/combat'
+import type { Combatant, HitEvent, KillerInfo, StatusEffect } from '../../contracts/combat'
 import type { BossArchetype, BossAttackSpec } from '../../contracts/content'
 import { DEPTH, PALETTE } from '../../contracts/constants'
 import { cssColor } from '../color'
+import { addStatus, clearStatus, createStatus, statusTimeScale, tickStatus } from '../combat/status'
 import { createAdds } from './adds'
 import { ATTACK_KINDS, createRun, resetRun } from './attacks'
 import type { AttackEnv, BossBody } from './attacks'
 import type { Arena, BossDeps, BossHandle } from './index'
 import { createScheduler, OPENING_DELAY_MS, windupMs } from './scheduler'
 import { applyRef, setOriginOf, stillTexture } from './sprites'
+import { staggerBarSize, staggerDurationMs, staggerLocked, staggerProgress } from './stagger'
 import { createTelegraphPool, createTextPool } from './telegraph'
 import { clamp, formatTell, highestWeakPoint, hitsWeakPoint } from './zones'
 
@@ -48,11 +50,14 @@ export interface Actor extends BossHandle {
 const WEAK_MULTIPLIER = 2
 const WEAK_SIZE = 16
 const STAGGER_MULTIPLIER = 1.5
-const STAGGER_HITS = 6
-const STAGGER_WITHIN_MS = 3000
 const STAGGER_RECOVER_MS = 350
+// A stagger pushes the boss this far away from the player, over STAGGER_PUSH_MS.
+const STAGGER_PUSH = 36
+const STAGGER_PUSH_MS = 220
 const TRANSITION_MS = 1200
 const DEFEAT_FADE_MS = 900
+// The tint of a boss that a freeze or a fume hood slows.
+const SLOWED_TINT = 0x9fd6ff
 const HURT_FLASH_MS = 70
 const LIGHT_FLASH_MS = 110
 const TELL_MS = 1400
@@ -117,9 +122,13 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
   let tellMs = 0
   let tellIndex = 0
   let tellText: Phaser.GameObjects.Text | null = null
-  let hitCount = 0
-  const hitTimes: number[] = new Array(STAGGER_HITS).fill(0)
+  let staggerFill = 0
+  let staggerTotalMs = 0
+  let pushMs = 0
+  let pushDir = 1
   const listeners = new Set<(phase: number) => void>()
+  // A boss is never frozen. A freeze slows its clock instead (addStatus with boss = true).
+  const status = createStatus()
   const move = { hopping: false, hopMs: 0, fromX: 0, toX: 0, waitMs: 700, blinkInMs: 2500 }
 
   const first = phases[0]
@@ -170,7 +179,8 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
     return s.setOrigin(0.5, 0.5).setTint(PALETTE.yellow)
   })
   let deathFx: Phaser.GameObjects.Sprite | null = null
-  let lastWhite = false
+  // 0 untinted, 1 white flash, 2 slowed.
+  let lastTint = 0
 
   const telegraphs = createTelegraphPool(scene, deps.art)
   const tellPool = createTextPool(scene, { fontFamily: 'sans-serif', fontStyle: 'bold', fontSize: '9px', color: CREAM, stroke: OUTLINE, strokeThickness: 2 })
@@ -203,10 +213,15 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
     isInvulnerable: () => transitionMs > 0 || state !== 'fighting',
     isDead: () => hp <= 0,
     receiveHit,
+    applyStatus(effect: StatusEffect) {
+      if (state === 'fighting') addStatus(status, effect, true)
+    },
     update,
     hpFraction: () => hp / maxHp,
     showHpBar: () => cfg().showHpBar,
     currentAttackName: () => (cfg().showAttackNames && (run.phase === 'windup' || run.phase === 'active') ? run.spec.name : null),
+    staggerFraction: () => (staggerMs > 0 ? staggerMs / staggerTotalMs : Math.min(1, staggerFill / staggerBarSize(cfg().quality))),
+    staggerState: () => (staggerMs > 0 ? 'staggered' : staggerLocked(run.phase, run.spec.heavy) ? 'locked' : 'filling'),
     isDefeated: () => state === 'defeated',
     destroy,
     phaseIndex: () => phase,
@@ -431,8 +446,10 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
   }
 
   function startStagger() {
-    staggerMs = cfg().staggerWindowMs
-    hitCount = 0
+    staggerFill = 0
+    staggerMs = staggerTotalMs = staggerDurationMs(cfg().staggerWindowMs)
+    pushMs = STAGGER_PUSH_MS
+    pushDir = player.position().x >= body.x ? -1 : 1
     landFromHop()
     interrupt(false)
     scheduler.complete()
@@ -444,8 +461,11 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
     phase++
     killer = config.killerFor(phase)
     transitionMs = TRANSITION_MS
+    // The next phase starts at full speed.
+    clearStatus(status)
     staggerMs = 0
-    hitCount = 0
+    staggerFill = 0
+    pushMs = 0
     interrupt(true)
     combat.cancelOwnedBy(self)
     adds.clear()
@@ -464,6 +484,7 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
     state = 'dying'
     defeatMs = 0
     staggerMs = 0
+    pushMs = 0
     landFromHop()
     interrupt(true)
     combat.cancelOwnedBy(self)
@@ -498,17 +519,20 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
       startTransition()
       return damage
     }
-    // Six hits within three seconds stagger the boss. The oldest of the last six sits where the
-    // next hit will be written.
-    hitTimes[hitCount % STAGGER_HITS] = clock
-    hitCount++
-    if (staggerMs > 0 || cfg().staggerWindowMs <= 0 || hitCount < STAGGER_HITS) return damage
-    if (clock - hitTimes[hitCount % STAGGER_HITS] <= STAGGER_WITHIN_MS) startStagger()
+    // The hit fills the stagger bar unless the boss is staggered already or a heavy attack locks it.
+    if (staggerMs > 0 || cfg().staggerWindowMs <= 0 || staggerLocked(run.phase, run.spec.heavy)) return damage
+    staggerFill += staggerProgress(hit)
+    if (staggerFill >= staggerBarSize(cfg().quality)) startStagger()
     return damage
   }
 
-  function update(dtMs: number) {
+  // A slow runs the whole boss on a slower clock: movement, windups, telegraphs and cooldowns. The
+  // adds keep their own time, and the stagger bar works as always.
+  function update(realMs: number) {
     if (destroyed || state === 'defeated') return
+    tickStatus(status, realMs)
+    if (state !== 'fighting') clearStatus(status)
+    const dtMs = realMs * statusTimeScale(status)
     clock += dtMs
     hurtFlashMs = Math.max(0, hurtFlashMs - dtMs)
     if (state === 'dying') {
@@ -523,13 +547,18 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
       if (tellMs <= 0) releaseTell()
     }
     scheduler.tick(dtMs)
-    adds.update(dtMs)
+    adds.update(realMs)
     if (transitionMs > 0) {
       transitionMs = Math.max(0, transitionMs - dtMs)
       return
     }
     if (staggerMs > 0) {
       staggerMs = Math.max(0, staggerMs - dtMs)
+      if (pushMs > 0) {
+        const step = Math.min(pushMs, dtMs)
+        pushMs -= step
+        body.x = clamp(body.x + pushDir * STAGGER_PUSH * (step / STAGGER_PUSH_MS), minX, maxX)
+      }
       return
     }
     if (run.phase !== 'none') {
@@ -572,8 +601,9 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
     const breathe = Math.sin(now / 450) * 0.015
     const wobble = staggerMs > 0 ? Math.sin(now / 70) * 0.1 : 0
     const white = hurtFlashMs > 0 || lightFlashMs > 0 || (transitionMs > 0 && Math.floor(now / 90) % 2 === 0)
-    const tintChanged = white !== lastWhite
-    lastWhite = white
+    const tint = white ? 1 : status.slowMs > 0 ? 2 : 0
+    const tintChanged = tint !== lastTint
+    lastTint = tint
 
     sprite.setVisible(visible)
     if (visible) {
@@ -582,10 +612,7 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
       sprite.setScale(baseScale.x * (1 + 0.05 * crouch - 0.05 * stretch), baseScale.y * (1 - 0.08 * crouch + 0.08 * stretch + breathe))
       sprite.setRotation(body.lean + wobble)
       sprite.setAlpha(alpha)
-      if (tintChanged) {
-        if (white) sprite.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL)
-        else sprite.clearTint()
-      }
+      if (tintChanged) paintTint(sprite, tint)
     }
 
     for (const limb of limbs) {
@@ -604,10 +631,7 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
       part.setPosition(body.x + limbFacing * (rest.x + pivot.x), y + rest.y + pivot.y)
       part.setRotation(swing + Math.sin(now / 500 + limb.phase) * 0.06)
       part.setAlpha(alpha)
-      if (tintChanged) {
-        if (white) part.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL)
-        else part.clearTint()
-      }
+      if (tintChanged) paintTint(part, tint)
     }
 
     const spots = state === 'fighting' ? cfg().weakPoints : 0
@@ -630,6 +654,13 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
     }
 
     if (tellText) tellText.setPosition(body.x, y - height - (dizzy ? 20 : 8)).setAlpha(Math.min(1, tellMs / 300))
+    telegraphs.update(now)
+  }
+
+  function paintTint(target: Phaser.GameObjects.Sprite, tint: number) {
+    if (tint === 1) target.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL)
+    else if (tint === 2) target.setTint(SLOWED_TINT).setTintMode(Phaser.TintModes.MULTIPLY)
+    else target.clearTint()
   }
 
   function destroy() {

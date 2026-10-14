@@ -2,8 +2,9 @@ import type { CombatWorld, HitboxSpec, ProjectileSpec } from '../../../contracts
 import type { AttackContext, AttackMove, WeaponMoveset } from '../../../contracts/player'
 import type { WeaponSlot } from '../../../contracts/progression'
 import type { Core, Feature } from './core'
+import { forgivingShape } from './helpers'
 import type { Point } from './helpers'
-import { SUB_HITS, bindFx, bindScheduler, heavyOf, spawnShockwaves } from './kit'
+import { SUB_HITS, bindFx, bindScheduler, heavyOf, spawnShockwaves, streak } from './kit'
 import type { HeavyDeclaration } from './kit'
 import { airHeavyOf, dashHeavyOf, dashLightOf, upHeavyOf, upLightOf, upward } from './variants'
 
@@ -12,22 +13,26 @@ export interface MoveLayer extends Feature {
   wrap(base: WeaponMoveset): WeaponMoveset
 }
 
-const POGO_BOUNCE = -480
 const DOI_SHARE = 0.6
 
-const SHOCKWAVE = { damage: 12, width: 14, height: 16, speed: 230, distance: 150 }
+// Shockwave Heavy follows every heavy move, also the dash and up heavies that leave the mage free to
+// move, so its waves carry no 'heavy' tag and never stagger.
+const SHOCKWAVE = { damage: 12, width: 14, height: 16, speed: 230, distance: 150, tags: ['shockwave'] }
 
 // Ground Slam: the landing of every air heavy covers 50% more and sends two waves along the ground.
 const SLAM_AREA = 1.5
 const SLAM_WAVES = { damage: 12, width: 16, height: 18, speed: 240, distance: 160 }
 
+// Reach of the Triple Combo spin behind and ahead of the feet.
+const SPIN_BACK = 56
+const SPIN_FRONT = 80
+
 // Wraps the weapon movesets, including their air, dash and up variants (or the fallbacks from
-// variants.ts). Every move runs through a copy of the attack context whose combat world reports
-// each spawned spec back (to Peer Review, and for DOI Excalibur the largest damage of a heavy move
-// that declares none). The mechanics that change or extend a move live here:
+// variants.ts). Every move runs through a copy of the attack context whose combat world makes the
+// player's hitboxes a little more forgiving (forgivingShape) and reports each spawned spec back (to
+// Peer Review, and for DOI Excalibur the largest damage of a heavy move that declares none). The
+// mechanics that change or extend a move live here:
 //  - tripleCombo appends a spin finisher to the light string
-//  - pogo turns a ground light in the air with down held into a downward stab that bounces. Dash
-//    and up lights never pogo, and the attack machine only picks up when down is not held.
 //  - groundSlam makes every air heavy land harder: its landing hits use 1.5 times the melee range,
 //    and two waves run along the ground. An air heavy without a landing hit gets the waves only.
 //  - shockwaveHeavy and doiExcalibur add their hits when the main damage of a heavy move happens.
@@ -47,7 +52,8 @@ export function createMoveLayer(core: Core): MoveLayer {
   const tapped: CombatWorld = {
     register: (combatant) => real.register(combatant),
     unregister: (combatant) => real.unregister(combatant),
-    spawnHitbox(hit) {
+    spawnHitbox(spec) {
+      const hit = spec.owner === player ? { ...spec, shape: forgivingShape(spec.shape) } : spec
       note(hit, null)
       return real.spawnHitbox(hit)
     },
@@ -56,6 +62,8 @@ export function createMoveLayer(core: Core): MoveLayer {
       return real.spawnProjectile(shot, origin)
     },
     cancelOwnedBy: (owner) => real.cancelOwnedBy(owner),
+    addSlowZone: (zone) => real.addSlowZone(zone),
+    cancelShots: (team, area) => real.cancelShots(team, area),
     livingCombatants: (team) => real.livingCombatants(team),
     on: (event, listener) => real.on(event, listener),
     setDamageModifier: (modifier) => real.setDamageModifier(modifier),
@@ -66,45 +74,37 @@ export function createMoveLayer(core: Core): MoveLayer {
 
   const tappedCtx = (ctx: AttackContext): AttackContext => ({ ...ctx, combat: tapped })
 
-  const pogoStab = (ctx: AttackContext) => {
-    ctx.combat.spawnHitbox({
-      owner: player,
-      shape: { kind: 'rect', x: -11, y: -6, w: 22, h: 34 * ctx.rangeScale },
-      follow: true,
-      activeMs: 120 / ctx.player.getBuild().stats.attackSpeed,
-      damage: 12,
-      knockback: { x: 0, y: 220 },
-      hitStopMs: 30,
-      maxTargets: Infinity,
-      tags: ['light', 'pogo'],
-    })
-  }
-
   // One box covers both sides, so an enemy that overlaps the middle is hit once. The combat world
   // mirrors knockback by the attacker's facing only, so every enemy flies the way the mage faces.
+  // It reaches as far ahead as the staff thrust, and the lunge closes the gap the knockback of the
+  // string's last hit opened.
   const spin = (ctx: AttackContext) => {
     const scale = ctx.rangeScale
+    const feet = ctx.player.position()
+    const face = ctx.player.facing()
     ctx.combat.spawnHitbox({
       owner: player,
-      shape: { kind: 'rect', x: -48 * scale, y: -40, w: 96 * scale, h: 40 },
+      shape: { kind: 'rect', x: -SPIN_BACK * scale, y: -48, w: (SPIN_BACK + SPIN_FRONT) * scale, h: 48 },
       follow: true,
       activeMs: 120 / ctx.player.getBuild().stats.attackSpeed,
-      damage: 14,
+      damage: 20,
       knockback: { x: 220, y: -140 },
       hitStopMs: 50,
       maxTargets: Infinity,
       tags: ['light', 'finisher'],
     })
+    streak(ctx, feet.x - face * SPIN_BACK * scale, feet.y - 26, feet.x + face * SPIN_FRONT * scale, feet.y - 22, 140)
   }
 
   const finisherBase: AttackMove = {
     name: 'Spin finisher',
-    startupMs: 80,
+    startupMs: 130,
     activeMs: 120,
-    recoveryMs: 260,
-    cancelAfterMs: 160,
-    lunge: 0,
+    recoveryMs: 320,
+    cancelAfterMs: 240,
+    lunge: 120,
     allowedInAir: true,
+    spin: true,
     onActive: spin,
   }
 
@@ -153,13 +153,9 @@ export function createMoveLayer(core: Core): MoveLayer {
     else heavyExtras(ctx, heavy.damage)
   }
 
-  const light = (move: AttackMove, pogo: boolean): AttackMove => ({
+  const light = (move: AttackMove): AttackMove => ({
     ...move,
-    onActive(ctx) {
-      const wrapped = tappedCtx(ctx)
-      if (pogo && flags.pogo && !player.isGrounded() && ctx.held.has('down')) pogoStab(wrapped)
-      else move.onActive(wrapped)
-    },
+    onActive: (ctx) => move.onActive(tappedCtx(ctx)),
   })
 
   const heavy = (move: AttackMove): AttackMove => {
@@ -199,18 +195,12 @@ export function createMoveLayer(core: Core): MoveLayer {
   }
 
   const buildList = (base: WeaponMoveset, slot: WeaponSlot, tier: 1 | 2): AttackMove[] => {
-    const moves = base.moves(slot, tier).map((move) => (slot === 'light' ? light(move, true) : heavy(move)))
+    const moves = base.moves(slot, tier).map((move) => (slot === 'light' ? light(move) : heavy(move)))
     // A heavy weapon has no light string, so it gets no finisher either.
-    if (slot === 'light' && flags.tripleCombo && moves.length > 0) moves.push(light(finisherBase, true))
+    if (slot === 'light' && flags.tripleCombo && moves.length > 0) moves.push(light(finisherBase))
     return moves
   }
 
-  core.own(
-    real.on('hit', (event) => {
-      if (event.attacker !== player || !event.tags.includes('pogo')) return
-      player.setVelocity(player.velocity().x, POGO_BOUNCE)
-    }),
-  )
   core.own(bindScheduler(deps.scene, core.scheduler))
   core.own(bindFx(deps.scene, core.fx))
   // A hit or a dash cancels the attack, so its sub-hits stop with it.
@@ -257,7 +247,7 @@ export function createMoveLayer(core: Core): MoveLayer {
         dashLight: (tier) =>
           single(1, tier, () => {
             const move = dashLightOf(base, tier)
-            return move && light(move, false)
+            return move && light(move)
           }),
         dashHeavy: (tier) =>
           single(2, tier, () => {
@@ -279,7 +269,7 @@ export function createMoveLayer(core: Core): MoveLayer {
           // The finisher turns overhead only for a weapon whose lights do, so a wand keeps aiming.
           let move = upLightOf(base, tier, Math.min(comboIndex, Math.max(0, own - 1)))
           if (move && comboIndex >= own) move = flags.tripleCombo ? upward(finisherBase) : null
-          result = move && light(move, false)
+          result = move && light(move)
           cache.set(comboIndex, result)
           return result
         },

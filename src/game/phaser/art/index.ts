@@ -14,6 +14,9 @@ import { tiles } from './tiles'
 
 export { TEXTURE_SCALE, textureBytes }
 export { MINION_ID_SUFFIX, minionArtSpec, releaseMonsters } from './monster'
+export { monsterWeapon } from './monster'
+export { carrier } from './carrier'
+export type { MonsterWeaponRef } from './monster'
 export { prewarmTelegraphs, releaseTelegraphs } from './telegraph'
 export { CARD_HEIGHT, CARD_WIDTH, RARITY_COLOR, cardArt, doorArt, glowTexture, shieldFragmentArt } from './props'
 export type { BossArt, PartRef } from './parts'

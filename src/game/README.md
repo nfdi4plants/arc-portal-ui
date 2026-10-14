@@ -25,7 +25,8 @@ time. `model/run/` turns the index into a `RunPlan`:
 3. Quality. `quality = min(1, annotations / 8)`.
 4. Telegraph. Heavy boss attacks warn `telegraphMs = 80 + 820 * quality` ms ahead. At quality 0 the
    boss also hides its hp bar and attack names. More quality brings safe zones, weak points,
-   visible tells (the node's own annotations) and a longer stagger window.
+   visible tells (the node's own annotations), a longer stagger and a smaller stagger bar
+   (`bosses/stagger.ts`): a boss at quality 0 is nearly unstaggerable.
 
 The node after each segment is a boss (`model/content/boss.ts`). The final boss has one phase per
 segment in path order, and each phase uses its segment's telegraph timing. Every final phase has
@@ -54,7 +55,7 @@ src/game/
     combat/        hitboxes, projectiles, damage, hit-stop and feedback
     input/         DOM keyboard and mouse listeners on the canvas
     player/        the mage, its attack machine and the staff
-    player/weapons/ the other weapons, mechanics and legendaries (the loadout)
+    player/weapons/ the other weapons, mechanics, legendaries and abilities (the loadout)
     mobs/          mob AI, passives, pickups and speech bubbles
     bosses/        node bosses, the final boss, telegraphs and safe zones
     scenes/        Boot, Stretch, Boss, FinalBoss, Hud, LevelUp, Death and Victory, the run flow
@@ -81,16 +82,77 @@ by a phantom" and tells the player to fill in the missing value. Key P in the Mo
 
 ## Attack variants
 
+Light presses walk the light string. A light press during a move of the string waits for the
+move's cancel window, and a press up to 250 ms after the move ended (`COMBO_GRACE_MS` in
+`phaser/player/attacks.ts`) still plays the next move, so a steady mash chains the whole string and
+the Triple Combo finisher. Only one press waits at a time and later presses merge into it, so a
+mash stops at most one move after the last press. A longer pause, a heavy, a dash, a jump or a hit
+starts the string over.
+A move's lunge pushes the mage forward only while left or right is held. Without a direction the
+attack stays in place on the ground and keeps the air speed in the air.
+
 Heavy pressed in the air plays the weapon's air heavy, mostly a plunge with a landing hit and a
 short landing lock. The first hit of an air heavy (the fall or the landing ring) ends the plunge and
 bounces the mage up at 55% of the jump speed (about 30% of the jump height), free to steer and cancel at once.
+Only one air heavy fits in one airtime: until the mage lands, wall jumps or is teleported, another
+heavy press in the air does nothing (up and dash heavies still play). The bounce continues that
+airtime, so it gives back no jump or air dash, not even when the landing ring bounced the mage off
+the floor (`startPlunge`, `plungeBounced` and `airHeavyRefused` in `model/input/motor.ts`).
+The Serial Dilution card lifts the one-per-airtime rule for air heavies that hit: after a bounce
+another air heavy may start, up to 5 per airtime (`PLUNGE_CHAIN_MAX`). The first bounce is a full
+jump high and each next one lower, 75%, 50%, 30% and 15% of it (`CHAIN_BOUNCE_HEIGHTS`,
+`bounceFactor`). The count (`plungeChain`) starts over on the same landing, wall jump or teleport,
+and the bounces still give back no jump, air dash or coyote time.
 Attacks during a dash, or up to 80 ms after it, play the dash light (no lock) or the
 dash heavy. Attacks with up held play an overhead version, and ranged weapons keep aiming at the cursor.
 Each weapon only defines the variants of its card slot (light weapons: light, dash light, up light.
 Heavy weapons: heavy, air heavy, dash heavy, up heavy) and the staff has all of them.
+The mage holds the light weapon. A heavy move puts the heavy weapon in the hand from its startup to
+the end of its recovery, and a cancel hands the light weapon back. Each weapon has a hold in
+`phaser/player/weaponPose.ts`: the staff and the beaker swing, the Bunsen staff points ahead, the
+petri shield is held up in front (over the head for the up heavy) and the disc leaves the hand once
+it is thrown.
 Each moveset defines its variants (`airHeavy`, `dashLight`, `dashHeavy`, `upLight`, `upHeavy`), the
 fallbacks live in `phaser/player/weapons/variants.ts`, and the attack machine in
 `phaser/player/attacks.ts` picks the variant, runs plunges until landing and applies locks.
+
+## Ability slots
+
+The mage has four ability slots on ability1 to ability4 (Q, E, R, F by default). An ability card
+takes the first free slot (`ABILITY_IDS` in `model/progression/catalog.ts`), and once all four are
+full no ability card is offered. The handlers live in `phaser/player/weapons/` (Parry and Familiar
+in `mechanics.ts`, Git Revert in `legendaries.ts`, the rest in `abilities.ts`). A handler that
+returns false from `activate` did nothing (Citation Needed without a target, Second Wind at full hp
+or spent) and starts no cooldown.
+
+| Card | Rarity | Cooldown | Effect |
+|---|---|---|---|
+| Centrifuge Spin | uncommon | 8 s | 0.6 s whirl, 4 hits of 5 damage that pull enemies within 4 tiles in |
+| Fume Hood | uncommon | 12 s | a 5 x 4 tile hood ahead for 4 s: enemy shots at 30% speed, enemies at 70% (bosses 85%) |
+| Sample Freeze | rare | 14 s | freezes enemies in a 6-tile cone for 1.5 s, bosses run at half speed instead |
+| Citation Needed | uncommon | 10 s | marks the nearest enemy ahead for 6 s, the mage's own hits on it deal 30% extra |
+| Autoclave | rare | 16 s | blocks hits for 0.4 s and knocks enemies within 3 tiles away for 8 damage |
+| Second Wind | uncommon | once per boss | heals 50% of max hp, then waits for the next boss to fall |
+| Peer Pressure | legendary | 40 s | 40 damage to every enemy on screen, pushed away, enemy shots on screen vanish |
+| Lab Coat | legendary | 30 s | a 0.28 s super-dash of about 10 tiles that hits for 30, hits miss the mage for 0.45 s |
+
+Pulls and pushes are knockback on hits of the loadout's stand-in attacker, so bosses, turrets and
+boss minions, which ignore knockback, never move. Only the Lab Coat dash is a hit of the mage
+itself, with damage bonuses and crits. The stand-in hits do not count as the mage's own
+(no lifesteal, Echo, Ontology tags, Peer Review or Citation bonus), and their `stagger` field keeps
+them from filling a boss stagger bar much (0.5 for the spin and Peer Pressure, 0 for Autoclave).
+Freezes and slows go through `Combatant.applyStatus` with the rules in `phaser/combat/status.ts`:
+a boss is never frozen, a freeze slows it to half speed, and it takes half of any slow. A slowed
+boss runs its whole clock slower (movement, windups, cooldowns), and its stagger bar and the heavy
+attack lock work as always. Mobs, minions, turrets and boss minions freeze in place and stop
+attacking, and a frozen phantom shows at its hit alpha. The fume hood is a slow zone of the combat
+world (`addSlowZone`), which slows reflectable enemy shots only, so bombs, falling debris and ground
+waves keep their timing.
+
+Second Wind's charge is a `BossCharge` owned by `RunDirector`, so it stays spent from one scene to
+the next. `defeatBoss` recharges it, and so does entering the final boss. The HUD greys a spent slot
+and writes "after boss" over it. Every slot shows its key, its name and, while it cools down, the
+seconds left.
 
 ## Running the sandboxes
 
@@ -117,6 +179,7 @@ Click the canvas to give it keyboard focus.
 | What | Where |
 |---|---|
 | Run, jump, dash, coyote time, jump buffer, wall jump | `model/input/motor.ts` (`MOTOR`) |
+| Air heavy bounce and Serial Dilution chain heights | `model/input/motor.ts` (`PLUNGE_BOUNCE_FACTOR`, `CHAIN_BOUNCE_HEIGHTS`) |
 | Mob hp, damage, speed and XP per mob (10, or 15 with an ontology accession) | `model/content/monster.ts` |
 | Mob behaviour timing (windups, knockback, aggro range, blink and bomb timers) | `phaser/mobs/tuning.ts` |
 | Node boss hp (`400 * (1 + 0.35 * segment index)`) and XP | `model/content/boss.ts` |
@@ -128,11 +191,22 @@ Click the canvas to give it keyboard focus.
 | Rarity odds | `model/progression/offer.ts` |
 | Staff timing and damage | `phaser/player/staffMoveset.ts` |
 | Other weapons | `phaser/player/weapons/light.ts`, `phaser/player/weapons/heavy.ts` |
+| Weapon numbers on the level-up screen (follow the movesets, a test compares them) | `model/progression/weaponStats.ts` |
+| Attack buffer and combo grace | `phaser/player/attacks.ts` |
+| Ability cooldowns, reach and damage | `phaser/player/weapons/abilities.ts` |
+| Boss freeze and slow rules | `phaser/combat/status.ts` |
 | Player i-frames and flinch | `phaser/player/Player.ts` |
 | Pit damage, banner time, mob wake distance, monster prewarm rate | `phaser/scenes/StretchScene.ts` |
 | Level layout | `phaser/scenes/levelGen.ts` |
 
 Change a pure constant together with its test under `tests/game/`.
+
+Attack timing. A mash plays one move per startup, active and `cancelAfterMs`, so that sum sets the
+attack rate. Light moves of the string take about 320 to 490 ms (about 2.5 to 3 hits per second,
+shots no faster than melee jabs, string enders slower), and `tests/game/player/combo.test.ts` keeps
+a frantic mash at or below 3 per second. Ground and up heavies take about 0.8 to 1 s from startup
+to the end of recovery. Air and dash heavies are gated by the airtime and the dash cooldown, so they
+stay quicker. Quick Hands (`attackSpeed`) divides every phase.
 
 ## Performance rules
 

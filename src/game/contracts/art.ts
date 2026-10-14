@@ -27,7 +27,8 @@ export interface PartRef extends SpriteRef {
 export type Theme = DatasetKind
 
 export type ProjectileArt = 'bolt' | 'droplet' | 'disc' | 'arrow' | 'bomb' | 'flame' | 'orb'
-export type TelegraphArt = 'rect' | 'circle' | 'cone' | 'line'
+// 'safe' is the teal spot where an area attack does not hit.
+export type TelegraphArt = 'rect' | 'circle' | 'cone' | 'line' | 'safe'
 export type FxArt = 'hit' | 'crit' | 'dust' | 'levelUp' | 'death' | 'xp'
 
 export interface TileArt {

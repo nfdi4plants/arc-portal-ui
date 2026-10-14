@@ -1,9 +1,9 @@
 import Phaser from 'phaser'
-import { DEPTH, PALETTE, SCENE, TILE } from '../../contracts/constants'
+import { DEPTH, PALETTE, PLAYER_HEIGHT, SCENE, TILE } from '../../contracts/constants'
 import type { MonsterSpec } from '../../contracts/content'
 import type { Segment } from '../../contracts/run'
 import { monsterFromAnnotation } from '../../model/content'
-import { applySpriteRef, doorArt, minionArtSpec, prewarm, prewarmEffects, releaseMonsters } from '../art'
+import { applySpriteRef, carrier, doorArt, minionArtSpec, prewarm, prewarmEffects, releaseMonsters } from '../art'
 import { spawnMob, updatePickups, type Mob, type MobDeps } from '../mobs'
 import { markOneWay } from '../player/Player'
 import type { View } from '../view'
@@ -12,6 +12,7 @@ import { GameplayScene, type LevelSetup } from './GameplayScene'
 import { addParallax, addTiles, type Parallax } from './levelArt'
 import { generateStretch, type StretchLayout } from './levelGen'
 import { PIT_KILLER } from './RunDirector'
+import { createRescueFrame, rescueAt } from './rescue'
 import { addText, plural } from './ui'
 
 const T = TILE
@@ -44,6 +45,13 @@ export class StretchScene extends GameplayScene {
   private safeX = 0
   private safeY = 0
   private readonly door = new Phaser.Geom.Rectangle()
+  // The pit rescue in progress, -1 when none runs. It advances with the world steps, so a pause,
+  // a level-up or a hit-stop holds it.
+  private rescueMs = -1
+  private readonly rescue = createRescueFrame()
+  private rescueStage: 'carry' | 'released' | 'vulnerable' = 'carry'
+  private readonly rescueSpot = { x: 0, y: 0 }
+  private cloud: Phaser.GameObjects.Sprite | null = null
 
   constructor(ctx: RunContext) {
     super(SCENE.stretch, ctx)
@@ -95,6 +103,8 @@ export class StretchScene extends GameplayScene {
     releaseMonsters(this, new Set(this.specs.map((spec) => spec.id)))
     this.slots = this.specs.map((spec, i) => ({ spec, ...layout.spawns[i], mob: null, asleep: false, gone: false }))
     this.prewarmed = 0
+    this.rescueMs = -1
+    this.cloud = null
     this.safeX = layout.start.x
     this.safeY = layout.start.y
 
@@ -127,9 +137,13 @@ export class StretchScene extends GameplayScene {
   }
 
   // Monster art is drawn behind the banner, a few per frame, so no frame stalls. A summoner's
-  // minion art goes with its summoner, and the effects and projectiles come on the first frame.
+  // minion art goes with its summoner, and the effects, projectiles and the pit rescue cloud come
+  // on the first frame.
   protected onBannerFrame() {
-    if (this.prewarmed === 0) prewarmEffects(this)
+    if (this.prewarmed === 0) {
+      prewarmEffects(this)
+      carrier(this)
+    }
     if (this.prewarmed >= this.specs.length) return
     const next = Math.min(this.specs.length, this.prewarmed + PREWARM_PER_FRAME)
     const batch = this.specs.slice(this.prewarmed, next)
@@ -173,6 +187,10 @@ export class StretchScene extends GameplayScene {
       }
     }
     updatePickups(this, this.player)
+    if (this.rescueMs >= 0) {
+      this.stepRescue(dtMs)
+      return
+    }
 
     const feet = this.player.position()
     if (feet.y > this.layout.pitY) {
@@ -187,10 +205,53 @@ export class StretchScene extends GameplayScene {
     if (Phaser.Geom.Intersects.RectangleToRectangle(box, this.door)) this.leave((director) => director.completeStretch())
   }
 
+  // The pit costs hp first. If the mage lives, the cloud carries it back down onto the last safe
+  // ground instead of dropping it there at once, so it does not run straight into the pit again.
   private fallIntoPit() {
     if (this.hurtByHazard(PIT_DAMAGE, PIT_KILLER)) return
     const spot = this.safeSpot()
-    this.player.teleport(spot.x, spot.y)
+    this.rescueSpot.x = spot.x
+    this.rescueSpot.y = spot.y
+    this.rescueMs = 0
+    this.rescueStage = 'carry'
+    // Unregistered, nothing in the combat world can hit the mage while it hangs on the rope.
+    this.combat.unregister(this.player)
+    if (!this.cloud) {
+      const ref = carrier(this)
+      this.cloud = this.add.sprite(0, 0, ref.textureKey).setDepth(DEPTH.player + 1)
+      applySpriteRef(this.cloud, ref)
+    }
+    this.cloud.setVisible(true)
+    this.stepRescue(0)
+  }
+
+  // The scene unfreezes the player at the start of every step, so the carry freezes it again
+  // here, before the player's own step runs, and holds it on the rope with a teleport.
+  private stepRescue(dtMs: number) {
+    this.rescueMs += dtMs
+    const frame = rescueAt(this.rescue, this.rescueMs)
+    const { x, y } = this.rescueSpot
+    const cloud = this.cloud
+    if (!frame.released) {
+      this.player.setFrozen(true)
+      this.player.teleport(x + frame.sway, y - frame.lift)
+      cloud?.setPosition(x + frame.sway, y - frame.lift - PLAYER_HEIGHT + 2)
+    } else {
+      // Presses made on the rope must not fire the moment the mage lands.
+      if (this.rescueStage === 'carry') {
+        this.rescueStage = 'released'
+        this.player.discardBufferedInput()
+      }
+      cloud?.setPosition(x + frame.cloudDx, y - PLAYER_HEIGHT + 2 + frame.cloudDy).setAlpha(frame.cloudAlpha)
+    }
+    if (frame.vulnerable && this.rescueStage !== 'vulnerable') {
+      this.rescueStage = 'vulnerable'
+      this.combat.register(this.player)
+    }
+    if (frame.done) {
+      this.rescueMs = -1
+      cloud?.setVisible(false).setAlpha(1)
+    }
   }
 
   // The last ground the player stood on, moved a tile in from its edges so the player does not

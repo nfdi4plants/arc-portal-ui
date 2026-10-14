@@ -84,7 +84,7 @@ export const placeholderArt: ScribbleArt = {
     return { ground, platform, wall, background }
   },
   telegraph(scene, shape, width, height) {
-    return box(scene, `telegraph:${shape}:${width}x${height}`, Math.max(2, Math.round(width)), Math.max(2, Math.round(height)), 0xe5484d).textureKey
+    return box(scene, `telegraph:${shape}:${width}x${height}`, Math.max(2, Math.round(width)), Math.max(2, Math.round(height)), shape === 'safe' ? PALETTE.teal : 0xe5484d).textureKey
   },
   fx(scene, kind) {
     // Effects play once, so they get their own non-looping animation.

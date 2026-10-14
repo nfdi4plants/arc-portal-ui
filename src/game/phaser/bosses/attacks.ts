@@ -8,11 +8,14 @@ import type { Rng } from '../../contracts/rng'
 import type { Adds } from './adds'
 import type { Arena } from './index'
 import type { TelegraphPool, Zone, ZoneSpec } from './telegraph'
-import { clamp, flightMs, insideAny, knockback, openIntervals, safeIntervals, toOwnerShape } from './zones'
-import type { Facing, Interval } from './zones'
+import { clamp, fallMs, flightMs, insideAny, knockback, openIntervals, platformBodyY, platformUnder, safeIntervals, toOwnerShape } from './zones'
+import type { ArenaPlatform, Facing, Interval } from './zones'
 
 // The eight attack kinds. Each one is written once. It takes its damage and timing from the spec,
-// its reach from the arena and its look from the boss archetype. The boss runs every attack through
+// its reach from the arena and its look from the boss archetype. A heavy attack in an arena with
+// platforms sometimes plays a platform variant: the quake and the flood cover the whole floor and
+// spare the platforms, the platform rain, the high beam and a leap onto the player's platform hit
+// the platforms and spare the floor. The boss runs every attack through
 // the same cycle: begin (the wind-up starts and the target is locked), windup (every step until the
 // telegraph is full), fire (the hitboxes appear) and active (every step while the attack lasts).
 
@@ -61,6 +64,8 @@ export interface AttackRun {
   waves: Wave[]
   dir: Facing
   variant: number
+  // The platform a leap lands on, or null for the floor.
+  ledge: ArenaPlatform | null
   startX: number
   targetX: number
   angle: number
@@ -87,6 +92,7 @@ export function createRun(): AttackRun {
     waves: [],
     dir: 1,
     variant: 0,
+    ledge: null,
     startX: 0,
     targetX: 0,
     angle: 0,
@@ -112,6 +118,7 @@ export function resetRun(run: AttackRun, spec: BossAttackSpec, windupMs: number)
   run.safe = []
   run.waves = []
   run.variant = 0
+  run.ledge = null
   run.timerMs = 0
 }
 
@@ -146,6 +153,11 @@ interface AttackKind {
 
 const SAFE_WIDTH = 64
 const SAFE_MARGIN = 8
+// Attacks that cover the whole floor warn this much longer than the telegraph time, so a player
+// on the far side of the arena still reaches a platform. Better annotations still warn longer.
+export const FLOOR_WARN_MS = 450
+// The safe glow over a platform, where the player stands.
+const LEDGE_SAFE_HEIGHT = 30
 // Where rain starts above the floor.
 const SKY = 300
 
@@ -183,6 +195,17 @@ function showSafe(run: AttackRun, env: AttackEnv, y: number, h: number): void {
   for (const spot of run.safe) {
     show(run, env, { shape: 'rect', x: (spot.from + spot.to) / 2, y, w: spot.to - spot.from, h, fill: 'radial', safe: true })
   }
+}
+
+// Lights up every platform as a safe spot, for the attacks that only cover the floor.
+function showLedgesSafe(run: AttackRun, env: AttackEnv): void {
+  for (const p of env.arena.platforms) {
+    show(run, env, { shape: 'rect', x: p.x + p.w / 2, y: p.top - LEDGE_SAFE_HEIGHT / 2, w: p.w + 8, h: LEDGE_SAFE_HEIGHT, fill: 'radial', safe: true })
+  }
+}
+
+function hasLedges(env: AttackEnv): boolean {
+  return env.arena.platforms.length > 0
 }
 
 function hit(run: AttackRun, env: AttackEnv, shape: HitShape, activeMs: number, knock: { x: number; y: number }, follow = false): void {
@@ -242,8 +265,9 @@ function shoot(run: AttackRun, env: AttackEnv, kind: ProjectileArt, shot: Shot):
 }
 
 // Slam: the boss comes down on the player's position. A treant smashes with a root arm, the others
-// leap there (the daemon blinks over). A heavy slam of a boss with safe zones sometimes shakes the
-// whole arena instead and leaves the safe spots untouched.
+// leap there (the daemon blinks over) and land on the platform the player stands on. A heavy slam
+// in an arena with platforms or safe zones sometimes shakes the whole floor instead and leaves the
+// platforms and the safe spots untouched.
 const LEAP_MS = 450
 const LEAP_RADIUS = 48
 const SMASH = { w: 52, h: 84 }
@@ -252,21 +276,27 @@ const QUAKE_HEIGHT = 44
 const slam: AttackKind = {
   begin(run, env) {
     const { arena, body } = env
-    const quake = run.spec.heavy && env.safeZones > 0 && env.rng.chance(0.5)
-    const playerX = env.player.position().x
+    const quake = run.spec.heavy && (env.safeZones > 0 || hasLedges(env)) && env.rng.chance(0.5)
+    const feet = env.player.position()
+    const playerX = feet.x
     run.variant = quake ? 2 : env.archetype === 'rootTreant' ? 1 : 0
+    // The root arm reaches high enough to hit a platform anyway.
+    if (run.variant === 0) run.ledge = platformUnder(arena.platforms, playerX, feet.y)
     run.startX = body.x
     run.targetX = quake ? body.x : clamp(playerX, env.minX, env.maxX)
     run.dir = faceToward(env, quake ? playerX : run.targetX)
     const floor = arena.floorY
     if (run.variant === 0) {
-      show(run, env, { shape: 'circle', x: run.targetX, y: floor - 6, w: LEAP_RADIUS * 2, h: LEAP_RADIUS * 2, fill: 'radial' })
+      const land = run.ledge ? run.ledge.top : floor
+      show(run, env, { shape: 'circle', x: run.targetX, y: land - 6, w: LEAP_RADIUS * 2, h: LEAP_RADIUS * 2, fill: 'radial' })
     } else if (run.variant === 1) {
       show(run, env, { shape: 'rect', x: run.targetX, y: floor, w: SMASH.w, h: SMASH.h, fill: 'up' })
     } else {
       run.safe = safeIntervals(env.rng, arena.left, arena.right, env.safeZones, SAFE_WIDTH)
+      run.windupMs += FLOOR_WARN_MS
       show(run, env, { shape: 'rect', x: (arena.left + arena.right) / 2, y: floor - QUAKE_HEIGHT / 2, w: arena.right - arena.left, h: QUAKE_HEIGHT, fill: 'wide' })
       showSafe(run, env, floor - QUAKE_HEIGHT / 2, QUAKE_HEIGHT + 6)
+      showLedgesSafe(run, env)
     }
   },
   windup(run, env, progress) {
@@ -280,7 +310,8 @@ const slam: AttackKind = {
     const u = clamp((run.elapsedMs - (run.windupMs - leapMs)) / leapMs, 0, 1)
     const daemon = env.archetype === 'glitchDaemon'
     const peak = run.variant === 2 ? 56 : daemon ? 28 : env.archetype === 'reagentGolem' ? 56 : 84
-    body.lift = env.hover + 4 * u * (1 - u) * peak
+    const land = run.ledge ? env.arena.floorY - run.ledge.top : env.hover
+    body.lift = env.hover + (land - env.hover) * u + 4 * u * (1 - u) * peak
     if (run.variant === 2) return
     if (daemon) {
       body.x = u < 0.5 ? run.startX : run.targetX
@@ -293,13 +324,14 @@ const slam: AttackKind = {
     const { arena, body } = env
     body.lean = 0
     body.alpha = 1
-    body.lift = env.hover
+    // A boss that landed on a platform sinks back to the floor while idle.
+    body.lift = run.ledge ? arena.floorY - run.ledge.top : env.hover
     if (run.variant !== 2) body.x = run.targetX
     const floor = arena.floorY
     const away: Facing = env.player.position().x >= run.targetX ? 1 : -1
     const knock = knockback(away, env.self.facing(), 190, 210)
     if (run.variant === 0) {
-      hit(run, env, { kind: 'circle', x: run.targetX, y: floor - 6, r: LEAP_RADIUS }, 180, knock)
+      hit(run, env, { kind: 'circle', x: run.targetX, y: (run.ledge ? run.ledge.top : floor) - 6, r: LEAP_RADIUS }, 180, knock)
     } else if (run.variant === 1) {
       hit(run, env, { kind: 'rect', x: run.targetX - SMASH.w / 2, y: floor - SMASH.h, w: SMASH.w, h: SMASH.h }, 200, knock)
     } else {
@@ -438,12 +470,35 @@ const charge: AttackKind = {
 }
 
 // Rain: drops fall across the whole arena, except over the safe spots. Some of them aim at where
-// the player stands.
+// the player stands. The heavy platform rain falls on the platforms only, and the drops break on
+// them, so the floor below is safe.
 const RAIN_RADIUS = 7
 const RAIN_BAND = 48
 
+function dropOnLedge(run: AttackRun, env: AttackEnv): void {
+  const { arena, rng } = env
+  const ledges = arena.platforms
+  const p = ledges[rng.int(0, ledges.length - 1)]
+  const y = arena.floorY - SKY
+  shoot(run, env, SHOT_ART[env.archetype], {
+    x: p.x + 4 + rng.next() * (p.w - 8),
+    y,
+    vx: 0,
+    vy: 60,
+    gravity: 760,
+    lifetimeMs: fallMs(p.top - y, 60, 760),
+    radius: RAIN_RADIUS,
+    knock: { x: 40, y: -140 },
+    reflectable: false,
+  })
+}
+
 function dropRain(run: AttackRun, env: AttackEnv): void {
   const { arena, rng } = env
+  if (run.variant === 1) {
+    dropOnLedge(run, env)
+    return
+  }
   const aimed = rng.chance(0.45)
   let x = aimed ? env.player.position().x + (rng.next() - 0.5) * 48 : arena.left + rng.next() * (arena.right - arena.left)
   for (let tries = 0; insideAny(x, run.safe, SAFE_MARGIN) || x < arena.left || x > arena.right; tries++) {
@@ -467,6 +522,11 @@ const rain: AttackKind = {
   begin(run, env) {
     const { arena } = env
     run.dir = faceToward(env, env.player.position().x)
+    run.variant = run.spec.heavy && hasLedges(env) && env.rng.chance(0.4) ? 1 : 0
+    if (run.variant === 1) {
+      for (const p of arena.platforms) show(run, env, { shape: 'rect', x: p.x + p.w / 2, y: p.top - RAIN_BAND / 2, w: p.w + 12, h: RAIN_BAND, fill: 'wide' })
+      return
+    }
     run.safe = safeIntervals(env.rng, arena.left, arena.right, env.safeZones, SAFE_WIDTH)
     show(run, env, { shape: 'rect', x: (arena.left + arena.right) / 2, y: arena.floorY - RAIN_BAND / 2, w: arena.right - arena.left, h: RAIN_BAND, fill: 'wide' })
     showSafe(run, env, arena.floorY - RAIN_BAND / 2, RAIN_BAND + 6)
@@ -488,16 +548,33 @@ const rain: AttackKind = {
 }
 
 // Beam: a line from the boss, level with the ground or aimed at the player. The combat world only
-// has axis-aligned rectangles and circles, so a diagonal beam is a chain of circles.
+// has axis-aligned rectangles and circles, so a diagonal beam is a chain of circles. The heavy high
+// beam runs both ways from the boss to the walls at the height of a player on a platform, so the
+// player drops to the floor, which lights up as safe.
 const BEAM_LENGTH = 420
 const BEAM_THICKNESS = 16
 const BEAM_STEP = 18
+
+const FLOOR_SAFE_HEIGHT = 24
+
+function beginHighBeam(run: AttackRun, env: AttackEnv): void {
+  const { arena, body } = env
+  run.top = platformBodyY(arena.platforms[0])
+  if (body.x - arena.left > 10) show(run, env, { shape: 'line', x: body.x, y: run.top, w: body.x - arena.left, h: BEAM_THICKNESS, rotation: Math.PI, fill: 'right' })
+  if (arena.right - body.x > 10) show(run, env, { shape: 'line', x: body.x, y: run.top, w: arena.right - body.x, h: BEAM_THICKNESS, fill: 'right' })
+  const mid = (arena.left + arena.right) / 2
+  show(run, env, { shape: 'rect', x: mid, y: arena.floorY - FLOOR_SAFE_HEIGHT / 2, w: arena.right - arena.left, h: FLOOR_SAFE_HEIGHT, fill: 'radial', safe: true })
+}
 
 const beam: AttackKind = {
   begin(run, env) {
     const { arena, body } = env
     run.dir = faceToward(env, env.player.position().x)
-    run.variant = env.rng.chance(0.5) ? 0 : 1
+    run.variant = run.spec.heavy && hasLedges(env) && env.rng.chance(1 / 3) ? 2 : env.rng.chance(0.5) ? 0 : 1
+    if (run.variant === 2) {
+      beginHighBeam(run, env)
+      return
+    }
     const ox = body.x + run.dir * body.hurtW * 0.4
     let oy = arena.floorY - 30
     if (run.variant === 0) {
@@ -526,7 +603,11 @@ const beam: AttackKind = {
     const cos = Math.cos(run.angle)
     const sin = Math.sin(run.angle)
     const knock = knockback(cos >= 0 ? 1 : -1, env.self.facing(), 150, 130)
-    if (run.variant === 0) {
+    if (run.variant === 2) {
+      const { arena } = env
+      const away: Facing = env.player.position().x >= env.body.x ? 1 : -1
+      hit(run, env, { kind: 'rect', x: arena.left, y: run.top - BEAM_THICKNESS / 2, w: arena.right - arena.left, h: BEAM_THICKNESS }, 420, knockback(away, env.self.facing(), 150, 60))
+    } else if (run.variant === 0) {
       const x = run.dir === 1 ? run.startX : run.startX - run.length
       hit(run, env, { kind: 'rect', x, y: run.top - BEAM_THICKNESS / 2, w: run.length, h: BEAM_THICKNESS }, 420, knock)
     } else {
@@ -551,7 +632,9 @@ const summon: AttackKind = {
 }
 
 // Shockwave: a low wave runs along the floor to both walls. It is low enough to jump. Where a safe
-// spot lies, the wave is cut in pieces so the spot stays empty.
+// spot lies, the wave is cut in pieces so the spot stays empty. The heavy flood instead rises over
+// the whole floor at once and stays too long to jump, so the player waits it out on a platform or a
+// safe spot.
 const WAVE_SPEED = 250
 const WAVE_BAND = 18
 const WAVE_WIDTH = 14
@@ -559,11 +642,22 @@ const WAVE_WIDTH = 14
 // this far from a safe spot to leave the whole spot untouched.
 const WAVE_MARGIN = WAVE_WIDTH / 2 + (WAVE_SPEED * STEP_MS) / 1000
 
+const FLOOD_HEIGHT = 36
+const FLOOD_MS = 900
+
 const shockwave: AttackKind = {
   begin(run, env) {
     const { arena, body } = env
     run.dir = faceToward(env, env.player.position().x)
     run.safe = safeIntervals(env.rng, arena.left, arena.right, env.safeZones, SAFE_WIDTH)
+    run.variant = run.spec.heavy && hasLedges(env) && env.rng.chance(0.5) ? 1 : 0
+    if (run.variant === 1) {
+      run.windupMs += FLOOR_WARN_MS
+      show(run, env, { shape: 'rect', x: (arena.left + arena.right) / 2, y: arena.floorY, w: arena.right - arena.left, h: FLOOD_HEIGHT, fill: 'up' })
+      showSafe(run, env, arena.floorY - FLOOD_HEIGHT / 2, FLOOD_HEIGHT + 6)
+      showLedgesSafe(run, env)
+      return
+    }
     const y = arena.floorY - WAVE_BAND / 2
     const left = body.x - body.hurtW / 2
     const right = body.x + body.hurtW / 2
@@ -573,6 +667,14 @@ const shockwave: AttackKind = {
   },
   fire(run, env) {
     const { arena, body } = env
+    if (run.variant === 1) {
+      const knock = knockback(env.player.position().x >= body.x ? 1 : -1, env.self.facing(), 80, 260)
+      for (const part of openIntervals(arena.left, arena.right, run.safe)) {
+        hit(run, env, { kind: 'rect', x: part.from, y: arena.floorY - FLOOD_HEIGHT, w: part.to - part.from, h: FLOOD_HEIGHT }, FLOOD_MS, knock)
+      }
+      run.activeMs = FLOOD_MS
+      return
+    }
     let end = 0
     for (const dir of [-1, 1] as const) {
       const edge = body.x + dir * (body.hurtW / 2)
@@ -591,6 +693,7 @@ const shockwave: AttackKind = {
   },
   active(run, env, dtMs) {
     run.timerMs += dtMs
+    if (run.variant === 1) return
     for (const wave of run.waves) {
       if (wave.fired || run.timerMs < wave.at) continue
       wave.fired = true

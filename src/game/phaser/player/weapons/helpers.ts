@@ -101,6 +101,56 @@ export function nearestLiving<T extends Living>(from: Point, enemies: readonly T
   return nearest(from, enemies, maxDistance, (enemy) => !enemy.isDead())
 }
 
+// True when `point` lies in the cone that opens from `origin` towards `facing`: no further than
+// `range` and no more than `halfAngle` radians off the facing line. `slack` widens the cone on
+// every side, so a body whose middle sits just outside but overlaps the edge still counts.
+export function inCone(origin: Point, facing: 1 | -1, point: Point, range: number, halfAngle: number, slack = 0): boolean {
+  const ahead = (point.x - origin.x) * facing
+  const side = Math.abs(point.y - origin.y)
+  if (ahead < -slack || Math.hypot(ahead, side) - slack > range) return false
+  return side <= Math.max(0, ahead) * Math.tan(halfAngle) + slack
+}
+
+// The nearest living enemy ahead of `from` within range, or null. `behind` lets an enemy that
+// overlaps the mage count as ahead.
+export function nearestAhead<T extends Living>(from: Point, facing: 1 | -1, enemies: readonly T[], maxDistance: number, behind = 12): T | null {
+  return nearest(from, enemies, maxDistance, (enemy) => !enemy.isDead() && (enemy.position().x - from.x) * facing >= -behind)
+}
+
+export interface Mark<T> {
+  // Marks a target for `ms`. A new mark replaces the old one.
+  set(target: T, ms: number): void
+  tick(dtMs: number): void
+  clear(): void
+  // The marked target, or null once the mark ran out.
+  target(): T | null
+  // The extra damage a hit of `damage` on `target` deals: `share` of it on the marked target, else 0.
+  bonus(target: T, damage: number): number
+}
+
+// One mark at a time, for Citation Needed.
+export function createMark<T>(share: number): Mark<T> {
+  let marked: T | null = null
+  let leftMs = 0
+  return {
+    set(target, ms) {
+      marked = target
+      leftMs = ms
+    },
+    tick(dtMs) {
+      if (leftMs <= 0) return
+      leftMs = Math.max(0, leftMs - dtMs)
+      if (leftMs <= 0) marked = null
+    },
+    clear() {
+      marked = null
+      leftMs = 0
+    },
+    target: () => marked,
+    bonus: (target, damage) => (marked !== null && target === marked ? damage * share : 0),
+  }
+}
+
 // A velocity of length `speed` from `from` towards `to`, turned by `spread` radians. Aiming at
 // the origin point itself falls back to the facing direction.
 export function aimedVelocity(from: Point, to: Point, speed: number, fallbackDir: 1 | -1, spread = 0): Point {
@@ -164,4 +214,19 @@ export function upwardKnockback(knockback: Point): Point {
   if (knockback.x === 0 && knockback.y === 0) return knockback
   const lift = Math.max(UPWARD_MIN_LIFT, Math.abs(knockback.y), Math.abs(knockback.x) * 0.9)
   return { x: knockback.x * UPWARD_FORWARD_SHARE, y: -lift }
+}
+
+// Every hitbox of a player move grows by this much on each side, so a swing that visibly grazes an
+// enemy hits it.
+export const MELEE_MARGIN = 4
+// Half the mage's hurtbox width. A rect reaches over the mage's own body at least, so an enemy
+// pressed against or inside the mage is hit by a forward swing too.
+export const MELEE_BODY_HALF_WIDTH = 9
+
+// The shape a player move's hitbox really gets, relative to the feet and facing right.
+export function forgivingShape(shape: HitShape): HitShape {
+  if (shape.kind === 'circle') return { kind: 'circle', x: shape.x, y: shape.y, r: shape.r + MELEE_MARGIN }
+  const left = Math.min(shape.x, -MELEE_BODY_HALF_WIDTH) - MELEE_MARGIN
+  const right = Math.max(shape.x + shape.w, MELEE_BODY_HALF_WIDTH) + MELEE_MARGIN
+  return { kind: 'rect', x: left, y: shape.y - MELEE_MARGIN, w: right - left, h: shape.h + 2 * MELEE_MARGIN }
 }

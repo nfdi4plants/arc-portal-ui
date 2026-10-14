@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { STEP_MS } from '../../../src/game/contracts/constants'
 import type { MotorAction, MotorEnv, MotorInput, MotorState } from '../../../src/game/model/input/motor'
-import { JUMP_VELOCITY, MOTOR, createMotorState, stepMotor } from '../../../src/game/model/input/motor'
+import { JUMP_VELOCITY, MOTOR, createMotorState, moveStarts, stepMotor } from '../../../src/game/model/input/motor'
 
 type Mechanics = MotorEnv['mechanics']
 const NO_MECHANICS: Mechanics = { doubleJump: false, airDash: false, wallJump: false, hatGlide: false }
@@ -197,5 +197,29 @@ describe('motor', () => {
     const normal = run(start, 100, input(), env()).vy
     const fast = run(start, 100, input(['down']), env()).vy
     expect(fast - start.vy).toBeCloseTo((normal - start.vy) * MOTOR.fastFallGravity)
+  })
+})
+
+describe('moveStarts', () => {
+  it('reports a jump or dash that a locked motor holds back', () => {
+    const locked = env({ grounded: true, actionsLocked: true })
+    const s = grounded()
+    expect(moveStarts(s, input([], ['jump']), locked, STEP_MS)).toBe('jump')
+    expect(moveStarts(s, input([], ['dash']), locked, STEP_MS)).toBe('dash')
+    expect(locked.actionsLocked).toBe(true)
+  })
+
+  it('reports nothing the motor rules forbid', () => {
+    expect(moveStarts(createMotorState(), input([], ['jump']), env(), STEP_MS)).toBeNull()
+    const cooling = { ...grounded(), dashCooldownMs: 500 }
+    expect(moveStarts(cooling, input([], ['dash']), env({ grounded: true }), STEP_MS)).toBeNull()
+    expect(moveStarts(grounded(), input(), env({ grounded: true }), STEP_MS)).toBeNull()
+  })
+
+  it('leaves the state untouched', () => {
+    const s = grounded()
+    const copy = { ...s }
+    moveStarts(s, input([], ['jump', 'dash']), env({ grounded: true }), STEP_MS)
+    expect(s).toEqual(copy)
   })
 })

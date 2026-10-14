@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { hitReaction, type ReactionInput } from '../../../src/game/phaser/mobs/reaction'
+import { hitReaction, shrugsOff, type ReactionInput } from '../../../src/game/phaser/mobs/reaction'
 
 const base: ReactionInput = { size: 'medium', body: 'beetle', heavy: false, armoredFront: false, defensiveStance: false }
 const react = (patch: Partial<ReactionInput>) => hitReaction({ ...base, ...patch })
@@ -49,5 +49,14 @@ describe('hitReaction', () => {
     expect(armored.knockbackScale).toBeLessThan(plain.knockbackScale)
     expect(defensive.staggerMs).toBeLessThan(plain.staggerMs)
     expect(both.staggerMs).toBeLessThan(armored.staggerMs)
+  })
+})
+
+describe('shrugsOff', () => {
+  it('lets a light shot only hurt, while strikes and heavy shots still stagger', () => {
+    expect(shrugsOff(['player', 'projectile'])).toBe(true)
+    expect(shrugsOff(['player', 'heavy', 'projectile'])).toBe(false)
+    expect(shrugsOff(['player', 'melee'])).toBe(false)
+    expect(shrugsOff(['player', 'heavy', 'melee'])).toBe(false)
   })
 })

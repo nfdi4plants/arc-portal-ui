@@ -3,7 +3,18 @@ import type { ScribbleArt } from '../../../contracts/art'
 import type { Combatant, CombatWorld } from '../../../contracts/combat'
 import type { AbilityHandler, PlayerHandle, WeaponMoveset } from '../../../contracts/player'
 import type { PlayerBuild } from '../../../contracts/progression'
+import type { BossCharge } from '../../../model/progression'
 import type { Rng } from '../../../contracts/rng'
+import {
+  createAutoclave,
+  createCentrifugeSpin,
+  createCitationNeeded,
+  createFumeHood,
+  createLabCoat,
+  createPeerPressure,
+  createSampleFreeze,
+  createSecondWind,
+} from './abilities'
 import { PASSIVE_IDS, createCore } from './core'
 import type { Feature } from './core'
 import { beakerMoveset, bunsenMoveset, discMoveset, petriMoveset } from './heavy'
@@ -22,6 +33,9 @@ export interface LoadoutDeps {
   rng: Rng
   // Living enemies the scene knows about, for effects that target or chain.
   enemies(): readonly Combatant[]
+  // The run's Second Wind charge, which recharges when a boss falls. Without it (the sandboxes)
+  // the loadout keeps its own and recharges it at the start of every boss fight.
+  secondWind?: BossCharge
 }
 
 export interface Loadout {
@@ -38,6 +52,8 @@ export interface Loadout {
 export type LoadoutWithStatus = Loadout & {
   // True while Git Revert is owned and its once-per-fight rewind is still available.
   gitRevertCharged(): boolean
+  // True while Second Wind is owned and its heal is still available until the next boss falls.
+  secondWindCharged(): boolean
 }
 
 // The eight new weapons. The staff stays with the player and is wrapped inside the loadout.
@@ -60,6 +76,16 @@ export function attachLoadout(deps: LoadoutDeps): LoadoutWithStatus {
   const parry = createParry(core)
   const familiar = createFamiliar(core)
   const gitRevert = createGitRevert(core)
+  const abilities = {
+    centrifugeSpin: createCentrifugeSpin(core),
+    fumeHood: createFumeHood(core),
+    sampleFreeze: createSampleFreeze(core),
+    citationNeeded: createCitationNeeded(core),
+    autoclave: createAutoclave(core),
+    secondWind: createSecondWind(core),
+    peerPressure: createPeerPressure(core),
+    labCoat: createLabCoat(core),
+  }
   const features: Feature[] = [
     moves,
     createEcho(core),
@@ -70,12 +96,14 @@ export function attachLoadout(deps: LoadoutDeps): LoadoutWithStatus {
     gitRevert,
     createFairPrinciples(core),
     createPeerReview(core),
+    ...Object.values(abilities),
   ]
   const handlers: Record<string, AbilityHandler> = {
     parry: parry.handler,
     familiar: familiar.handler,
     gitRevert: gitRevert.handler,
   }
+  for (const [id, ability] of Object.entries(abilities)) handlers[id] = ability.handler
   const movesets = [...WEAPON_MOVESETS, staffMoveset].map((moveset) => moves.wrap(moveset))
   const critRoll = deps.rng.fork('loadout-crit')
   const modifier = createDamageModifier(player, core.damage, () => critRoll.next())
@@ -144,5 +172,6 @@ export function attachLoadout(deps: LoadoutDeps): LoadoutWithStatus {
     },
     destroy,
     gitRevertCharged: gitRevert.charged,
+    secondWindCharged: abilities.secondWind.charged,
   }
 }

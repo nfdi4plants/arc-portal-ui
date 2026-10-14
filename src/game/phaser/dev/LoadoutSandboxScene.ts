@@ -301,6 +301,7 @@ export class LoadoutSandboxScene extends Phaser.Scene {
         `x ${Math.round(player.position().x)}  y ${Math.round(player.position().y)}`,
         `dealt ${Math.round(dealt)} damage in ${hits} hits`,
         `git revert charge ${loadout.gitRevertCharged() ? 'ready' : 'spent or not owned'}`,
+        `second wind charge ${loadout.secondWindCharged() ? 'ready' : 'spent or not owned'}`,
         `tags ${[...tagCounts].map(([tag, count]) => `${tag} ${count}`).join(', ')}`,
       ].join('\n')
     }
@@ -340,7 +341,7 @@ function buildPanel(scene: Phaser.Scene, checked: Set<string>, tierTwo: Set<stri
   const hint = document.createElement('div')
   hint.style.cssText = 'margin-bottom:6px;opacity:.8'
   hint.textContent =
-    'Click the canvas first. WASD, Space, Shift, mouse buttons, Q E R F. Heavy in the air plunges, attacks during a dash are dash attacks, W + attack goes up, down + light in the air is the pogo.'
+    'Click the canvas first. WASD, Space, Shift, mouse buttons, Q E R F. Heavy in the air plunges, attacks during a dash are dash attacks, W + attack goes up.'
   root.append(stats, hint)
 
   const boxes = new Map<string, HTMLInputElement>()

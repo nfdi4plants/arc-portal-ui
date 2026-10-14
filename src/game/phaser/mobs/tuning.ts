@@ -21,6 +21,9 @@ export const WANDER_RADIUS = 2 * TILE
 export const PATROL_RADIUS = 4 * TILE
 // Aggro ends only when the player is this much farther than the aggro range, so the edge does not flicker.
 export const AGGRO_RELEASE = 1.15
+// A hit provokes the mob for this long whatever the distance, so shots from beyond its aggro range
+// still draw it to the player. Each further hit restarts the timer.
+export const PROVOKE_MS = 6000
 
 export const BLINK_MIN_MS = 2500
 export const BLINK_MAX_MS = 4000

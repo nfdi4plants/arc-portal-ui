@@ -4,7 +4,7 @@ import type { FxArt, ProjectileArt, SpriteRef, TelegraphArt, Theme } from '../..
 import type { BodyKind, BossArchetype, BossSpec, EnemyWeaponKind, FinalBossSpec, MonsterSpec, PassiveKind } from '../../contracts/content'
 import { SCENE } from '../../contracts/constants'
 import type { PlayerWeaponId } from '../../contracts/progression'
-import { applySpriteRef, createScribbleArt, prewarm, TEXTURE_SCALE, textureBytes } from '../art'
+import { applySpriteRef, createScribbleArt, monsterWeapon, prewarm, TEXTURE_SCALE, textureBytes } from '../art'
 import type { PartRef } from '../art/parts'
 import { followView, viewForBox } from '../view'
 import type { View } from '../view'
@@ -162,6 +162,14 @@ export class ArtGalleryScene extends Phaser.Scene {
     return sprite
   }
 
+  // A monster with its weapon sprite at rest in its hand, as a mob holds it.
+  private monsterSprite(spec: MonsterSpec, x: number, y: number): void {
+    const ref = this.art.monster(this, spec)
+    this.sprite(ref, x, y)
+    const weapon = monsterWeapon(this, spec)
+    this.sprite(weapon, x + ref.anchors.weapon.x, y + ref.anchors.weapon.y).setOrigin(weapon.originX, weapon.originY).setRotation(weapon.rest)
+  }
+
   private heading(y: number, value: string): number {
     this.text(4, y, value, 11, 0).setColor('#2b2620')
     return y + 18
@@ -177,7 +185,6 @@ export class ArtGalleryScene extends Phaser.Scene {
     const t0 = performance.now()
     prewarm(this, specs)
     const first = performance.now() - t0
-    const refs = specs.map((spec) => this.art.monster(this, spec))
     const t1 = performance.now()
     specs.forEach((spec) => this.art.monster(this, spec))
     const again = performance.now() - t1
@@ -185,7 +192,7 @@ export class ArtGalleryScene extends Phaser.Scene {
 
     this.memory = this.text(4, y + 42, '', 8, 0).setColor('#9c3b2e')
     const row = y + 58
-    refs.forEach((ref, i) => this.sprite(ref, LEFT + (i % 12) * 90 + 40, row + 62 + Math.floor(i / 12) * 76))
+    specs.forEach((spec, i) => this.monsterSprite(spec, LEFT + (i % 12) * 90 + 40, row + 62 + Math.floor(i / 12) * 76))
     return row + 3 * 76 + 10
   }
 
@@ -210,7 +217,7 @@ export class ArtGalleryScene extends Phaser.Scene {
       WEAPONS.forEach((weapon, c) => {
         const n = r * 8 + c
         const spec = monsterSpec(`grid:${n}`, body, weapon, PASSIVES[(r + c) % 8], SIZES[(r + c * 2) % 3], (r * 40 + c * 25) % 360, n, 0.75 + (n % 5) * 0.2)
-        this.sprite(this.art.monster(this, spec), LEFT + c * CELL.w + CELL.w / 2, y + 62)
+        this.monsterSprite(spec, LEFT + c * CELL.w + CELL.w / 2, y + 62)
       })
       y += CELL.h
     })
@@ -225,7 +232,7 @@ export class ArtGalleryScene extends Phaser.Scene {
     rows.forEach(([body, size], r) => {
       PASSIVES.forEach((passive, c) => {
         const spec = monsterSpec(`passive:${r}:${c}`, body, 'claw', passive, size, 20 + c * 43, c)
-        this.sprite(this.art.monster(this, spec), LEFT + c * CELL.w + CELL.w / 2, y + 62)
+        this.monsterSprite(spec, LEFT + c * CELL.w + CELL.w / 2, y + 62)
       })
       y += CELL.h
     })
@@ -236,7 +243,7 @@ export class ArtGalleryScene extends Phaser.Scene {
     let y = this.heading(top, 'Faces (passive variant 0 to 15: eyes = variant % 4, mouth = variant / 4)')
     for (let v = 0; v < 16; v++) {
       const spec = monsterSpec(`face:${v}`, v < 8 ? 'slime' : 'imp', 'wand', 'tuned', 'medium', v * 22, v)
-      this.sprite(this.art.monster(this, spec), LEFT + (v % 8) * CELL.w + CELL.w / 2, y + 48 + Math.floor(v / 8) * 62)
+      this.monsterSprite(spec, LEFT + (v % 8) * CELL.w + CELL.w / 2, y + 48 + Math.floor(v / 8) * 62)
       this.text(LEFT + (v % 8) * CELL.w + CELL.w / 2, y + 50 + Math.floor(v / 8) * 62, `${v}`, 7)
     }
     y += 2 * 62
@@ -341,7 +348,7 @@ export class ArtGalleryScene extends Phaser.Scene {
         for (let j = 0; j < 3; j++) this.add.image(left + 20 * 24 + 4 - 48 + i * 24, y + 360 - 24 - 24 * (j + 1), tiles.wall).setOrigin(0, 0).setDisplaySize(24, 24)
       }
       const spec = monsterSpec(`theme:${theme}`, 'imp', 'wand', 'blink', 'medium', 40, 3)
-      this.sprite(this.art.monster(this, spec), left + 220, y + 360 - 24)
+      this.monsterSprite(spec, left + 220, y + 360 - 24)
       // The same tiles repeated, to check the seams.
       for (let r = 0; r < 4; r++) {
         for (let c = 0; c < 10; c++) this.add.image(520 + c * 24, y + 40 + r * 24, tiles.ground).setOrigin(0, 0).setDisplaySize(24, 24)

@@ -20,9 +20,9 @@ export interface AttackContext {
 }
 
 // Which version of a slot's move an attack plays. The attack machine picks it when the attack starts:
-// 'dash' during a dash or up to 80 ms after it, else 'up' with up held (and down not held), else
-// 'air' for a heavy press in the air, else 'ground'. A slot without the picked version falls through
-// to the next one.
+// 'dash' for a press during a dash (it plays when the dash ends) or up to 80 ms after it, else 'up'
+// with up held (and down not held), else 'air' for a heavy press in the air, else 'ground'. A slot
+// without the picked version falls through to the next one.
 export type AttackVariant = 'ground' | 'up' | 'air' | 'dash'
 
 // One attack. The player's attack state machine runs the timing. All times are divided by
@@ -32,13 +32,16 @@ export interface AttackMove {
   startupMs: number
   activeMs: number
   recoveryMs: number
-  // After this many ms of recovery, jump, dash and the next attack may cancel the move.
+  // After this many ms of recovery the next attack may cancel the move. A jump or dash ends a move
+  // at any time.
   cancelAfterMs: number
-  // Horizontal push at the start of the active phase, world units per second.
+  // Horizontal push at the start of the active phase, world units per second, only while left or
+  // right is held. Without a direction the mage stays in place (lungeVelocity in player/controls.ts).
   lunge?: number
   allowedInAir: boolean
   // A lock that starts when the active phase ends. While it runs the mage takes no movement input
-  // and cannot jump, dash, attack or cancel the move. Presses in its last 150 ms stay buffered.
+  // and cannot attack or cancel the move into another one. Attack presses in its last 150 ms stay
+  // buffered. A jump or dash still ends the move and the lock.
   lockMs?: number
   // The same lock, started by the landing that fires onLand.
   landingLockMs?: number
@@ -55,12 +58,14 @@ export interface AttackMove {
   // For dash variants: the dash speed carries through startup and active, then normal friction
   // takes over. Without it the dash stops when the move starts.
   keepsMomentum?: boolean
+  // The held weapon spins around the hand during the active phase.
+  spin?: boolean
   // Called once when the active phase starts. Spawns hitboxes or projectiles.
   onActive(ctx: AttackContext): void
 }
 
 // The moves a weapon has in one slot. For the light slot this is a combo string. Pressing light
-// again during the cancel window advances to the next move. The heavy slot usually has one move.
+// again during the cancel window, or up to 250 ms after the move ended, advances to the next move. The heavy slot usually has one move.
 //
 // Each weapon only defines the slot its card puts it in. A light weapon has moves, dashLight and
 // upLight, a heavy weapon has moves, airHeavy, dashHeavy and upHeavy, and moves() returns an empty
@@ -89,12 +94,13 @@ export interface WeaponMoveset {
 
 export interface AbilityHandler {
   cooldownMs: number
-  activate(ctx: AttackContext): void
+  // Returns false when the press did nothing (no target in reach, nothing to heal), so the cooldown
+  // does not start.
+  activate(ctx: AttackContext): boolean | void
 }
 
 export interface PlayerEvents {
-  // held is the set of actions held when the attack started, for moves that depend on a direction
-  // (down + light in the air is a pogo).
+  // held is the set of actions held when the attack started, for moves that depend on a direction.
   attackStarted: { slot: WeaponSlot; comboIndex: number; move: AttackMove; held: ReadonlySet<Action>; variant: AttackVariant }
   attackActive: { slot: WeaponSlot; comboIndex: number; move: AttackMove }
   dashed: { direction: 1 | -1 }
@@ -123,8 +129,14 @@ export interface PlayerHandle extends Combatant {
   setLethalHitInterceptor(interceptor: ((hit: HitEvent) => boolean) | null): void
   // Freezes input and physics, for hit-stop, level-up cards and pause.
   setFrozen(frozen: boolean): void
+  // Drops the presses and releases saved while frozen, for freezes whose input should not carry
+  // over, like the pit rescue.
+  discardBufferedInput(): void
   // A shield absorbs the next hit completely. Shield fragments (component monsters) grant one,
   // up to three at a time.
   grantShield(): void
   shieldCount(): number
+  // Every hit misses the mage for this long, without the blinking of the damage invulnerability.
+  // For abilities that block (Autoclave, Lab Coat).
+  blockHits(ms: number): void
 }

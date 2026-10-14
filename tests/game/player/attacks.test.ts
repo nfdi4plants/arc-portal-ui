@@ -56,13 +56,22 @@ describe('createAttackMachine', () => {
     expect(started).toHaveLength(2)
   })
 
-  it('drops a press made 200 ms before recovery ends', () => {
+  it('drops a heavy press made 200 ms before recovery ends', () => {
     const { started, press, wait } = setup(200)
-    press()
+    press(HEAVY)
     wait(90)
-    press()
+    press(HEAVY)
     wait(300)
     expect(started).toHaveLength(1)
+  })
+
+  it('keeps an early light press for the next move of the string', () => {
+    const { started, press, wait } = setup(100)
+    press()
+    wait(20)
+    press()
+    wait(300)
+    expect(started.map((s) => s.comboIndex)).toEqual([0, 1])
   })
 
   it('advances the light combo when pressed inside the cancel window', () => {
@@ -219,15 +228,6 @@ describe('attack variants', () => {
     rangedAir.press(HEAVY)
     expect(ranged.started[0]).toMatchObject({ name: 'a', variant: 'ground' })
     expect(rangedAir.started[0]).toMatchObject({ name: 'air', variant: 'air' })
-  })
-
-  it('leaves a light in the air with up and down held to the pogo', () => {
-    // The player sets env.up only when down is not held, so the ground light (and its pogo) plays.
-    const { env, started, press } = setup(100, 1, all)
-    env.grounded = false
-    env.up = false
-    press(LIGHT)
-    expect(started[0]).toMatchObject({ name: 'a', variant: 'ground' })
   })
 
   it('keeps a plunge active until it lands, then locks for landingLockMs', () => {

@@ -17,7 +17,6 @@ describe('cardDetails', () => {
   it('shows max HP and the heal for the hp cards', () => {
     const build = { ...createBuild(), hp: 60 }
     expect(cardDetails(build, 'stat.thickRobe')).toContain('Max HP: 100 -> 115')
-    expect(cardDetails(build, 'stat.secondWind')[0]).toBe('HP: 60/100 -> 100/100')
   })
 
   it('names the slot and the replaced weapon', () => {
@@ -40,6 +39,11 @@ describe('cardDetails', () => {
     expect(cardDetails(createBuild(), 'mechanic.parry')).toContain('Lands on ability slot 1 (Q).')
     const build = applyCard(createBuild(), 'mechanic.parry')
     expect(cardDetails(build, 'legendary.gitRevert')).toContain('Lands on ability slot 2 (E).')
+  })
+
+  it('names the slot Second Wind lands on', () => {
+    const build = applyCard(createBuild(), 'mechanic.fumeHood')
+    expect(cardDetails(build, 'mechanic.secondWind')).toContain('Lands on ability slot 2 (E).')
   })
 
   it('uses the label function for the key', () => {

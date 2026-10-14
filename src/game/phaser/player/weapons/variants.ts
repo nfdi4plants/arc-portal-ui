@@ -75,6 +75,8 @@ function overhead(real: CombatWorld): CombatWorld {
     spawnHitbox: (spec) => real.spawnHitbox({ ...spec, shape: overheadShape(spec.shape), knockback: upwardKnockback(spec.knockback) }),
     spawnProjectile: (spec, origin) => real.spawnProjectile(spec, origin),
     cancelOwnedBy: (owner) => real.cancelOwnedBy(owner),
+    addSlowZone: (zone) => real.addSlowZone(zone),
+    cancelShots: (team, area) => real.cancelShots(team, area),
     livingCombatants: (team) => real.livingCombatants(team),
     on: (event, listener) => real.on(event, listener),
     setDamageModifier: (modifier) => real.setDamageModifier(modifier),

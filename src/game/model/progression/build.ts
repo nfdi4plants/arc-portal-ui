@@ -10,6 +10,7 @@ import type {
   XpForNextLevel,
 } from '../../contracts/progression'
 import { ABILITY_IDS } from './catalog'
+import { weaponStats } from './weaponStats'
 
 // dashCooldownMs is a floor. Fresh battery stops applying once the cooldown reaches it.
 export const STAT_CAPS = {
@@ -74,15 +75,19 @@ export const addXp: AddXp = (build, amount) => {
   }
 }
 
-function raiseStat(field: CappedStat, update: (value: number) => number): Effect {
+function raiseStat(field: CappedStat, update: (value: number) => number, usable: (build: PlayerBuild) => boolean = () => true): Effect {
   return {
-    applies: (build) => build.stats[field] < STAT_CAPS[field],
+    applies: (build) => build.stats[field] < STAT_CAPS[field] && usable(build),
     apply: (build) => ({
       ...build,
       stats: { ...build.stats, [field]: Math.min(STAT_CAPS[field], update(build.stats[field])) },
     }),
   }
 }
+
+// Melee range scales melee hitboxes only, so a build with two shooting weapons gains nothing from it.
+const hasMeleeWeapon = (build: PlayerBuild): boolean =>
+  (['light', 'heavy'] as const).some((slot) => weaponStats(build.weapons[slot].id, slot, build.weapons[slot].tier).reach !== 'ranged')
 
 // Each Fresh Battery card takes this much off the dash cooldown, so two cards reach the floor.
 const FRESH_BATTERY_MS = 500
@@ -102,14 +107,6 @@ const thickRobe: Effect = {
     const maxHp = Math.round(build.stats.maxHp * 1.15)
     return { ...build, hp: build.hp + maxHp - build.stats.maxHp, stats: { ...build.stats, maxHp } }
   },
-}
-
-const secondWind: Effect = {
-  applies: (build) => build.hp < build.stats.maxHp,
-  apply: (build) => ({
-    ...build,
-    hp: Math.min(build.stats.maxHp, build.hp + Math.round(0.5 * build.stats.maxHp)),
-  }),
 }
 
 function weapon(slot: WeaponSlot, id: PlayerWeaponId): Effect {
@@ -163,8 +160,7 @@ const EFFECTS = new Map<string, Effect>([
   ['stat.keenEye', raiseStat('critChance', (value) => value + 0.05)],
   ['stat.freshBattery', freshBattery],
   ['stat.thickRobe', thickRobe],
-  ['stat.longReach', raiseStat('meleeRange', (value) => value * 1.15)],
-  ['stat.secondWind', secondWind],
+  ['stat.longReach', raiseStat('meleeRange', (value) => value * 1.15, hasMeleeWeapon)],
   ['weapon.wand', weapon('light', 'wand')],
   ['weapon.pipettePistol', weapon('light', 'pipettePistol')],
   ['weapon.scalpel', weapon('light', 'scalpel')],
@@ -184,14 +180,22 @@ const EFFECTS = new Map<string, Effect>([
   ['mechanic.reflectDash', mechanic('reflectDash')],
   ['mechanic.echoStrike', mechanic('echoStrike')],
   ['mechanic.shockwaveHeavy', mechanic('shockwaveHeavy')],
-  ['mechanic.pogo', mechanic('pogo')],
   ['mechanic.familiar', mechanic('familiar')],
   ['mechanic.extraChoice', mechanic('extraChoice', (build) => ({ ...build, offerSize: 4 }))],
+  ['mechanic.serialDilution', mechanic('serialDilution')],
+  ['mechanic.centrifugeSpin', mechanic('centrifugeSpin')],
+  ['mechanic.fumeHood', mechanic('fumeHood')],
+  ['mechanic.sampleFreeze', mechanic('sampleFreeze')],
+  ['mechanic.citationNeeded', mechanic('citationNeeded')],
+  ['mechanic.autoclave', mechanic('autoclave')],
+  ['mechanic.secondWind', mechanic('secondWind')],
   ['legendary.theOntology', legendary('theOntology')],
   ['legendary.gitRevert', legendary('gitRevert')],
   ['legendary.doiExcalibur', legendary('doiExcalibur')],
   ['legendary.fairPrinciples', legendary('fairPrinciples')],
   ['legendary.peerReview', legendary('peerReview')],
+  ['legendary.peerPressure', legendary('peerPressure')],
+  ['legendary.labCoat', legendary('labCoat')],
 ])
 
 export const canApply = (build: PlayerBuild, cardId: string): boolean => {
