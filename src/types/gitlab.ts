@@ -56,6 +56,8 @@ export interface ListProjectsOptions extends GitLabRequestOptions {
   lastActivityAfter?: string
   /** Limit results to projects the authenticated user is a member of. */
   membership?: boolean
+  /** Limit results to projects starred by the authenticated user. */
+  starred?: boolean
 }
 
 export interface GitLabPage<T> {

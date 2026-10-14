@@ -40,7 +40,9 @@ its top or bottom, scrolling continues in the surrounding dashboard or page.
 
 Public browsing is available immediately. The navbar Login button opens a Primer
 dialog accepting a GitLab personal access token. The generation link requests
-`read_user` and `read_api` scopes. `GET /user` validates the token and returns the
+the `api` scope so signed-in users can star and unstar repositories. Existing
+`read_api` tokens can still browse but need to be replaced with an `api` token
+to change stars. `GET /user` validates the token and returns the
 name and username shown beside Logout.
 
 Successful tokens are stored under `arc-portal-gitlab-token` in local storage;
@@ -54,6 +56,12 @@ account-specific results.
 After login, search includes all accessible public, internal, and private
 projects. Most-starred ARCs remain public. Login/logout cancels old requests and
 clears submitted search results while preserving the draft search term.
+
+The dashboard's Starred filter shows repositories starred by the signed-in user
+on the selected DataHUB. The star count button toggles the user's star and is
+disabled when that DataHUB has no signed-in account. Star changes update the
+button in place without refetching or removing rows, so they can be undone
+immediately even in the Starred view. Use Update to reload the results.
 
 Tokens are supplied at runtime through `PRIVATE-TOKEN` headers; they never go in
 request URLs. Browser session credentials are omitted. Do not put private tokens

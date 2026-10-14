@@ -1,6 +1,6 @@
 import { useId } from 'react'
 import { ActionList, ActionMenu, Button, IconButton, Label, Pagination, Select } from '@primer/react'
-import { GlobeIcon, KebabHorizontalIcon, LinkExternalIcon, LockIcon, StarIcon } from '@primer/octicons-react'
+import { GlobeIcon, KebabHorizontalIcon, LinkExternalIcon, LockIcon, StarFillIcon, StarIcon } from '@primer/octicons-react'
 import type { ArcSummary, SortState } from '../../types/dashboard.ts'
 import type { GitLabPage, GitLabProject } from '../../types/gitlab.ts'
 import { relativeTime } from '../../util/time.ts'
@@ -16,6 +16,10 @@ export interface ArcResultsListProps {
   onClearFilters?: () => void
   pagination: GitLabPage<GitLabProject>
   onPageChange: (page: number) => void
+  starredProjectIds: ReadonlySet<number>
+  updatingStar?: number | null
+  onToggleStar?: (arc: ArcSummary) => void
+  starDisabledReason?: string
 }
 
 const sortOptions: { label: string; value: string; sort: SortState }[] = [
@@ -25,7 +29,8 @@ const sortOptions: { label: string; value: string; sort: SortState }[] = [
   { label: 'Title: Z–A', value: 'title-DESC', sort: { column: 'title', direction: 'DESC' } },
 ]
 
-export function ArcResultsList({ arcs, hubNames, sort, onSortChange, now, onOpen, onClearFilters, pagination, onPageChange }: ArcResultsListProps) {
+export function ArcResultsList({ arcs, hubNames, sort, onSortChange, now, onOpen, onClearFilters, pagination, onPageChange,
+  starredProjectIds, updatingStar, onToggleStar, starDisabledReason }: ArcResultsListProps) {
   const headingId = useId()
   const sortId = useId()
   const totalPages = pagination.totalPages ?? (pagination.total === null ? null : Math.ceil(pagination.total / pagination.perPage))
@@ -50,19 +55,26 @@ export function ArcResultsList({ arcs, hubNames, sort, onSortChange, now, onOpen
       {onClearFilters && <Button variant="invisible" onClick={onClearFilters}>Clear filters</Button>}
     </div> : <ul aria-labelledby={headingId} className={styles.list}>
       {arcs.map(arc => <li key={arc.key} className={styles.item}>
-        <button type="button" className={styles.open} aria-label={'Open ' + arc.title} onClick={() => onOpen(arc)}>
-          <span className={styles.title}>{arc.title}</span>
-          <span className={styles.namespace}>{arc.group.label}</span>
-          {arc.description.trim() && <span className={styles.description}>{arc.description}</span>}
-          <span className={styles.metadata}>
+        <div className={styles.content}>
+          <button type="button" className={styles.open} aria-label={'Open ' + arc.title} onClick={() => onOpen(arc)}>
+            <span className={styles.title}>{arc.title}</span>
+            <span className={styles.namespace}>{arc.group.label}</span>
+            {arc.description.trim() && <span className={styles.description}>{arc.description}</span>}
+          </button>
+          <div className={styles.metadata}>
             {arc.access === 'public'
               ? <Label variant="success" className={styles.access}><GlobeIcon size={12} /> Public</Label>
               : <Label variant="attention" className={styles.access}><LockIcon size={12} /> Private</Label>}
             <span>{hubNames.get(arc.hubId) ?? arc.hubId}</span>
             <span>Last activity {relativeTime(arc.lastActivityAt, now)}</span>
-            <span className={styles.stars} aria-label={arc.stars + ' stars'}><StarIcon size={14} /> {arc.stars}</span>
-          </span>
-        </button>
+            <Button type="button" className={styles.stars} size="small" variant="invisible"
+              leadingVisual={starredProjectIds.has(arc.projectId) ? StarFillIcon : StarIcon}
+              aria-label={(starredProjectIds.has(arc.projectId) ? 'Unstar ' : 'Star ') + arc.title + ' (' + arc.stars + ' stars)'}
+              aria-pressed={starredProjectIds.has(arc.projectId)} aria-busy={updatingStar === arc.projectId}
+              disabled={!onToggleStar || updatingStar != null} title={!onToggleStar ? starDisabledReason : undefined}
+              onClick={() => onToggleStar?.(arc)}>{arc.stars}</Button>
+          </div>
+        </div>
         <div className={styles.actions}>
           <ActionMenu>
             <ActionMenu.Anchor><IconButton icon={KebabHorizontalIcon} size="small" variant="invisible"

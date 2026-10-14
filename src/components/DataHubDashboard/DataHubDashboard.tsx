@@ -14,6 +14,7 @@ import { useDashboardConfiguration, type DashboardGroup } from './configuration.
 import { useDataHubs } from './hooks/useDataHubs.ts'
 import { useGroups } from './hooks/useGroups.ts'
 import { useProjectsPage } from './hooks/useProjectsPage.ts'
+import { useProjectStars } from './hooks/useProjectStars.ts'
 import { toArcSummary } from './logic/toArcSummary.ts'
 import styles from './DataHubDashboard.module.css'
 
@@ -25,7 +26,7 @@ export interface DataHubDashboardProps {
 interface ProjectView {
   hubId: string
   group?: DashboardGroup
-  repositories: 'all' | 'your' | 'mostStarred'
+  repositories: 'all' | 'your' | 'starred' | 'mostStarred'
   query: string
   recentAfter?: string
   sort: SortState
@@ -49,7 +50,9 @@ function DataHubDashboard({ onArcClick, now = () => new Date() }: DataHubDashboa
       : view.sort.column === 'title' ? 'name' : view.group ? 'last_activity_at' : 'updated_at',
     sort: view.repositories === 'mostStarred' ? 'desc' : view.sort.direction === 'ASC' ? 'asc' : 'desc',
     lastActivityAfter: view.recentAfter, membership: view.repositories === 'your' ? true : undefined,
+    starred: view.repositories === 'starred' ? true : undefined,
   }, refreshKey)
+  const stars = useProjectStars(view.hubId, refreshKey)
   const current = now()
   const hubNames = useMemo(() => new Map(dataHubs.map(hub => [hub.id, hub.name])), [dataHubs])
   const token = accounts[view.hubId]?.session?.token
@@ -58,9 +61,10 @@ function DataHubDashboard({ onArcClick, now = () => new Date() }: DataHubDashboa
     const names = new Map<string, string>()
     return projects.result.data.items.map(project => {
       const arc = toArcSummary(project, projects.hub!, names, !token || projects.result.tokenRejected)
-      return { ...arc, group: { ...arc.group, label: project.namespace?.full_path ?? project.namespace?.name ?? arc.group.label } }
+      return { ...arc, stars: stars.updates.get(project.id)?.stars ?? arc.stars,
+        group: { ...arc.group, label: project.namespace?.full_path ?? project.namespace?.name ?? arc.group.label } }
     })
-  }, [projects.status, projects.result, projects.hub, token])
+  }, [projects.status, projects.result, projects.hub, token, stars.updates])
   const hubCounts = hubs.map(({ hub, data, status }) => ({
     key: hub.id, label: hub.name, count: data ?? null,
     loading: status === 'loading', capped: data !== undefined && data !== null && data >= PROJECT_COUNT_LIMIT,
@@ -74,7 +78,8 @@ function DataHubDashboard({ onArcClick, now = () => new Date() }: DataHubDashboa
   const chips: { kind: FilterKind; label: string }[] = [{ kind: 'hub', label: 'DataHUB: ' + (hubNames.get(view.hubId) ?? view.hubId) }]
   if (view.group) chips.push({ kind: 'group', label: 'Group: ' + view.group.group.full_path })
   if (view.repositories !== 'all') chips.push({ kind: 'repositories',
-    label: view.repositories === 'your' ? 'Your repositories' : 'Most Starred repositories' })
+    label: view.repositories === 'your' ? 'Your repositories'
+      : view.repositories === 'starred' ? 'Starred repositories' : 'Most Starred repositories' })
   if (view.query) chips.push({ kind: 'query', label: 'Search: “' + view.query + '”' })
   if (view.recentAfter) chips.push({ kind: 'recent', label: 'Active in the last 30 days' })
   const clearAll = () => {
@@ -113,10 +118,11 @@ function DataHubDashboard({ onArcClick, now = () => new Date() }: DataHubDashboa
         <div className={styles.repositoryFilters}>
           <span className={styles.repositoryLabel}>Repositories</span>
           <SegmentedControl aria-label="Repositories" size="small" onChange={index => setView(previous => ({ ...previous,
-            repositories: (['all', 'your', 'mostStarred'] as const)[index], group: undefined,
+            repositories: (['all', 'your', 'starred', 'mostStarred'] as const)[index], group: undefined,
             sort: { column: 'lastChange', direction: 'DESC' }, page: 1 }))}>
             <SegmentedControl.Button selected={view.repositories === 'all'}>All</SegmentedControl.Button>
             <SegmentedControl.Button selected={view.repositories === 'your'}>Your</SegmentedControl.Button>
+            <SegmentedControl.Button selected={view.repositories === 'starred'}>Starred</SegmentedControl.Button>
             <SegmentedControl.Button selected={view.repositories === 'mostStarred'}>Most Starred</SegmentedControl.Button>
           </SegmentedControl>
           {view.group && <span className={styles.repositoryHint}>Choosing an option clears the organisation filter.</span>}
@@ -133,11 +139,19 @@ function DataHubDashboard({ onArcClick, now = () => new Date() }: DataHubDashboa
         </section>}
         {projects.status === 'error' && <Banner variant="critical" title="Could not load ARCs" description={projects.error}
           primaryAction={<Banner.PrimaryAction onClick={projects.retry}>Retry ARCs</Banner.PrimaryAction>} />}
+        {stars.status === 'error' && <Banner variant="warning" title="Could not load your starred repositories" description={stars.error}
+          primaryAction={<Banner.PrimaryAction onClick={stars.retry}>Retry stars</Banner.PrimaryAction>} />}
+        {stars.mutationError && <Banner variant="critical" role="alert" title="Could not update the repository star"
+          description={stars.mutationError} />}
         {projects.status === 'success' && <ArcResultsList arcs={arcs} hubNames={hubNames}
           sort={view.repositories === 'mostStarred' ? undefined : view.sort} now={current}
           pagination={projects.result.data} onPageChange={page => setView(previous => ({ ...previous, page }))}
           onSortChange={sort => setView(previous => ({ ...previous, sort, page: 1 }))}
           onClearFilters={view.group || view.repositories !== 'all' || view.query || view.recentAfter ? clearAll : undefined}
+          starredProjectIds={stars.starredIds} updatingStar={stars.pendingProjectId}
+          onToggleStar={token && !projects.result.tokenRejected && stars.status === 'success' ? stars.toggleStar : undefined}
+          starDisabledReason={!token ? 'Log in to this DataHUB to star repositories.'
+            : stars.status === 'loading' ? 'Loading your starred repositories…' : 'Your starred repositories are unavailable.'}
           onOpen={arc => onArcClick(arc.url, arc.title, arc.projectId, projects.hub!)} />}
         {!initialHub && <p>No DataHUBs configured.</p>}
       </Stack>

@@ -25,6 +25,7 @@ export function listProjects(source: string, options: ListProjectsOptions = {}):
   if (options.archived !== undefined) params.set('archived', String(options.archived))
   if (options.lastActivityAfter !== undefined) params.set('last_activity_after', options.lastActivityAfter)
   if (options.membership !== undefined) params.set('membership', String(options.membership))
+  if (options.starred !== undefined) params.set('starred', String(options.starred))
   return requestPage(source, 'projects', params, options, isProject, 'project')
 }
 
@@ -63,4 +64,22 @@ export async function listMemberProjectIds(source: string, options: GitLabReques
   const params = new URLSearchParams({ membership: 'true', simple: 'true' })
   const result = await listAllPages(source, 'projects', params, isMemberProject, 'project', options)
   return map(result, projects => projects.map(project => project.id))
+}
+
+/** Load the current user's stars without fetching full project details. */
+export async function listStarredProjectIds(source: string, options: GitLabRequestOptions = {}): Promise<Result<number[]>> {
+  if (!options.token) return Failure('Log in to see your starred repositories.')
+  const params = new URLSearchParams({ starred: 'true', simple: 'true' })
+  const result = await listAllPages(source, 'projects', params, isMemberProject, 'project', options)
+  return map(result, projects => projects.map(project => project.id))
+}
+
+export async function setProjectStarred(source: string, projectId: number, starred: boolean,
+  options: GitLabRequestOptions = {}): Promise<Result<GitLabProject>> {
+  if (!options.token) return Failure('Log in to star repositories.')
+  if (!validIdentifier(projectId)) return Failure('A valid project ID is required.')
+  const response = await requestGitLab<GitLabProject>(source, `projects/${projectId}/${starred ? 'star' : 'unstar'}`,
+    new URLSearchParams(), { ...options, method: 'POST' })
+  if (response.success === true && !isProject(response.value.data)) return Failure('GitLab returned an invalid project.')
+  return map(response, value => value.data)
 }

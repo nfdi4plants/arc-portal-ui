@@ -24,7 +24,7 @@ export async function requestGitLab<T>(
   source: string,
   resource: string,
   params: URLSearchParams,
-  options: GitLabRequestOptions = {},
+  options: GitLabRequestOptions & { method?: 'POST' } = {},
 ): Promise<Result<{ data: T; headers: Headers }>> {
   let url: URL
   let headers: Headers
@@ -38,7 +38,9 @@ export async function requestGitLab<T>(
 
   let response: Response
   try {
-    response = await (options.fetchCall ?? fetch)(url, { headers, signal: options.signal, credentials: 'omit' })
+    response = await (options.fetchCall ?? fetch)(url, {
+      headers, signal: options.signal, credentials: 'omit', ...(options.method ? { method: options.method } : {}),
+    })
   } catch (error) {
     return Failure(isCanceled(error, options.signal)
       ? 'GitLab request canceled.'
