@@ -24,6 +24,8 @@ describe('ScrollingDashboard', () => {
     const user = userEvent.setup()
     const webview = screen.getByRole('region', { name: 'Webview section' })
     const graphview = screen.getByRole('region', { name: 'Graphview section' })
+    expect(screen.getAllByRole('region', { name: /^(Graphview|Webview) section$/ }).map(section => section.getAttribute('aria-label')))
+      .toEqual(['Graphview section', 'Webview section'])
     // jsdom has no scroll implementation; exercise the jump controls and their focus behavior.
     webview.scrollIntoView = vi.fn()
     graphview.scrollIntoView = vi.fn()

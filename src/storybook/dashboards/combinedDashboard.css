@@ -42,6 +42,7 @@
 .combined-dashboard-details > .arc-details {
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior-y: auto;
 }
 
 .combined-dashboard-details .investigation-header-layout {
@@ -79,9 +80,11 @@
 .combined-dashboard-row {
   display: grid;
   grid-template-columns: repeat(10, minmax(34px, 1fr));
+  grid-auto-columns: minmax(34px, 1fr);
   min-width: 0;
   min-height: 0;
   overflow: auto;
+  overscroll-behavior: auto;
 }
 
 .combined-dashboard-row > .combined-dashboard-tile {
@@ -128,6 +131,9 @@
   min-height: 0;
 }
 
+
+.combined-dashboard-row > .combined-dashboard-tile:nth-child(4) { grid-column: 10 / span 4; }
+.combined-dashboard-row > .combined-dashboard-tile:nth-child(5) { grid-column: 13 / span 4; }
 
 .combined-dashboard-bottom {
   display: grid;

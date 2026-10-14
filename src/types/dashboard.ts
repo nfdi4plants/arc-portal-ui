@@ -43,7 +43,7 @@ export interface ArcDetails {
 export type DetailsMap = Map<string, ArcDetails | 'unavailable'>
 
 export type Access = 'public' | 'private'
-export type FilterKind = 'hub' | 'group' | 'query' | 'recent'
+export type FilterKind = 'hub' | 'group' | 'query' | 'recent' | 'repositories'
 
 export interface CountItem { key: string; label: string; count: number }
 

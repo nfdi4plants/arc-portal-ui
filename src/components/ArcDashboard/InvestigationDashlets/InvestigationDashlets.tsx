@@ -1,5 +1,7 @@
+import { dataHubRepositoryUrl } from '../../../api/gitlab'
+import type { DashboardProps } from '../dashboardTypes'
 import { Text } from '@primer/react'
-import { BeakerIcon, BookIcon, BrowserIcon, DatabaseIcon, FileIcon, OrganizationIcon, PeopleIcon } from '@primer/octicons-react'
+import { PlayIcon, WorkflowIcon, BeakerIcon, BookIcon, BrowserIcon, DatabaseIcon, FileIcon, OrganizationIcon, PeopleIcon } from '@primer/octicons-react'
 import { lazy, Suspense, type RefObject } from 'react'
 import { PopupDashlet } from '../../PopupDashlet'
 import { ContactList } from '../Investigation/ContactList'
@@ -16,12 +18,9 @@ const ArcViewer = lazy(() => import('../ArcViewer/ArcViewer'))
 
 export type { InvestigationDashletId } from './investigationDashletOptions'
 
-export function InvestigationDashlets({ metadata, arcJson, repositoryUrl, token, classNamePrefix, ids, interactive = false, collapsed, onToggleCollapsed, externalPopup }: {
+export function InvestigationDashlets({ metadata, arcJson, repository, repositoryUrl, token, classNamePrefix, ids, interactive = false, collapsed, onToggleCollapsed, externalPopup }: Pick<DashboardProps, 'repository' | 'repositoryUrl' | 'token'> & {
   metadata: InvestigationMetadata
   arcJson: string
-  /** Lets the Webview resolve and download repository files. */
-  repositoryUrl?: string
-  token?: string
   classNamePrefix: string
   ids?: readonly InvestigationDashletId[]
   interactive?: boolean
@@ -41,40 +40,52 @@ export function InvestigationDashlets({ metadata, arcJson, repositoryUrl, token,
       content: <InvestigationDescription metadata={metadata} />,
     },
     {
-      id: 'contacts', title: investigationDashletTitles.contacts,
+      id: 'contacts', title: `${investigationDashletTitles.contacts} (${metadata.contacts.length})`,
       symbol: <PeopleIcon size={48} />,
       description: 'People associated with this ARC and their involvement in its studies and assays.',
       content: <ContactList contacts={metadata.contacts} showHeading={false} description="All people associated with this ARC." />,
     },
     {
-      id: 'organizations', title: investigationDashletTitles.organizations,
+      id: 'organizations', title: `${investigationDashletTitles.organizations} (${metadata.organizations.length})`,
       symbol: <OrganizationIcon size={48} />,
       description: 'Organization affiliations recorded for the people in this ARC.',
       content: <OrganizationList organizations={metadata.organizations} />,
     },
     {
-      id: 'publications', title: investigationDashletTitles.publications,
+      id: 'publications', title: `${investigationDashletTitles.publications} (${metadata.publications.length})`,
       symbol: <BookIcon size={48} />,
       description: 'Related publications, authors, publication status, and DOI links.',
       content: <PublicationList publications={metadata.publications} showHeading={false} description="Publications associated with this ARC." />,
     },
     {
-      id: 'assays', title: investigationDashletTitles.assays,
+      id: 'assays', title: `${investigationDashletTitles.assays} (${metadata.assays.length})`,
       symbol: <BeakerIcon size={48} />,
       description: 'Experimental assays and measurement workflows recorded in this ARC.',
       content: <NamedEntityList title="Assays" items={metadata.assays} />,
     },
     {
-      id: 'studies', title: investigationDashletTitles.studies,
+      id: 'studies', title: `${investigationDashletTitles.studies} (${metadata.studies.length})`,
       symbol: <DatabaseIcon size={48} />,
       description: 'Studies and sample collections recorded in this ARC.',
       content: <NamedEntityList title="Studies" items={metadata.studies} />,
     },
     {
+      id: 'runs', title: `${investigationDashletTitles.runs} (${metadata.runs.length})`,
+      symbol: <PlayIcon size={48} />,
+      description: 'Runs recorded in this ARC.',
+      content: <NamedEntityList title="Runs" items={metadata.runs} />,
+    },
+    {
+      id: 'workflows', title: `${investigationDashletTitles.workflows} (${metadata.workflows.length})`,
+      symbol: <WorkflowIcon size={48} />,
+      description: 'Workflows recorded in this ARC.',
+      content: <NamedEntityList title="Workflows" items={metadata.workflows} />,
+    },
+    {
       id: 'webview', title: investigationDashletTitles.webview,
       symbol: <BrowserIcon size={48} />,
       description: "Browse the ARC's files, metadata, and annotation tables.",
-      content: <Suspense fallback={<Text as="p" role="status">Loading ARC viewer…</Text>}><ArcViewer jsonString={arcJson} repositoryUrl={repositoryUrl} token={token} embedded /></Suspense>,
+      content: <Suspense fallback={<Text as="p" role="status">Loading ARC viewer…</Text>}><ArcViewer jsonString={arcJson} repositoryUrl={repositoryUrl ?? (repository ? dataHubRepositoryUrl(repository) : undefined)} token={token} embedded /></Suspense>,
     },
   ]
 

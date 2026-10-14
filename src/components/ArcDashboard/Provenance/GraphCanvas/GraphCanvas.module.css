@@ -9,6 +9,7 @@
   width: 100%;
   height: 100%;
   overflow: auto;
+  overscroll-behavior: auto;
   /* A scrollbar that appears must not narrow the box, because the width of the box shapes the layout. */
   scrollbar-gutter: stable;
   color: var(--fgColor-default, #1f2328);
@@ -212,6 +213,7 @@
   box-sizing: border-box;
   width: max-content;
   overflow: auto;
+  overscroll-behavior: auto;
   padding: 4px 0;
   border: 1px solid var(--borderColor-default, #d1d9e0);
   border-radius: 6px;

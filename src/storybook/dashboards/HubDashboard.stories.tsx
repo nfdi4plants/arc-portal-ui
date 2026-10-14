@@ -16,25 +16,25 @@ function HubDashboardLayout({ metadata, provenance, actions, ...props }: Dashboa
       {actions && <div className="viewer-dashboard-actions">{actions}</div>}
       <div className="hub-dashboard-overview">
         <nav className="hub-dashboard-metadata hub-dashboard-left" aria-label="Description, contacts, and organizations">
-          <InvestigationDashlets metadata={metadata} arcJson={props.arcJson} classNamePrefix="hub-dashboard" ids={['description', 'contacts', 'organizations']} />
+          <InvestigationDashlets repository={props.repository} repositoryUrl={props.repositoryUrl} token={props.token} metadata={metadata} arcJson={props.arcJson} classNamePrefix="hub-dashboard" ids={['description', 'contacts', 'organizations']} />
         </nav>
         <div className="hub-dashboard-hub">
           <ArcDetails {...props} metadata={metadata} />
         </div>
-        <nav className="hub-dashboard-metadata hub-dashboard-right" aria-label="Publications, assays, and studies">
-          <InvestigationDashlets metadata={metadata} arcJson={props.arcJson} classNamePrefix="hub-dashboard" ids={['publications', 'assays', 'studies']} />
+        <nav className="hub-dashboard-metadata hub-dashboard-right" aria-label="Publications, assays, studies, runs, and workflows">
+          <InvestigationDashlets repository={props.repository} repositoryUrl={props.repositoryUrl} token={props.token} metadata={metadata} arcJson={props.arcJson} classNamePrefix="hub-dashboard" ids={['publications', 'assays', 'studies', 'runs', 'workflows']} />
         </nav>
         <div className="hub-dashboard-metadata hub-dashboard-game">
           <PopupArcGame index={provenance} arcTitle={metadata.title} className="hub-dashboard-tile" />
         </div>
       </div>
-      <ViewerWorkspace metadata={metadata} provenance={provenance} arcJson={props.arcJson} />
+      <ViewerWorkspace repository={props.repository} repositoryUrl={props.repositoryUrl} token={props.token} metadata={metadata} provenance={provenance} arcJson={props.arcJson} />
     </main>
   )
 }
 
 const meta = {
-  title: 'HubDashboard',
+  title: 'Dashboard/HubDashboard',
   component: ArcDashboardFrame,
   decorators: [(Story) => <TalinumStory>{() => <Story />}</TalinumStory>],
   argTypes: { content: { control: false, table: { disable: true } }, label: { table: { disable: true } }, fillHeight: { table: { disable: true } } },

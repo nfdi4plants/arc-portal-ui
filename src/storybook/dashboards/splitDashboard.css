@@ -7,12 +7,18 @@
 
 .split-dashboard-metadata {
   display: grid;
-  grid-template-columns: repeat(6, minmax(144px, 1fr));
+  grid-template-columns: repeat(8, minmax(144px, 1fr));
   gap: 8px;
   overflow-x: auto;
+  overscroll-behavior-x: auto;
 }
 
 .split-dashboard-metadata > .popup-dashlet { height: 42px; }
 .split-dashboard-metadata .popup-dashlet-panel:not([data-expanded]):not([data-preview]) > .popup-dashlet-bar { padding: 6px; gap: 4px; }
 .split-dashboard-metadata .popup-dashlet-panel:not([data-expanded]):not([data-preview]) .dashboard-window-title { font-size: 0.75rem; }
 .split-dashboard-metadata .popup-dashlet-panel:not([data-expanded]):not([data-preview]) > .popup-dashlet-symbol { display: none; }
+
+.split-dashboard.scrolling-dashboard > .split-dashboard-workspace {
+  flex: none;
+  height: max(720px, 150dvh);
+}

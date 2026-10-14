@@ -8,39 +8,62 @@ export type ViewerWorkspaceMode = 'webview' | 'graphview' | 'compare'
 const clampShare = (share: number) => Math.max(20, Math.min(80, share))
 
 /** Keep the same viewers mounted in single-view and comparison modes. */
-export function ViewerWorkspace({ metadata, arcJson, provenance, mode = 'compare' }: Pick<DashboardContentProps, 'metadata' | 'arcJson' | 'provenance'> & { mode?: ViewerWorkspaceMode }) {
+export function ViewerWorkspace({ metadata, arcJson, provenance, repository, repositoryUrl, token, mode = 'compare', firstViewer = 'webview' }: Pick<DashboardContentProps, 'metadata' | 'arcJson' | 'provenance' | 'repository' | 'repositoryUrl' | 'token'> & {
+  mode?: ViewerWorkspaceMode
+  firstViewer?: 'webview' | 'graphview'
+}) {
   const [webviewShare, setWebviewShare] = useState(60)
   const [collapsed, setCollapsed] = useState<'webview' | 'graphview' | null>(null)
   const workspace = useRef<HTMLDivElement>(null)
   const webviewId = useId()
   const graphviewId = useId()
   const compare = mode === 'compare'
+  const graphFirst = firstViewer === 'graphview'
+  const firstShare = graphFirst ? 100 - webviewShare : webviewShare
+  const firstTitle = graphFirst ? 'Graphview' : 'Webview'
+  const secondTitle = graphFirst ? 'Webview' : 'Graphview'
   const effectiveCollapsed = compare ? collapsed : null
   const togglePane = (pane: 'webview' | 'graphview') => setCollapsed(current => current === pane ? null : pane)
   const releaseDivider = (event: PointerEvent<HTMLDivElement>) => {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
   }
+  const webviewPane = (
+    <div key="webview" id={webviewId} className="split-dashboard-pane" hidden={mode === 'graphview'}>
+      <InvestigationDashlets repository={repository} repositoryUrl={repositoryUrl} token={token} metadata={metadata} arcJson={arcJson} classNamePrefix="split-dashboard" ids={['webview']} interactive collapsed={mode === 'graphview' || effectiveCollapsed === 'webview'} onToggleCollapsed={compare ? () => togglePane('webview') : undefined} />
+    </div>
+  )
+  const graphviewPane = (
+    <div key="graphview" id={graphviewId} className="split-dashboard-pane" hidden={mode === 'webview'}>
+      <PopupGraphview
+        index={provenance}
+        label="Graphview"
+        className="split-dashboard-graphview"
+        expandOnClick={false}
+        collapsed={mode === 'webview' || effectiveCollapsed === 'graphview'}
+        onToggleCollapsed={compare ? () => togglePane('graphview') : undefined}
+      />
+    </div>
+  )
 
   return (
     <div
       ref={workspace}
       className="split-dashboard-workspace"
       data-view-mode={mode}
+      data-first-viewer={firstViewer}
       data-collapsed={effectiveCollapsed ?? undefined}
-      style={{ '--webview-share': `${webviewShare}fr`, '--graphview-share': `${100 - webviewShare}fr` } as CSSProperties}
+      style={{ '--first-viewer-share': `${firstShare}fr`, '--second-viewer-share': `${100 - firstShare}fr` } as CSSProperties}
     >
-      <div id={webviewId} className="split-dashboard-pane" hidden={mode === 'graphview'}>
-        <InvestigationDashlets metadata={metadata} arcJson={arcJson} classNamePrefix="split-dashboard" ids={['webview']} interactive collapsed={mode === 'graphview' || effectiveCollapsed === 'webview'} onToggleCollapsed={compare ? () => togglePane('webview') : undefined} />
-      </div>
+      {graphFirst ? graphviewPane : webviewPane}
       <div
         role="separator"
-        aria-label="Resize Webview and Graphview"
+        aria-label={`Resize ${firstTitle} and ${secondTitle}`}
         aria-orientation="horizontal"
-        aria-controls={`${webviewId} ${graphviewId}`}
+        aria-controls={graphFirst ? `${graphviewId} ${webviewId}` : `${webviewId} ${graphviewId}`}
         aria-valuemin={20}
         aria-valuemax={80}
-        aria-valuenow={Math.round(webviewShare)}
-        aria-valuetext={`Webview ${Math.round(webviewShare)}%, Graphview ${Math.round(100 - webviewShare)}%`}
+        aria-valuenow={Math.round(firstShare)}
+        aria-valuetext={`${firstTitle} ${Math.round(firstShare)}%, ${secondTitle} ${Math.round(100 - firstShare)}%`}
         aria-disabled={!!effectiveCollapsed || undefined}
         tabIndex={effectiveCollapsed ? -1 : 0}
         className="split-dashboard-divider"
@@ -54,7 +77,10 @@ export function ViewerWorkspace({ metadata, arcJson, provenance, mode = 'compare
         onPointerMove={(event) => {
           if (effectiveCollapsed || !event.currentTarget.hasPointerCapture(event.pointerId)) return
           const rect = workspace.current?.getBoundingClientRect()
-          if (rect && rect.height > 12) setWebviewShare(clampShare((event.clientY - rect.top - 6) / (rect.height - 12) * 100))
+          if (rect && rect.height > 12) {
+            const share = clampShare((event.clientY - rect.top - 6) / (rect.height - 12) * 100)
+            setWebviewShare(graphFirst ? 100 - share : share)
+          }
         }}
         onPointerUp={releaseDivider}
         onPointerCancel={releaseDivider}
@@ -63,23 +89,15 @@ export function ViewerWorkspace({ metadata, arcJson, provenance, mode = 'compare
           const changes: Record<string, number> = { ArrowUp: -5, ArrowDown: 5 }
           if (event.key in changes) {
             event.preventDefault()
-            setWebviewShare(current => clampShare(current + changes[event.key]))
+            setWebviewShare(current => clampShare(current + (graphFirst ? -changes[event.key] : changes[event.key])))
           } else if (event.key === 'Home' || event.key === 'End') {
             event.preventDefault()
-            setWebviewShare(event.key === 'Home' ? 20 : 80)
+            const share = event.key === 'Home' ? 20 : 80
+            setWebviewShare(graphFirst ? 100 - share : share)
           }
         }}
       />
-      <div id={graphviewId} className="split-dashboard-pane" hidden={mode === 'webview'}>
-        <PopupGraphview
-          index={provenance}
-          label="Graphview"
-          className="split-dashboard-graphview"
-          expandOnClick={false}
-          collapsed={mode === 'webview' || effectiveCollapsed === 'graphview'}
-          onToggleCollapsed={compare ? () => togglePane('graphview') : undefined}
-        />
-      </div>
+      {graphFirst ? webviewPane : graphviewPane}
     </div>
   )
 }

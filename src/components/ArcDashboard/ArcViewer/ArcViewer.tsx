@@ -38,10 +38,9 @@ function ExpandedWebViewer({ provideJson, repositoryUrl, json, token }: { provid
   const popupMode = useContext(PopupDashletModeContext);
   const popupExpanded = popupMode === undefined ? undefined : popupMode === 'expanded';
   const paths = useMemo(() => {
-    if (!repositoryUrl) return []
     try { return Array.from(ARC.fromROCrateJsonString(json).FileSystem.Tree.ToFilePaths(true)) }
     catch { return [] } // The viewer displays parsing errors.
-  }, [json, repositoryUrl])
+  }, [json])
   const [sizeResult, setSizeResult] = useState<{repository: string; sizes: FileSizes; complete: boolean; error?: string} | null>(null)
   useEffect(() => {
     if (!repositoryUrl) return
@@ -101,8 +100,8 @@ function ExpandedWebViewer({ provideJson, repositoryUrl, json, token }: { provid
 
   useEffect(() => {
     const container = containerRef.current
-    if (!container || !repositoryUrl) return
-    const update = () => attachGitlabDownloads(container, repositoryUrl, paths, sizeResult?.repository === repositoryUrl ? sizeResult.sizes : undefined, !sizeResult || sizeResult.repository !== repositoryUrl || !sizeResult.complete)
+    if (!container) return
+    const update = () => attachGitlabDownloads(container, repositoryUrl, paths, sizeResult && sizeResult.repository === repositoryUrl ? sizeResult.sizes : undefined, !!repositoryUrl && (!sizeResult || sizeResult.repository !== repositoryUrl || !sizeResult.complete))
     const observer = new MutationObserver(update)
     observer.observe(container, {childList: true, subtree: true})
     update()

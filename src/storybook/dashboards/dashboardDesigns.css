@@ -1,0 +1,9 @@
+.dashboard-designs-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  box-sizing: border-box;
+  max-width: 1168px;
+  margin: 0 auto;
+  padding: 16px 16px 0;
+}

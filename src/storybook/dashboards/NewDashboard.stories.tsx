@@ -5,7 +5,7 @@ import { privateTalinumDataHubData, publicTalinumDataHubData, talinumArcJson, ta
 import { NewDashboardContent } from '../../components/ArcDashboard/NewDashboard'
 
 const meta = {
-  title: 'NewDashboard',
+  title: 'Dashboard/NewDashboard',
   component: ArcDashboardFrame,
   decorators: [(Story) => <TalinumStory>{() => <Story />}</TalinumStory>],
   argTypes: { content: { control: false, table: { disable: true } }, label: { table: { disable: true } }, fillHeight: { table: { disable: true } } },
@@ -13,7 +13,7 @@ const meta = {
   parameters: {
     docs: {
       description: {
-        component: 'Alternate investigation dashboard with a circular ARC header and nine equally sized, compact dashlets: Description, Contacts, Organizations, Publications, Assays, Studies, Webview, Graphview, and the ARCade game. Hover for 1.5 seconds to preview; click to expand over the dashboard. Click outside, press Escape, or use the shrink icon to restore the dashlet. Overview is omitted. The layout stacks on smaller screens. Uses the bundled Talinum ARC without DataHub requests.',
+        component: 'Alternate investigation dashboard with a circular ARC header and eleven equally sized, compact dashlets: Description, Contacts, Organizations, Publications, Assays, Studies, Runs, Workflows, Webview, Graphview, and the ARCade game. Hover for 1.5 seconds to preview; click to expand over the dashboard. Click outside, press Escape, or use the shrink icon to restore the dashlet. Overview is omitted. The layout stacks on smaller screens. Uses the bundled Talinum ARC without DataHub requests.',
       },
     },
   },

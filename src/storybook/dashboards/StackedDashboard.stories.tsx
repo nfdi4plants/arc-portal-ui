@@ -17,7 +17,7 @@ function StackedDashboardLayout({ metadata, provenance, actions, ...props }: Das
       <ArcDetails {...props} metadata={metadata} />
       <div className="stacked-dashboard-body">
         <aside className="stacked-dashboard-cards" aria-label="Investigation dashlets">
-          <InvestigationDashlets metadata={metadata} arcJson={props.arcJson} classNamePrefix="stacked-dashboard" />
+          <InvestigationDashlets repository={props.repository} repositoryUrl={props.repositoryUrl} token={props.token} metadata={metadata} arcJson={props.arcJson} classNamePrefix="stacked-dashboard" />
           <PopupArcGame index={provenance} arcTitle={metadata.title} className="stacked-dashboard-tile" />
         </aside>
         {provenance ? (
@@ -36,7 +36,7 @@ function StackedDashboardLayout({ metadata, provenance, actions, ...props }: Das
 }
 
 const meta = {
-  title: 'StackedDashboard',
+  title: 'Dashboard/StackedDashboard',
   component: ArcDashboardFrame,
   decorators: [(Story) => <TalinumStory>{() => <Story />}</TalinumStory>],
   argTypes: { content: { control: false, table: { disable: true } }, label: { table: { disable: true } }, fillHeight: { table: { disable: true } } },
@@ -44,7 +44,7 @@ const meta = {
   parameters: {
     docs: {
       description: {
-        component: 'Flat ARC header above an index-card stack occupying one quarter of the dashboard width. The shared investigation popup dashlets keep all eight titles visible, ARCade last; click a card to expand it. Graphview fills the remaining three quarters. On narrow screens Graphview sits above the stack. Uses the bundled Talinum ARC without DataHub requests.',
+        component: 'Flat ARC header above an index-card stack occupying one quarter of the dashboard width. The shared investigation popup dashlets keep all ten titles visible, ARCade last; click a card to expand it. Graphview fills the remaining three quarters. On narrow screens Graphview sits above the stack. Uses the bundled Talinum ARC without DataHub requests.',
       },
     },
   },

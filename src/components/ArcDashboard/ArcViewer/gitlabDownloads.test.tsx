@@ -35,10 +35,10 @@ it('counts immediate files and subfolders without counting deeper descendants', 
   expect(directItemCount([], 'empty')).toBe(0)
 })
 
-it('shows one count beside the folder name across repeated updates', () => {
+it.each([undefined, 'https://git.nfdi4plants.org/lab/arc'])('shows one folder count across updates with repository %s', (repositoryUrl) => {
   const container = document.createElement('div')
   container.innerHTML = '<table><thead><tr><th></th><th>Name</th><th>Path</th><th>Download</th></tr></thead><tbody><tr><td><span aria-label="Folder"></span></td><th><a href="#">assays</a></th><td>assays</td><td></td></tr></tbody></table>'
-  for (let i = 0; i < 2; i++) attachGitlabDownloads(container, 'https://git.nfdi4plants.org/lab/arc', ['assays/a/file.csv', 'assays/readme.md'])
+  for (let i = 0; i < 2; i++) attachGitlabDownloads(container, repositoryUrl, ['assays/a/file.csv', 'assays/readme.md'])
   expect(container.querySelectorAll('.folder-item-count')).toHaveLength(1)
-  expect(container.querySelector('.folder-item-count')?.textContent).toBe('2 items')
+  expect(container.querySelector('.folder-item-count')?.textContent).toBe('(2 items)')
 })

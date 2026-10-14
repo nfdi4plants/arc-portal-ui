@@ -17,6 +17,7 @@
   grid-area: 1 / 1;
   margin-top: 0;
   padding-inline: 0;
+  overscroll-behavior-x: auto;
 }
 
 .investigation-details-tabs [role='tablist'] {
@@ -44,7 +45,7 @@
   padding-top: 12px;
   overflow-y: auto;
   scrollbar-gutter: stable;
-  overscroll-behavior: contain;
+  overscroll-behavior: auto;
 }
 
 /* Keep every panel in the shared grid cell so the tallest one sets its height. */

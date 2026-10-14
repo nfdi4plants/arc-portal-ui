@@ -12,14 +12,14 @@ import story from './CombinedDashboard.stories'
 vi.mock('@nfdi4plants/arc-web-view', () => ({ WebViewer: () => <p>ARC files</p> }))
 
 describe('CombinedDashboard', () => {
-  it('groups the six cards into the requested rows and keeps both viewers interactive with popup controls', async () => {
+  it('groups the eight cards into the requested rows and keeps both viewers interactive with popup controls', async () => {
     const store = createArcStore(sampleCrateSource())
     await store.load()
     renderWithTheme(<ArcProvider store={store}><ArcDashboardFrame content={story.args.content} label={story.args.label} fillHeight={story.args.fillHeight} arcJson={crateJson} /></ArcProvider>)
     expect(screen.getByRole('heading', { level: 1, name: 'Facultative CAM in Talinum triangulare' })).toBeVisible()
     const rows = [
-      { name: 'Description, contacts, and organizations', titles: ['Description', 'Contacts', 'Organizations'] },
-      { name: 'Publications, assays, and studies', titles: ['Publications', 'Assays', 'Studies'] },
+      { name: 'Description, contacts, and organizations', titles: ['Description', 'Contacts (12)', 'Organizations (4)'] },
+      { name: 'Publications, assays, studies, runs, and workflows', titles: ['Publications (2)', 'Assays (3)', 'Studies (2)', 'Runs (6)', 'Workflows (6)'] },
     ]
     for (const { name, titles } of rows) {
       const row = screen.getByRole('region', { name })
@@ -36,11 +36,11 @@ describe('CombinedDashboard', () => {
     expect(screen.getByRole('region', { name: 'ARCade' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Expand ARCade' })).toBeVisible()
     const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: 'Expand Contacts' }))
-    const contacts = screen.getByRole('dialog', { name: 'Contacts' })
+    await user.click(screen.getByRole('button', { name: 'Expand Contacts (12)' }))
+    const contacts = screen.getByRole('dialog', { name: 'Contacts (12)' })
     expect(within(contacts).getAllByRole('listitem')).toHaveLength(12)
-    await user.click(within(contacts).getByRole('button', { name: 'Shrink Contacts' }))
-    expect(screen.getByRole('img', { name: 'Contacts symbol' })).toBeVisible()
+    await user.click(within(contacts).getByRole('button', { name: 'Shrink Contacts (12)' }))
+    expect(screen.getByRole('img', { name: 'Contacts (12) symbol' })).toBeVisible()
     await user.click(screen.getByRole('button', { name: 'Expand Webview' }))
     expect(within(screen.getByRole('dialog', { name: 'Webview' })).getByText('ARC files')).toBeVisible()
     await user.click(screen.getByRole('button', { name: 'Shrink Webview' }))

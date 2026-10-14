@@ -20,7 +20,7 @@ it('renders the New Dashboard tiles with ARCade, Graphview and the Back button',
 
   const dashboard = await screen.findByRole('region', { name: 'ARC-Dashboard' })
   await within(dashboard).findByRole('heading', { level: 1, name: 'Facultative CAM in Talinum triangulare' })
-  for (const name of ['Description', 'Contacts', 'Organizations', 'Publications', 'Assays', 'Studies', 'Webview', 'Graphview', 'ARCade']) {
+  for (const name of ['Description', 'Contacts (12)', 'Organizations (4)', 'Publications (2)', 'Assays (3)', 'Studies (2)', 'Runs (6)', 'Workflows (6)', 'Webview', 'Graphview', 'ARCade']) {
     expect(within(dashboard).getByRole('button', { name: `Expand ${name}` })).toBeVisible()
   }
   await user.click(within(dashboard).getByRole('button', { name: 'Back' }))

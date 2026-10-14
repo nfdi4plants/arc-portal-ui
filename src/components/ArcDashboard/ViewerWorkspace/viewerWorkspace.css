@@ -2,11 +2,13 @@
   display: grid;
   flex: 1;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: minmax(0, var(--webview-share)) 12px minmax(0, var(--graphview-share));
+  grid-template-rows: minmax(0, var(--first-viewer-share)) 12px minmax(0, var(--second-viewer-share));
   min-height: 300px;
 }
-.split-dashboard-workspace[data-collapsed='webview'] { grid-template-rows: 50px 12px minmax(0, 1fr); }
-.split-dashboard-workspace[data-collapsed='graphview'] { grid-template-rows: minmax(0, 1fr) 12px 50px; }
+.split-dashboard-workspace[data-first-viewer='webview'][data-collapsed='webview'],
+.split-dashboard-workspace[data-first-viewer='graphview'][data-collapsed='graphview'] { grid-template-rows: 50px 12px minmax(0, 1fr); }
+.split-dashboard-workspace[data-first-viewer='webview'][data-collapsed='graphview'],
+.split-dashboard-workspace[data-first-viewer='graphview'][data-collapsed='webview'] { grid-template-rows: minmax(0, 1fr) 12px 50px; }
 .split-dashboard-pane { min-width: 0; min-height: 0; }
 .split-dashboard-pane > .popup-dashlet { height: 100%; }
 
