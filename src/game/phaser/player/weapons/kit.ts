@@ -239,7 +239,12 @@ export interface WaveOptions {
   height: number
   speed: number
   distance: number
+  // Mobs only stagger from a shot tagged 'heavy', which a move earns by committing the mage while
+  // it fires. Defaults to ['heavy', 'shockwave'].
+  tags?: string[]
 }
+
+const WAVE_TAGS = ['heavy', 'shockwave']
 
 // Distance from the mage's centre to the inner edge of each wave. The gap keeps an enemy next to
 // the mage out of both waves in the same step.
@@ -260,7 +265,7 @@ export function spawnShockwaves(ctx: AttackContext, wave: WaveOptions): void {
       pierce: 99,
       knockback: { x: 120, y: -150 },
       hitStopMs: 0,
-      tags: ['heavy', 'shockwave'],
+      tags: wave.tags ?? WAVE_TAGS,
     })
   }
 }

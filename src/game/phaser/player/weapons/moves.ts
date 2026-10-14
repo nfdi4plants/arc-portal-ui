@@ -16,7 +16,9 @@ export interface MoveLayer extends Feature {
 const POGO_BOUNCE = -480
 const DOI_SHARE = 0.6
 
-const SHOCKWAVE = { damage: 12, width: 14, height: 16, speed: 230, distance: 150 }
+// Shockwave Heavy follows every heavy move, also the dash and up heavies that leave the mage free to
+// move, so its waves carry no 'heavy' tag and never stagger.
+const SHOCKWAVE = { damage: 12, width: 14, height: 16, speed: 230, distance: 150, tags: ['shockwave'] }
 
 // Ground Slam: the landing of every air heavy covers 50% more and sends two waves along the ground.
 const SLAM_AREA = 1.5

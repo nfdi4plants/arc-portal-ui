@@ -84,7 +84,8 @@ function spinDrop(tier: 1 | 2): AttackMove {
   const roller = tier === 2 ? { damage: 16, speed: 320, ms: 700 } : { damage: 12, speed: 300, ms: 550 }
   return move(
     'Spin Drop',
-    variantTiming(90, 70, 200, 140, { hover: { ms: 160 } }),
+    // The lock roots the mage after the throw, which earns the discs their 'heavy' stagger.
+    variantTiming(90, 70, 200, 140, { hover: { ms: 160 }, lockMs: 150 }),
     (ctx) => {
       const feet = ctx.player.position()
       const from = { x: feet.x, y: feet.y - 10 }
@@ -330,6 +331,8 @@ function flameJet(tier: 1 | 2): AttackMove {
     'Flame Jet',
     variantTiming(70, 0, 200, 140, {
       plunge: JET,
+      // The fire patch staggers ('heavy'), so the landing roots the mage briefly.
+      landingLockMs: 150,
       onLand(ctx) {
         const feet = ctx.player.position()
         const width = patch.width * ctx.rangeScale
