@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { STEP_MS } from '../../../src/game/contracts/constants'
 import type { Action } from '../../../src/game/contracts/input'
 import type { AttackMove, AttackVariant } from '../../../src/game/contracts/player'
-import { MOTOR, createMotorState } from '../../../src/game/model/input/motor'
+import { JUMP_VELOCITY, MOTOR, availableJump, createMotorState, plungeBounced } from '../../../src/game/model/input/motor'
 import type { MotorEnv } from '../../../src/game/model/input/motor'
 import { createAttackMachine } from '../../../src/game/phaser/player/attacks'
 import { createControls } from '../../../src/game/phaser/player/controls'
@@ -19,14 +19,14 @@ const DASH_HEAVY = move('comet', { startupMs: 70, activeMs: 160, recoveryMs: 220
 const AIR_HEAVY = move('meteor', { startupMs: 90, activeMs: 0, recoveryMs: 220, cancelAfterMs: 160, landingLockMs: 220, plunge: { speed: 700 } })
 
 // The mage on a flat floor at y = 0 (y grows downwards), stepped like Player's onStep.
-function setup() {
+function setup(mechanics: Partial<MotorEnv['mechanics']> = {}) {
   const motor = createMotorState()
   const motorEnv: MotorEnv = {
     grounded: true,
     touchingWallLeft: false,
     touchingWallRight: false,
     stats: { moveSpeed: 1, dashCooldownMs: 2000 },
-    mechanics: { doubleJump: false, airDash: false, wallJump: false, hatGlide: false },
+    mechanics: { doubleJump: false, airDash: false, wallJump: false, hatGlide: false, ...mechanics },
     speedScale: 1,
     actionsLocked: false,
   }
@@ -64,7 +64,14 @@ function setup() {
   const wait = (ms: number) => {
     for (let n = Math.round(ms / STEP_MS); n > 0; n--) step()
   }
-  return { motor, attacks, started, step, wait, airborne: () => y < 0 }
+  // What Player does when the first hit of an air heavy lands (PLUNGE_BOUNCE_FACTOR is 0.55).
+  const bounce = () => {
+    if (!attacks.onOwnHit()) return false
+    motor.vy = -JUMP_VELOCITY * 0.55
+    plungeBounced(motor)
+    return true
+  }
+  return { motor, motorEnv, attacks, started, step, wait, bounce, airborne: () => y < 0 }
 }
 
 describe('createControls', () => {
@@ -174,5 +181,75 @@ describe('createControls', () => {
     const before = started.length
     step(['light'])
     expect(started).toHaveLength(before + 1)
+  })
+
+  describe('one air heavy per airtime', () => {
+    const meteors = (started: { name: string }[]) => started.filter((s) => s.name === 'meteor').length
+
+    it('refuses a second air heavy after the bounce until the mage lands', () => {
+      const { started, step, wait, bounce, airborne } = setup()
+      step(['jump'])
+      wait(150)
+      step(['heavy'])
+      // Startup ends, the fall hits an enemy.
+      wait(100)
+      expect(bounce()).toBe(true)
+      wait(150)
+      expect(airborne()).toBe(true)
+      step(['heavy'])
+      wait(50)
+      expect(meteors(started)).toBe(1)
+      // A press that stayed buffered would slam on the landing, so it must be gone.
+      wait(600)
+      expect(airborne()).toBe(false)
+      expect(started).toHaveLength(1)
+    })
+
+    it('allows the air heavy again after landing', () => {
+      const { started, step, wait, bounce, airborne } = setup()
+      step(['jump'])
+      wait(150)
+      step(['heavy'])
+      wait(100)
+      bounce()
+      wait(800)
+      expect(airborne()).toBe(false)
+      step(['jump'])
+      wait(150)
+      step(['heavy'])
+      expect(meteors(started)).toBe(2)
+    })
+
+    it('does not give back a used double jump', () => {
+      const { motor, motorEnv, step, wait, bounce } = setup({ doubleJump: true })
+      step(['jump'])
+      wait(150)
+      step(['jump'])
+      expect(motor.jumpsUsed).toBe(2)
+      wait(100)
+      step(['heavy'])
+      wait(100)
+      expect(bounce()).toBe(true)
+      expect(motor.jumpsUsed).toBe(2)
+      expect(availableJump(motor, motorEnv)).toBeNull()
+    })
+
+    it('gives no jump off the floor when the landing ring bounces the mage', () => {
+      const { motor, motorEnv, step, wait, bounce, airborne } = setup()
+      step(['jump'])
+      wait(150)
+      step(['heavy'])
+      // Falls at 700 per second, lands well within this, and the ring hits right after.
+      for (let n = 0; n < 100 && airborne(); n++) wait(10)
+      expect(airborne()).toBe(false)
+      // The step that stands the mage on the floor lands the plunge, and its ring hits.
+      wait(10)
+      expect(motor.coyoteMs).toBeGreaterThan(0)
+      expect(bounce()).toBe(true)
+      wait(20)
+      expect(availableJump(motor, motorEnv)).toBeNull()
+      step(['jump'])
+      expect(motor.jumped).toBe(false)
+    })
   })
 })

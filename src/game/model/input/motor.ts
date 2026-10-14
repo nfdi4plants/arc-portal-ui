@@ -73,6 +73,11 @@ export interface MotorState {
   airDashUsed: boolean
   // True from a jump until jump is released, for the apex hang and the jump cut.
   jumpHeld: boolean
+  // An air heavy started in this airtime, so no other may start before the mage lands, wall jumps
+  // or is teleported. The jumpsUsed and airDashUsed it started with come back after its bounce.
+  plungeUsed: boolean
+  plungeJumpsUsed: number
+  plungeAirDashUsed: boolean
   // Set for the step in which the move started, for animation and events.
   jumped: boolean
   dashed: boolean
@@ -97,6 +102,9 @@ export function createMotorState(facing: 1 | -1 = 1): MotorState {
     jumpsUsed: 0,
     airDashUsed: false,
     jumpHeld: false,
+    plungeUsed: false,
+    plungeJumpsUsed: 0,
+    plungeAirDashUsed: false,
     jumped: false,
     dashed: false,
   }
@@ -157,6 +165,31 @@ export function moveStarts(state: MotorState, input: MotorInput, env: MotorEnv, 
   return probeState.jumped ? 'jump' : null
 }
 
+// An air heavy started. Call once per air heavy.
+export function startPlunge(state: MotorState): void {
+  state.plungeUsed = true
+  state.plungeJumpsUsed = state.jumpsUsed
+  state.plungeAirDashUsed = state.airDashUsed
+}
+
+// The air heavy bounced the mage up (the caller sets the velocity). The bounce continues the airtime
+// the plunge started in, also when the landing ring bounced it off the floor: the jumps and the air
+// dash are as they were before the plunge, the coyote time of that landing is gone and no second air
+// heavy may start before the next landing.
+export function plungeBounced(state: MotorState): void {
+  state.plungeUsed = true
+  state.jumpsUsed = state.plungeJumpsUsed
+  state.airDashUsed = state.plungeAirDashUsed
+  state.coyoteMs = 0
+  state.jumpHeld = false
+}
+
+// A plain heavy press in the air plays the air heavy, which only one may do per airtime. Up and dash
+// heavies are other variants and stay free.
+export function airHeavyRefused(state: MotorState, airborne: boolean, up: boolean, dashing: boolean): boolean {
+  return state.plungeUsed && airborne && !up && !dashing
+}
+
 function approach(value: number, target: number, maxDelta: number): number {
   if (value < target) return Math.min(target, value + maxDelta)
   return Math.max(target, value - maxDelta)
@@ -189,6 +222,7 @@ export function stepMotor(state: MotorState, input: MotorInput, env: MotorEnv, d
     s.coyoteMs = MOTOR.coyoteMs
     s.jumpsUsed = 0
     s.airDashUsed = false
+    s.plungeUsed = false
     if (s.vy > 0) s.vy = 0
   } else {
     s.coyoteMs = Math.max(0, s.coyoteMs - dtMs)
@@ -237,6 +271,7 @@ export function stepMotor(state: MotorState, input: MotorInput, env: MotorEnv, d
         s.wallLockDir = side
         s.wallGraceMs = 0
         s.jumpsUsed = Math.max(1, s.jumpsUsed)
+        s.plungeUsed = false
       }
     }
   }

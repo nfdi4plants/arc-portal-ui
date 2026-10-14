@@ -90,6 +90,10 @@ the Triple Combo finisher. A longer pause, a heavy, a dash, a jump or a hit star
 Heavy pressed in the air plays the weapon's air heavy, mostly a plunge with a landing hit and a
 short landing lock. The first hit of an air heavy (the fall or the landing ring) ends the plunge and
 bounces the mage up at 55% of the jump speed (about 30% of the jump height), free to steer and cancel at once.
+Only one air heavy fits in one airtime: until the mage lands, wall jumps or is teleported, another
+heavy press in the air does nothing (up and dash heavies still play). The bounce continues that
+airtime, so it gives back no jump or air dash, not even when the landing ring bounced the mage off
+the floor (`startPlunge`, `plungeBounced` and `airHeavyRefused` in `model/input/motor.ts`).
 Attacks during a dash, or up to 80 ms after it, play the dash light (no lock) or the
 dash heavy. Attacks with up held play an overhead version, and ranged weapons keep aiming at the cursor.
 Each weapon only defines the variants of its card slot (light weapons: light, dash light, up light.

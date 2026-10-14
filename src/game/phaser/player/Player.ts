@@ -5,7 +5,7 @@ import { DEPTH, MAGE_FRAME, MAGE_TEXTURE, PALETTE, PLAYER_HEIGHT } from '../../c
 import type { Action, InputFrame } from '../../contracts/input'
 import type { AbilityHandler, AttackContext, PlayerEvents, PlayerHandle, WeaponMoveset } from '../../contracts/player'
 import type { PlayerBuild, PlayerWeaponId, WeaponSlot } from '../../contracts/progression'
-import { EMPTY_MOTOR_INPUT, JUMP_VELOCITY, MOTOR, createMotorState, runSpeed } from '../../model/input/motor'
+import { EMPTY_MOTOR_INPUT, JUMP_VELOCITY, MOTOR, createMotorState, plungeBounced, runSpeed } from '../../model/input/motor'
 import type { MotorEnv, MotorInput, MotorState } from '../../model/input/motor'
 import type { InputLayer } from '../input/InputLayer'
 import { applySpriteRef } from '../art'
@@ -585,6 +585,7 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
       motor.vx = 0
       motor.vy = 0
       motor.dashMs = 0
+      motor.plungeUsed = false
       grounded = false
       container.setPosition(tx, ty)
     },
@@ -643,7 +644,7 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
   const stopBounceListener = deps.combat.on('hit', (event) => {
     if (event.attacker !== handle || destroyed || !attacks.onOwnHit()) return
     handle.setVelocity(motor.vx, -JUMP_VELOCITY * PLUNGE_BOUNCE_FACTOR)
-    motor.jumpHeld = false
+    plungeBounced(motor)
     squashX = 0.82
     squashY = 1.2
     puffDust()

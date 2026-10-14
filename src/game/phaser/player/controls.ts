@@ -1,6 +1,6 @@
-import { moveStarts, stepMotor } from '../../model/input/motor'
+import { airHeavyRefused, moveStarts, startPlunge, stepMotor } from '../../model/input/motor'
 import type { MotorEnv, MotorInput, MotorState } from '../../model/input/motor'
-import type { AttackMachine, AttackStepEnv } from './attacks'
+import type { AttackInfo, AttackMachine, AttackStepEnv } from './attacks'
 
 // An attack pressed this long after a dash ended still plays the dash variant.
 export const DASH_ATTACK_GRACE_MS = 80
@@ -30,6 +30,8 @@ export interface Controls {
 // buffer and plays the dash variant when the dash ends.
 export function createControls(motor: MotorState, motorEnv: MotorEnv, attacks: AttackMachine): Controls {
   let sinceDashMs = Infinity
+  // The attack seen last step. Each started move has a fresh info object, so a new one means a start.
+  let seen: Readonly<AttackInfo> | null = null
   const attackPressed = { light: false, heavy: false }
   const attackEnv: AttackStepEnv = { grounded: false, attackSpeed: 1, canStart: false, dashing: false, holdBuffer: false, up: false }
   // What the motor reads during an attack lock: no direction held, while jump and dash presses
@@ -41,8 +43,6 @@ export function createControls(motor: MotorState, motorEnv: MotorEnv, attacks: A
       const grounded = motorEnv.grounded
       const move = controllable ? moveStarts(motor, input, motorEnv, dtMs) : null
       const dashRuns = motor.dashMs > 0 || move === 'dash'
-      attackPressed.light = controllable && presses.light
-      attackPressed.heavy = controllable && presses.heavy
       // A just-started jump can still report the ground, so a rising mage plays the air variants.
       attackEnv.grounded = grounded && motor.vy >= 0
       attackEnv.attackSpeed = attackSpeed
@@ -50,7 +50,16 @@ export function createControls(motor: MotorState, motorEnv: MotorEnv, attacks: A
       attackEnv.dashing = dashRuns || sinceDashMs < DASH_ATTACK_GRACE_MS
       attackEnv.holdBuffer = dashRuns
       attackEnv.up = presses.up
+      attackPressed.light = controllable && presses.light
+      // A second air heavy before landing is dropped, not buffered, so it cannot slam on the landing.
+      attackPressed.heavy =
+        controllable && presses.heavy && !airHeavyRefused(motor, !attackEnv.grounded, presses.up, attackEnv.dashing)
       attacks.step(dtMs, attackPressed, attackEnv)
+      const current = attacks.current()
+      if (current !== seen) {
+        seen = current
+        if (current?.variant === 'air') startPlunge(motor)
+      }
       // After the attack step, so a plunge landing on this step still fires its landing hit. Hits
       // already spawned stay.
       if (move) attacks.cancel()
