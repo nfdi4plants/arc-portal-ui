@@ -53,9 +53,9 @@ const row = (name: string, hits: number[], timeMs: number, reach?: number): Row 
 const twice = (damage: number) => [damage, damage]
 const dual = (damage: number) => [damage * 0.75, damage * 0.75]
 
-const STAFF_LIGHT = [row('Staff jab', [10], 200, 42), row('Staff jab', [10], 200, 42), row('Staff thrust', [16], 300, 50)]
+const STAFF_LIGHT = [row('Staff jab', [10], 200, 72), row('Staff jab', [10], 200, 72), row('Staff thrust', [16], 300, 76)]
 // The staff is the only weapon in both slots, so its heavy half has an entry of its own.
-const STAFF_HEAVY: Entry = { slot: 'heavy', rows: [[row('Staff slam', [30], 600, 62)], [row('Staff slam', [30], 600, 62)]], notes: ['Slow overhead slam', 'Slow overhead slam'] }
+const STAFF_HEAVY: Entry = { slot: 'heavy', rows: [[row('Staff slam', [30], 600, 70)], [row('Staff slam', [30], 600, 70)]], notes: ['Slow overhead slam', 'Slow overhead slam'] }
 
 const TABLE: Record<PlayerWeaponId, Entry> = {
   staff: {
@@ -82,12 +82,12 @@ const TABLE: Record<PlayerWeaponId, Entry> = {
   scalpel: {
     slot: 'light',
     rows: [
-      [row('Scalpel cut', [8], 145, 32), row('Scalpel cut', [8], 145, 32), row('Scalpel cut', [8], 145, 32), row('Scalpel slash', [12], 220, 32)],
+      [row('Scalpel cut', [8], 145, 52), row('Scalpel cut', [8], 145, 52), row('Scalpel cut', [8], 145, 52), row('Scalpel slash', [12], 220, 52)],
       [
-        row('Scalpel cut', dual(8), 145, 32),
-        row('Scalpel cut', dual(8), 145, 32),
-        row('Scalpel cut', dual(8), 145, 32),
-        row('Scalpel slash', dual(12), 220, 32),
+        row('Scalpel cut', dual(8), 145, 52),
+        row('Scalpel cut', dual(8), 145, 52),
+        row('Scalpel cut', dual(8), 145, 52),
+        row('Scalpel slash', dual(12), 220, 52),
       ],
     ],
     notes: ['Very fast string of four', 'Every cut hits twice'],

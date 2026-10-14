@@ -14,6 +14,8 @@ import type { AttackPhase } from './attacks'
 import { createControls } from './controls'
 import { bodyOf, isOneWay } from './oneWay'
 import { staffMoveset } from './staffMoveset'
+import { weaponPose } from './weaponPose'
+import type { PosedAttack, WeaponPose } from './weaponPose'
 import { airHeavyOf, dashHeavyOf, dashLightOf, upHeavyOf, upLightOf } from './weapons/variants'
 
 export const PLAYER_HURTBOX = { width: 18, height: 42 }
@@ -442,6 +444,8 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
     }
   }
 
+  const pose: WeaponPose = { x: 0, y: 0, angle: 0, poke: 0 }
+  const posed: PosedAttack = { heavy: false, variant: 'ground', plunge: false }
   const onRender = (_time: number, delta: number) => {
     if (destroyed) return
     container.setPosition(body.center.x, body.bottom)
@@ -467,29 +471,23 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
 
     const attack = attacks.current()
     const phase = attacks.phase()
-    let poke = 0
-    if (attack && phase === 'startup') poke = -0.4
-    else if (attack && phase === 'active') poke = 1
-    else if (attack && phase === 'recovery') poke = 0.4
     const heavy = attack?.slot === 'heavy'
-    const variant = attack?.variant
-    const up = variant === 'up'
+    const up = attack?.variant === 'up'
+    if (attack) {
+      posed.heavy = heavy
+      posed.variant = attack.variant
+      posed.plunge = attack.move.plunge !== undefined
+    }
+    // The move's own clock stops in hit-stop, so a spin stops with it.
+    const { poke } = weaponPose(attack ? posed : null, phase, attacks.moveElapsedMs(), pose)
 
     mage.setPosition(0, bob)
     mage.setScale(baseScale * squashX * motor.facing, baseScale * squashY * breathe)
     mage.setRotation(lean + (poke > 0 && !up ? poke * 0.08 * motor.facing : 0))
 
-    weapon.setPosition(motor.facing * (up ? 4 : 8 + poke * 8), -12 + bob - (up ? Math.max(0, poke) * 8 : 0))
+    weapon.setPosition(motor.facing * pose.x, pose.y + bob)
     weapon.scaleX = weaponScaleX * motor.facing
-    // Angles from upright, positive tips the weapon forward.
-    let angle: number
-    if (up) angle = phase === 'startup' ? -0.6 : phase === 'active' ? -0.05 : 0.15
-    else if (attack?.move.plunge && phase === 'active') angle = 2.8
-    // The move's own clock stops in hit-stop, so the spin stops with it.
-    else if (variant === 'dash' && heavy && phase === 'active') angle = (attacks.moveElapsedMs() * 0.03) % (Math.PI * 2)
-    else if (heavy) angle = phase === 'startup' ? -0.6 : phase === 'active' ? 2 : 1.2
-    else angle = 0.35 + Math.max(0, poke) * 1.1
-    weapon.setRotation(angle * motor.facing)
+    weapon.setRotation(pose.angle * motor.facing)
     updateSmear(attack !== null && phase === 'active' && !RANGED_WEAPONS.has(build.weapons[attack.slot].id), heavy, delta)
 
     if (motor.dashMs > 0) {

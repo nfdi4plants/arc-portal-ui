@@ -32,7 +32,10 @@ function move(name: string, timing: Omit<AttackMove, 'name' | 'onActive'>, hit: 
   return result
 }
 
-const JAB_SHAPE = { x: 4, y: -34, w: 38, h: 18 }
+// The staff is drawn 54 units long (58 at tier 2) from the hand, so at the strike it reaches about
+// 70 units ahead of the feet, a little below the hip. The boxes cover the drawn staff and the lower
+// part of the swing's smear. The move layer adds a small margin on top.
+const JAB_SHAPE = { x: 4, y: -46, w: 68, h: 36 }
 
 const LIGHT: AttackMove[] = [
   move(
@@ -48,7 +51,7 @@ const LIGHT: AttackMove[] = [
   move(
     'Staff thrust',
     { startupMs: 80, activeMs: 90, recoveryMs: 220, cancelAfterMs: 130, lunge: 220, allowedInAir: true },
-    { shape: { x: 4, y: -36, w: 46, h: 22 }, damage: 16, knockback: { x: 300, y: -160 }, hitStopMs: 55, tags: ['light'] },
+    { shape: { x: 4, y: -46, w: 72, h: 36 }, damage: 16, knockback: { x: 300, y: -160 }, hitStopMs: 55, tags: ['light'] },
   ),
 ]
 
@@ -56,7 +59,7 @@ const HEAVY: AttackMove[] = [
   move(
     'Staff slam',
     { startupMs: 280, activeMs: 120, recoveryMs: 320, cancelAfterMs: 200, lunge: 80, allowedInAir: false },
-    { shape: { x: -10, y: -60, w: 72, h: 60 }, damage: 30, knockback: { x: 260, y: -260 }, hitStopMs: 70, tags: ['heavy'] },
+    { shape: { x: -10, y: -68, w: 80, h: 68 }, damage: 30, knockback: { x: 260, y: -260 }, hitStopMs: 70, tags: ['heavy'] },
   ),
 ]
 
@@ -96,7 +99,8 @@ const METEOR: AttackMove = {
     const feet = ctx.player.position()
     const floor = groundBelow(ctx, feet.x, feet.y, 600)
     const fallMs = floor === null ? METEOR_FALL_FALLBACK_MS : ((floor - feet.y) / METEOR_SPEED) * 1000 + 40
-    hitbox(ctx, { kind: 'rect', x: -12, y: -12, w: 24, h: 26 }, fallMs, {
+    // The staff points down and a little forward under the feet while the mage falls.
+    hitbox(ctx, { kind: 'rect', x: -12, y: -12, w: 60, h: 56 }, fallMs, {
       damage: 10,
       knockback: { x: 60, y: 200 },
       hitStopMs: 20,
@@ -123,7 +127,7 @@ const LUNGE: AttackMove = {
   keepsMomentum: true,
   onActive(ctx) {
     const scale = ctx.rangeScale
-    hitbox(ctx, { kind: 'rect', x: 0, y: -36, w: 52 * scale, h: 20 }, 90, { damage: 12, knockback: { x: 220, y: -60 }, hitStopMs: 40, tags: ['light'] })
+    hitbox(ctx, { kind: 'rect', x: 0, y: -46, w: 72 * scale, h: 36 }, 90, { damage: 12, knockback: { x: 220, y: -60 }, hitStopMs: 40, tags: ['light'] })
   },
 }
 
@@ -140,7 +144,8 @@ const COMET: AttackMove = {
   lockMs: 150,
   onActive(ctx) {
     const scale = ctx.rangeScale
-    hitbox(ctx, { kind: 'rect', x: -40 * scale, y: -46, w: 80 * scale, h: 46 }, 160, {
+    // The staff spins around the hand, which sits 16 units ahead of the feet.
+    hitbox(ctx, { kind: 'rect', x: -44 * scale, y: -68, w: 120 * scale, h: 68 }, 160, {
       damage: 24,
       knockback: { x: 200, y: -240 },
       hitStopMs: 60,

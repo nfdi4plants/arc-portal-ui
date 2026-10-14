@@ -140,11 +140,12 @@ export const pipetteMoveset: WeaponMoveset = {
 }
 
 // Scalpel: a very fast short string of four. Tier 2 (Dual Scalpels) hits twice per move.
+// The scalpel is drawn 34 to 36 units long, so the cut reaches about 52 units ahead of the feet.
 const stab = (damage: number, knockback: { x: number; y: number }, hitStopMs: number): MeleeHit => ({
   x: 2,
-  y: -30,
-  w: 30,
-  h: 18,
+  y: -38,
+  w: 50,
+  h: 34,
   damage,
   knockback,
   hitStopMs,
@@ -157,7 +158,7 @@ function scalpelMove(name: string, timing: Timing, hit: MeleeHit, tier: 1 | 2): 
 
 // Scalpel variants. Pass Cut leaves a cut along the dash line. Rising Cut opens upward.
 function passCut(tier: 1 | 2): AttackMove {
-  const hit: MeleeHit = { x: -50, y: -34, w: 80, h: 18, damage: 10, knockback: { x: 90, y: -50 }, hitStopMs: 25, tags: LIGHT_TAGS }
+  const hit: MeleeHit = { x: -50, y: -38, w: 104, h: 36, damage: 10, knockback: { x: 90, y: -50 }, hitStopMs: 25, tags: LIGHT_TAGS }
   return move('Pass Cut', dashLightTiming(30, 80, 110), strike(hit, tier === 2))
 }
 
@@ -190,13 +191,13 @@ export const scalpelMoveset: WeaponMoveset = {
   }),
 }
 
-// Sequence whip: a long thin hitbox. Tier 2 pulls hit enemies towards the player (negative
-// knockback x).
+// Sequence whip: a long hitbox, tall enough for the drawn whip and its smear. Tier 2 pulls
+// hit enemies towards the player (negative knockback x).
 const lash = (damage: number, push: number, hitStopMs: number, tier: 1 | 2): MeleeHit => ({
   x: 4,
-  y: -26,
+  y: -38,
   w: 70,
-  h: 10,
+  h: 30,
   damage,
   knockback: tier === 2 ? { x: -120, y: -30 } : { x: push, y: -40 },
   hitStopMs,
@@ -228,7 +229,7 @@ function skyLash(tier: 1 | 2): AttackMove {
   // Tier 2 drags a flyer down towards the mage, as its lash pulls enemies in.
   const knockback = tier === 2 ? { x: 0, y: 160 } : { x: 20, y: -220 }
   return move('Sky Lash', variantTiming(90, 70, 170, 90), (ctx, self) => {
-    overheadBox(ctx, 92, 14, activeMs(ctx, self), 12, knockback, 35, LIGHT_TAGS)
+    overheadBox(ctx, 92, 24, activeMs(ctx, self), 12, knockback, 35, LIGHT_TAGS)
     const feet = ctx.player.position()
     streak(ctx, feet.x + ctx.player.facing() * 4, feet.y - 34, feet.x, feet.y - 30 - 92 * ctx.rangeScale, 140)
   })

@@ -165,3 +165,18 @@ export function upwardKnockback(knockback: Point): Point {
   const lift = Math.max(UPWARD_MIN_LIFT, Math.abs(knockback.y), Math.abs(knockback.x) * 0.9)
   return { x: knockback.x * UPWARD_FORWARD_SHARE, y: -lift }
 }
+
+// Every hitbox of a player move grows by this much on each side, so a swing that visibly grazes an
+// enemy hits it.
+export const MELEE_MARGIN = 4
+// Half the mage's hurtbox width. A rect reaches over the mage's own body at least, so an enemy
+// pressed against or inside the mage is hit by a forward swing too.
+export const MELEE_BODY_HALF_WIDTH = 9
+
+// The shape a player move's hitbox really gets, relative to the feet and facing right.
+export function forgivingShape(shape: HitShape): HitShape {
+  if (shape.kind === 'circle') return { kind: 'circle', x: shape.x, y: shape.y, r: shape.r + MELEE_MARGIN }
+  const left = Math.min(shape.x, -MELEE_BODY_HALF_WIDTH) - MELEE_MARGIN
+  const right = Math.max(shape.x + shape.w, MELEE_BODY_HALF_WIDTH) + MELEE_MARGIN
+  return { kind: 'rect', x: left, y: shape.y - MELEE_MARGIN, w: right - left, h: shape.h + 2 * MELEE_MARGIN }
+}

@@ -2,6 +2,7 @@ import type { CombatWorld, HitboxSpec, ProjectileSpec } from '../../../contracts
 import type { AttackContext, AttackMove, WeaponMoveset } from '../../../contracts/player'
 import type { WeaponSlot } from '../../../contracts/progression'
 import type { Core, Feature } from './core'
+import { forgivingShape } from './helpers'
 import type { Point } from './helpers'
 import { SUB_HITS, bindFx, bindScheduler, heavyOf, spawnShockwaves } from './kit'
 import type { HeavyDeclaration } from './kit'
@@ -22,9 +23,10 @@ const SLAM_AREA = 1.5
 const SLAM_WAVES = { damage: 12, width: 16, height: 18, speed: 240, distance: 160 }
 
 // Wraps the weapon movesets, including their air, dash and up variants (or the fallbacks from
-// variants.ts). Every move runs through a copy of the attack context whose combat world reports
-// each spawned spec back (to Peer Review, and for DOI Excalibur the largest damage of a heavy move
-// that declares none). The mechanics that change or extend a move live here:
+// variants.ts). Every move runs through a copy of the attack context whose combat world makes the
+// player's hitboxes a little more forgiving (forgivingShape) and reports each spawned spec back (to
+// Peer Review, and for DOI Excalibur the largest damage of a heavy move that declares none). The
+// mechanics that change or extend a move live here:
 //  - tripleCombo appends a spin finisher to the light string
 //  - pogo turns a ground light in the air with down held into a downward stab that bounces. Dash
 //    and up lights never pogo, and the attack machine only picks up when down is not held.
@@ -47,7 +49,8 @@ export function createMoveLayer(core: Core): MoveLayer {
   const tapped: CombatWorld = {
     register: (combatant) => real.register(combatant),
     unregister: (combatant) => real.unregister(combatant),
-    spawnHitbox(hit) {
+    spawnHitbox(spec) {
+      const hit = spec.owner === player ? { ...spec, shape: forgivingShape(spec.shape) } : spec
       note(hit, null)
       return real.spawnHitbox(hit)
     },
