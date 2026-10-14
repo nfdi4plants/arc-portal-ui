@@ -3,3 +3,7 @@ export { STAT_CAPS, addXp, applyCard, canApply, createBuild, xpForNextLevel } fr
 export { rollOffer } from './offer'
 export { cardDetails, defaultAbilityLabel } from './details'
 export { FLAVOR } from './flavor'
+export { buildSummary, changeText } from './buildSummary'
+export type { BuildSummary, StatRow, WeaponSummary } from './buildSummary'
+export { weaponName, weaponRelation, weaponStats } from './weaponStats'
+export type { WeaponMove, WeaponRelation, WeaponStats } from './weaponStats'
