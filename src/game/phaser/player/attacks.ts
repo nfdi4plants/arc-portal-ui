@@ -12,6 +12,9 @@ export const LANDING_WINDOW_MS = 1500
 export const BOUNCE_LANDING_WINDOW_MS = 120
 // The recovery that is left after a bounce, already cancellable.
 export const BOUNCE_RECOVERY_MS = 100
+// After a light move of the string ends, a light press this soon still plays the next move of the
+// string, so steady mashing chains as well as pressing inside each cancel window.
+export const COMBO_GRACE_MS = 250
 
 export interface AttackHooks {
   movesFor(slot: WeaponSlot): AttackMove[]
@@ -91,6 +94,8 @@ export function createAttackMachine(hooks: AttackHooks): AttackMachine {
   // counts down after the landing.
   let bounceReady = false
   let bounceWindowMs = Infinity
+  // Time left to continue the light string after its last move ended. comboIndex keeps that move.
+  let comboGraceMs = 0
 
   const scaled = (ms: number) => ms / attackSpeed
 
@@ -149,6 +154,9 @@ export function createAttackMachine(hooks: AttackHooks): AttackMachine {
         toRecovery(current)
       } else if (phase === 'recovery') {
         if (elapsed < scaled(current.recoveryMs)) return
+        // Dash and air variants are not part of the string, so they leave nothing to continue.
+        const variant = info?.variant
+        comboGraceMs = slot === 'light' && (variant === 'ground' || variant === 'up') ? COMBO_GRACE_MS : 0
         finish()
       } else {
         return
@@ -191,6 +199,7 @@ export function createAttackMachine(hooks: AttackHooks): AttackMachine {
     moveMs = 0
     landing = null
     bounceReady = false
+    comboGraceMs = 0
     hooks.onStart(slot, comboIndex, move, kind)
     advance(grounded)
     return true
@@ -203,6 +212,7 @@ export function createAttackMachine(hooks: AttackHooks): AttackMachine {
     landing = null
     lockMs = 0
     bounceReady = false
+    comboGraceMs = 0
   }
 
   return {
@@ -224,6 +234,7 @@ export function createAttackMachine(hooks: AttackHooks): AttackMachine {
         bounceWindowMs -= dtMs
         if (bounceWindowMs <= 0) bounceReady = false
       }
+      if (comboGraceMs > 0) comboGraceMs = Math.max(0, comboGraceMs - dtMs)
       if (phase !== 'idle') {
         elapsed += dtMs
         moveMs += dtMs
@@ -242,7 +253,8 @@ export function createAttackMachine(hooks: AttackHooks): AttackMachine {
       if (bufferedSlot && env.canStart && lockMs <= 0) {
         let started = false
         if (phase === 'idle') {
-          started = start(bufferedSlot, 0, env, dashing || bufferedDash)
+          const chain = bufferedSlot === 'light' && comboGraceMs > 0
+          started = start(bufferedSlot, chain ? comboIndex + 1 : 0, env, dashing || bufferedDash)
         } else if (canCancel()) {
           const chain = bufferedSlot === 'light' && slot === 'light'
           started = start(bufferedSlot, chain ? comboIndex + 1 : 0, env, dashing || bufferedDash)
@@ -250,7 +262,10 @@ export function createAttackMachine(hooks: AttackHooks): AttackMachine {
         if (started) bufferedSlot = null
       }
 
-      if (bufferedSlot && !env.holdBuffer) {
+      // A light press during a light move of the string waits for its cancel window, so every press
+      // of a mash plays one move however early it came.
+      const waitsForString = bufferedSlot === 'light' && slot === 'light' && phase !== 'idle' && info?.variant !== 'dash'
+      if (bufferedSlot && !env.holdBuffer && !waitsForString) {
         bufferedMs -= dtMs
         if (bufferedMs <= 0) bufferedSlot = null
       }

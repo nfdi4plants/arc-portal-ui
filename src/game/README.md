@@ -82,6 +82,11 @@ by a phantom" and tells the player to fill in the missing value. Key P in the Mo
 
 ## Attack variants
 
+Light presses walk the light string. A light press during a move of the string waits for the
+move's cancel window, and a press up to 250 ms after the move ended (`COMBO_GRACE_MS` in
+`phaser/player/attacks.ts`) still plays the next move, so a steady mash chains the whole string and
+the Triple Combo finisher. A longer pause, a heavy, a dash, a jump or a hit starts the string over.
+
 Heavy pressed in the air plays the weapon's air heavy, mostly a plunge with a landing hit and a
 short landing lock. The first hit of an air heavy (the fall or the landing ring) ends the plunge and
 bounces the mage up at 55% of the jump speed (about 30% of the jump height), free to steer and cancel at once.

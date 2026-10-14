@@ -57,12 +57,14 @@ export interface AttackMove {
   // For dash variants: the dash speed carries through startup and active, then normal friction
   // takes over. Without it the dash stops when the move starts.
   keepsMomentum?: boolean
+  // The held weapon spins around the hand during the active phase.
+  spin?: boolean
   // Called once when the active phase starts. Spawns hitboxes or projectiles.
   onActive(ctx: AttackContext): void
 }
 
 // The moves a weapon has in one slot. For the light slot this is a combo string. Pressing light
-// again during the cancel window advances to the next move. The heavy slot usually has one move.
+// again during the cancel window, or up to 250 ms after the move ended, advances to the next move. The heavy slot usually has one move.
 //
 // Each weapon only defines the slot its card puts it in. A light weapon has moves, dashLight and
 // upLight, a heavy weapon has moves, airHeavy, dashHeavy and upHeavy, and moves() returns an empty

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createRng } from '../../../src/game/contracts/rng'
-import { addXp, applyCard, createBuild, rollOffer, xpForNextLevel } from '../../../src/game/model/progression'
+import { addXp, applyCard, canApply, createBuild, rollOffer, xpForNextLevel } from '../../../src/game/model/progression'
 
 describe('createBuild', () => {
   it('starts at level 1 with the staff in both slots and three offered cards', () => {
@@ -45,5 +45,15 @@ describe('input builds', () => {
     applyCard(build, 'weapon.wand')
     rollOffer(build, createRng('no-mutation'))
     expect(build).toEqual(snapshot)
+  })
+})
+
+describe('Long Reach', () => {
+  it('is offered while a melee weapon is equipped and not with two shooting weapons', () => {
+    const ranged = applyCard(applyCard(createBuild(), 'weapon.wand'), 'weapon.centrifugeDisc')
+    expect(canApply(createBuild(), 'stat.longReach')).toBe(true)
+    expect(canApply(applyCard(createBuild(), 'weapon.wand'), 'stat.longReach')).toBe(true)
+    expect(canApply(ranged, 'stat.longReach')).toBe(false)
+    expect(canApply(applyCard(ranged, 'weapon.scalpel'), 'stat.longReach')).toBe(true)
   })
 })

@@ -445,7 +445,7 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
   }
 
   const pose: WeaponPose = { x: 0, y: 0, angle: 0, poke: 0 }
-  const posed: PosedAttack = { heavy: false, variant: 'ground', plunge: false }
+  const posed: PosedAttack = { heavy: false, variant: 'ground', plunge: false, spin: false }
   const onRender = (_time: number, delta: number) => {
     if (destroyed) return
     container.setPosition(body.center.x, body.bottom)
@@ -477,6 +477,7 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
       posed.heavy = heavy
       posed.variant = attack.variant
       posed.plunge = attack.move.plunge !== undefined
+      posed.spin = attack.move.spin === true
     }
     // The move's own clock stops in hit-stop, so a spin stops with it.
     const { poke } = weaponPose(attack ? posed : null, phase, attacks.moveElapsedMs(), pose)

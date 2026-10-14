@@ -10,6 +10,7 @@ import type {
   XpForNextLevel,
 } from '../../contracts/progression'
 import { ABILITY_IDS } from './catalog'
+import { weaponStats } from './weaponStats'
 
 // dashCooldownMs is a floor. Fresh battery stops applying once the cooldown reaches it.
 export const STAT_CAPS = {
@@ -74,15 +75,19 @@ export const addXp: AddXp = (build, amount) => {
   }
 }
 
-function raiseStat(field: CappedStat, update: (value: number) => number): Effect {
+function raiseStat(field: CappedStat, update: (value: number) => number, usable: (build: PlayerBuild) => boolean = () => true): Effect {
   return {
-    applies: (build) => build.stats[field] < STAT_CAPS[field],
+    applies: (build) => build.stats[field] < STAT_CAPS[field] && usable(build),
     apply: (build) => ({
       ...build,
       stats: { ...build.stats, [field]: Math.min(STAT_CAPS[field], update(build.stats[field])) },
     }),
   }
 }
+
+// Melee range scales melee hitboxes only, so a build with two shooting weapons gains nothing from it.
+const hasMeleeWeapon = (build: PlayerBuild): boolean =>
+  (['light', 'heavy'] as const).some((slot) => weaponStats(build.weapons[slot].id, slot, build.weapons[slot].tier).reach !== 'ranged')
 
 // Each Fresh Battery card takes this much off the dash cooldown, so two cards reach the floor.
 const FRESH_BATTERY_MS = 500
@@ -163,7 +168,7 @@ const EFFECTS = new Map<string, Effect>([
   ['stat.keenEye', raiseStat('critChance', (value) => value + 0.05)],
   ['stat.freshBattery', freshBattery],
   ['stat.thickRobe', thickRobe],
-  ['stat.longReach', raiseStat('meleeRange', (value) => value * 1.15)],
+  ['stat.longReach', raiseStat('meleeRange', (value) => value * 1.15, hasMeleeWeapon)],
   ['stat.secondWind', secondWind],
   ['weapon.wand', weapon('light', 'wand')],
   ['weapon.pipettePistol', weapon('light', 'pipettePistol')],

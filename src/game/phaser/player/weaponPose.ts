@@ -17,9 +17,11 @@ export interface PosedAttack {
   heavy: boolean
   variant: AttackVariant
   plunge: boolean
+  // The move spins the weapon (AttackMove.spin).
+  spin: boolean
 }
 
-// Turns per ms of a dash heavy's spin.
+// Radians per ms of a spinning move (dash heavies, the combo finisher).
 export const SPIN_RATE = 0.03
 
 // Writes into `out`, so the render loop allocates nothing. spinMs is the move's own clock.
@@ -35,7 +37,7 @@ export function weaponPose(attack: PosedAttack | null, phase: AttackPhase, spinM
   out.y = -12 - (up ? Math.max(0, poke) * 8 : 0)
   if (up) out.angle = phase === 'startup' ? -0.6 : phase === 'active' ? -0.05 : 0.15
   else if (attack?.plunge && phase === 'active') out.angle = 2.8
-  else if (attack?.variant === 'dash' && heavy && phase === 'active') out.angle = (spinMs * SPIN_RATE) % (Math.PI * 2)
+  else if (((attack?.variant === 'dash' && heavy) || attack?.spin) && phase === 'active') out.angle = (spinMs * SPIN_RATE) % (Math.PI * 2)
   else if (heavy) out.angle = phase === 'startup' ? -0.6 : phase === 'active' ? 2 : 1.2
   else out.angle = 0.35 + Math.max(0, poke) * 1.1
   return out

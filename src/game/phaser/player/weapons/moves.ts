@@ -4,7 +4,7 @@ import type { WeaponSlot } from '../../../contracts/progression'
 import type { Core, Feature } from './core'
 import { forgivingShape } from './helpers'
 import type { Point } from './helpers'
-import { SUB_HITS, bindFx, bindScheduler, heavyOf, spawnShockwaves } from './kit'
+import { SUB_HITS, bindFx, bindScheduler, heavyOf, spawnShockwaves, streak } from './kit'
 import type { HeavyDeclaration } from './kit'
 import { airHeavyOf, dashHeavyOf, dashLightOf, upHeavyOf, upLightOf, upward } from './variants'
 
@@ -22,6 +22,10 @@ const SHOCKWAVE = { damage: 12, width: 14, height: 16, speed: 230, distance: 150
 // Ground Slam: the landing of every air heavy covers 50% more and sends two waves along the ground.
 const SLAM_AREA = 1.5
 const SLAM_WAVES = { damage: 12, width: 16, height: 18, speed: 240, distance: 160 }
+
+// Reach of the Triple Combo spin behind and ahead of the feet.
+const SPIN_BACK = 56
+const SPIN_FRONT = 80
 
 // Wraps the weapon movesets, including their air, dash and up variants (or the fallbacks from
 // variants.ts). Every move runs through a copy of the attack context whose combat world makes the
@@ -70,11 +74,15 @@ export function createMoveLayer(core: Core): MoveLayer {
 
   // One box covers both sides, so an enemy that overlaps the middle is hit once. The combat world
   // mirrors knockback by the attacker's facing only, so every enemy flies the way the mage faces.
+  // It reaches as far ahead as the staff thrust, and the lunge closes the gap the knockback of the
+  // string's last hit opened.
   const spin = (ctx: AttackContext) => {
     const scale = ctx.rangeScale
+    const feet = ctx.player.position()
+    const face = ctx.player.facing()
     ctx.combat.spawnHitbox({
       owner: player,
-      shape: { kind: 'rect', x: -48 * scale, y: -40, w: 96 * scale, h: 40 },
+      shape: { kind: 'rect', x: -SPIN_BACK * scale, y: -48, w: (SPIN_BACK + SPIN_FRONT) * scale, h: 48 },
       follow: true,
       activeMs: 120 / ctx.player.getBuild().stats.attackSpeed,
       damage: 14,
@@ -83,6 +91,7 @@ export function createMoveLayer(core: Core): MoveLayer {
       maxTargets: Infinity,
       tags: ['light', 'finisher'],
     })
+    streak(ctx, feet.x - face * SPIN_BACK * scale, feet.y - 26, feet.x + face * SPIN_FRONT * scale, feet.y - 22, 140)
   }
 
   const finisherBase: AttackMove = {
@@ -91,8 +100,9 @@ export function createMoveLayer(core: Core): MoveLayer {
     activeMs: 120,
     recoveryMs: 260,
     cancelAfterMs: 160,
-    lunge: 0,
+    lunge: 120,
     allowedInAir: true,
+    spin: true,
     onActive: spin,
   }
 
