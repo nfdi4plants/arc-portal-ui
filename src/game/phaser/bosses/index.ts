@@ -7,11 +7,16 @@ import type { Rng } from '../../contracts/rng'
 import type { RunPlan, Segment } from '../../contracts/run'
 import { createActor } from './actor'
 import type { PhaseConfig } from './actor'
+import type { ArenaPlatform } from './zones'
+
+export { arenaPlatforms, PLATFORM_THICKNESS, type ArenaPlatform } from './zones'
 
 export interface Arena {
   left: number
   right: number
   floorY: number
+  // One-way platforms over the floor, see arenaPlatforms.
+  platforms: readonly ArenaPlatform[]
 }
 
 export interface BossDeps {

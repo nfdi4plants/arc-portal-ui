@@ -1,6 +1,6 @@
-import Phaser from 'phaser'
+import type Phaser from 'phaser'
 import type { ScribbleArt, TelegraphArt } from '../../contracts/art'
-import { DEPTH, PALETTE } from '../../contracts/constants'
+import { DEPTH } from '../../contracts/constants'
 
 // How a zone fills while the wind-up runs. The anchor (x, y) of a ZoneSpec depends on it:
 //   radial  centre, grows in both directions
@@ -18,7 +18,7 @@ export interface ZoneSpec {
   h: number
   rotation?: number
   fill: FillMode
-  // A hatched spot where the attack does not hit.
+  // A teal spot where the attack does not hit. It is drawn with the 'safe' art whatever the shape.
   safe?: boolean
 }
 
@@ -38,9 +38,11 @@ const ORIGIN: Record<FillMode, readonly [number, number]> = {
   up: [0.5, 1],
 }
 
-const WARN = { base: 0.28, fill: 0.6 }
-const LIVE = { base: 0.55, fill: 0.9 }
-const SAFE_ALPHA = 0.6
+const WARN = { base: 0.4, fill: 0.75 }
+const LIVE = { base: 0.6, fill: 0.95 }
+// Safe spots breathe between these alphas, about once a second, so they stand out from the danger.
+const SAFE_ALPHA = { min: 0.65, max: 0.95 }
+const SAFE_PULSE_MS = 160
 const MIN_PROGRESS = 0.001
 
 interface Slot extends Zone {
@@ -48,28 +50,21 @@ interface Slot extends Zone {
   fillImage: Phaser.GameObjects.Image
   mode: FillMode
   safe: boolean
-  tinted: boolean
   used: boolean
 }
 
 export interface TelegraphPool {
   show(spec: ZoneSpec): Zone
+  // Pulses the safe spots. Call once per rendered frame with the scene time.
+  update(now: number): void
   destroy(): void
 }
-
 
 // Danger zones and safe spots share a pool of image pairs: a dim image of the whole zone and a
 // bright copy on top that grows over the telegraph time.
 export function createTelegraphPool(scene: Phaser.Scene, art: ScribbleArt): TelegraphPool {
   const slots: Slot[] = []
   const free: Slot[] = []
-
-  function setTint(slot: Slot, tinted: boolean) {
-    if (slot.tinted === tinted) return
-    slot.tinted = tinted
-    if (tinted) slot.base.setTint(PALETTE.teal).setTintMode(Phaser.TintModes.FILL)
-    else slot.base.clearTint().setTintMode(Phaser.TintModes.MULTIPLY)
-  }
 
   function create(): Slot {
     const base = scene.add.image(0, 0, '__DEFAULT').setVisible(false)
@@ -79,7 +74,6 @@ export function createTelegraphPool(scene: Phaser.Scene, art: ScribbleArt): Tele
       fillImage,
       mode: 'right',
       safe: false,
-      tinted: false,
       used: false,
       setProgress(progress) {
         if (slot.safe) return
@@ -98,8 +92,8 @@ export function createTelegraphPool(scene: Phaser.Scene, art: ScribbleArt): Tele
         else image.setCrop(0, h * (1 - k), w, h * k)
       },
       activate() {
-        slot.base.setAlpha(LIVE.base)
         if (slot.safe) return
+        slot.base.setAlpha(LIVE.base)
         slot.fillImage.setAlpha(LIVE.fill)
         slot.setProgress(1)
       },
@@ -119,13 +113,12 @@ export function createTelegraphPool(scene: Phaser.Scene, art: ScribbleArt): Tele
     show(spec) {
       const slot = free.pop() ?? create()
       // The art snaps the size to a few cached textures. The images are stretched to the zone below.
-      const texture = art.telegraph(scene, spec.shape, spec.w, spec.h)
+      const texture = art.telegraph(scene, spec.safe ? 'safe' : spec.shape, spec.w, spec.h)
       const [ox, oy] = ORIGIN[spec.fill]
       const depth = spec.safe ? DEPTH.telegraphs + 1 : DEPTH.telegraphs
       slot.used = true
       slot.mode = spec.fill
       slot.safe = !!spec.safe
-      setTint(slot, slot.safe)
       for (const image of [slot.base, slot.fillImage]) {
         image
           .setTexture(texture)
@@ -136,10 +129,15 @@ export function createTelegraphPool(scene: Phaser.Scene, art: ScribbleArt): Tele
           .setDepth(depth)
           .setCrop()
       }
-      slot.base.setAlpha(slot.safe ? SAFE_ALPHA : WARN.base).setVisible(true)
+      slot.base.setAlpha(slot.safe ? SAFE_ALPHA.max : WARN.base).setVisible(true)
       slot.fillImage.setAlpha(WARN.fill).setVisible(!slot.safe)
       if (!slot.safe) slot.setProgress(0)
       return slot
+    },
+    update(now) {
+      const k = 0.5 + 0.5 * Math.sin(now / SAFE_PULSE_MS)
+      const alpha = SAFE_ALPHA.min + (SAFE_ALPHA.max - SAFE_ALPHA.min) * k
+      for (const slot of slots) if (slot.used && slot.safe) slot.base.setAlpha(alpha)
     },
     destroy() {
       for (const slot of slots) {

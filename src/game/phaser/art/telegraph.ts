@@ -5,9 +5,10 @@ import { conePts, telegraphSize } from './geometry'
 import { TEXTURE_SCALE, telegraphKey } from './layout'
 import type { Look, Pen } from './pen'
 
-// Hatched red (#e5484d) danger zones. One still frame, the boss scene scales it and fills it over
-// the telegraph time. The hatching is 60 % opaque and the outline is solid, so the arena stays
-// visible through the zone.
+// Hatched red (#e5484d) danger zones and teal (#22c3a6) safe spots. One still frame, the boss scene
+// scales it and fills it over the telegraph time. Each zone has a solid wash, a bold hatch and a
+// solid outline, so even a thin strip along the floor reads as an area and not as a dashed line.
+// The safe spots hatch the other way, so the two never look alike where they overlap.
 //
 // Sizes snap up to powers of two (16 to 1024), so a fight draws a handful of textures and the
 // prewarm below can cover the usual ones. The hatch is a tiny tile that fills the shape as a canvas
@@ -19,21 +20,26 @@ interface HatchLook {
   // Distance between the lines in world units.
   gap: number
   crossed: boolean
+  color: string
+  // Line width in world units.
+  width: number
+  // Lines fall to the right instead of rising.
+  flip?: boolean
 }
 
-const EDGE: Look = { tint: 'rgba(229, 72, 77, 0.3)', line: '#a3262b', weight: 1.4 }
-const HATCH_COLOR = 'rgba(229, 72, 77, 0.6)'
-const HATCH_WIDTH = 0.6
-const ZONE_HATCH: HatchLook = { gap: 3, crossed: false }
-const BEAM_HATCH: HatchLook = { gap: 2.4, crossed: true }
+const EDGE: Look = { tint: 'rgba(229, 72, 77, 0.38)', line: '#a3262b', weight: 1.8 }
+const ZONE_HATCH: HatchLook = { gap: 3.2, crossed: false, color: 'rgba(196, 44, 50, 0.85)', width: 1 }
+const BEAM_HATCH: HatchLook = { gap: 2.6, crossed: true, color: 'rgba(196, 44, 50, 0.85)', width: 0.8 }
+const SAFE_EDGE: Look = { tint: 'rgba(34, 195, 166, 0.34)', line: '#127a68', weight: 1.8, rough: 0.6 }
+const SAFE_HATCH: HatchLook = { gap: 4, crossed: false, color: 'rgba(75, 174, 214, 0.75)', width: 1, flip: true }
 
 const tiles = new Map<string, HTMLCanvasElement>()
 
 // A square of 45 degree lines that repeats without a seam, so its side is a whole number of
 // pixels. That rounds the gap a little (3 becomes 2.8 world units).
-function hatchTile({ gap, crossed }: HatchLook): HTMLCanvasElement {
+function hatchTile({ gap, crossed, color, width, flip }: HatchLook): HTMLCanvasElement {
   const side = Math.max(2, Math.round(gap * Math.SQRT2 * TEXTURE_SCALE))
-  const id = `${side}:${crossed}`
+  const id = `${side}:${crossed}:${color}:${width}:${!!flip}`
   const hit = tiles.get(id)
   if (hit) return hit
   const tile = document.createElement('canvas')
@@ -41,8 +47,12 @@ function hatchTile({ gap, crossed }: HatchLook): HTMLCanvasElement {
   tile.height = side
   const ctx = tile.getContext('2d')
   if (!ctx) throw new Error('Canvas 2D is not available')
-  ctx.strokeStyle = HATCH_COLOR
-  ctx.lineWidth = HATCH_WIDTH * TEXTURE_SCALE
+  ctx.strokeStyle = color
+  ctx.lineWidth = width * TEXTURE_SCALE
+  if (flip) {
+    ctx.translate(side, 0)
+    ctx.scale(-1, 1)
+  }
   ctx.beginPath()
   // Each line runs past the tile, so the corners are covered like the rest.
   for (let k = -1; k <= 1; k++) {
@@ -83,7 +93,10 @@ export function telegraph(scene: Phaser.Scene, shape: TelegraphArt, width: numbe
     anchors: { weapon: { x: 0, y: -h / 2 }, head: { x: 0, y: -h } },
     draw(pen) {
       // The hatch goes first, so the outline lies on top of it.
-      if (shape === 'circle') {
+      if (shape === 'safe') {
+        hatch(pen, SAFE_HATCH, (ctx) => ctx.rect(1.5, 1.5, w - 3, h - 3))
+        pen.rect(1.5, 1.5, w - 3, h - 3, SAFE_EDGE)
+      } else if (shape === 'circle') {
         hatch(pen, ZONE_HATCH, (ctx) => ctx.ellipse(w / 2, h / 2, (w - 2) / 2, (h - 2) / 2, 0, 0, Math.PI * 2))
         pen.ellipse(w / 2, h / 2, w - 2, h - 2, EDGE)
       } else if (shape === 'cone') {
@@ -119,6 +132,13 @@ const COMMON: readonly (readonly [TelegraphArt, number, number])[] = [
   ['line', 512, 16],
   ['line', 256, 16],
   ['line', 128, 16],
+  ['line', 1024, 16],
+  ['rect', 128, 64],
+  ['safe', 1024, 32],
+  ['safe', 128, 32],
+  ['safe', 128, 64],
+  ['safe', 64, 32],
+  ['safe', 64, 64],
 ]
 
 export function prewarmTelegraphs(scene: Phaser.Scene): void {

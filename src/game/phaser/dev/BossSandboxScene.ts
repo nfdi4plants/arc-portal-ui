@@ -13,19 +13,19 @@ import { createBuild } from '../../model/progression'
 import { planRun } from '../../model/run'
 import { preloadCoreAssets } from '../assets'
 import { createScribbleArt } from '../art'
-import { spawnBoss, spawnFinalBoss } from '../bosses'
+import { arenaPlatforms, PLATFORM_THICKNESS, spawnBoss, spawnFinalBoss } from '../bosses'
 import type { Arena, BossHandle } from '../bosses'
 import { createCombatWorld } from '../combat'
 import { createInputLayer } from '../input/InputLayer'
 import { placeholderArt } from '../placeholderArt'
-import { createPlayer } from '../player/Player'
+import { createPlayer, markOneWay } from '../player/Player'
 import type { Player } from '../player/Player'
 import { followView } from '../view'
 
 const T = TILE
 const FLOOR = 0
 const ARENA_TILES = 26
-const ARENA: Arena = { left: 0, right: ARENA_TILES * T, floorY: FLOOR }
+const ARENA: Arena = { left: 0, right: ARENA_TILES * T, floorY: FLOOR, platforms: arenaPlatforms(0, ARENA_TILES * T, FLOOR) }
 const SPAWN = { x: 3 * T, y: FLOOR }
 const KINDS: readonly IoKind[] = ['source', 'sample', 'material', 'data']
 const KIND_KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4']
@@ -88,6 +88,13 @@ export class BossSandboxScene extends Phaser.Scene {
       statics.push(this.physics.add.staticBody(x, y, w, h))
       g.fillStyle(0x8a7f6e, 1).fillRect(x, y, w, h)
       g.lineStyle(2, PALETTE.outline, 1).strokeRect(x, y, w, h)
+    }
+    for (const p of ARENA.platforms) {
+      const body = this.physics.add.staticBody(p.x, p.top, p.w, PLATFORM_THICKNESS)
+      markOneWay(body)
+      statics.push(body)
+      g.fillStyle(0xa89a84, 1).fillRect(p.x, p.top, p.w, PLATFORM_THICKNESS)
+      g.lineStyle(2, PALETTE.outline, 1).strokeRect(p.x, p.top, p.w, PLATFORM_THICKNESS)
     }
 
     const combat = createCombatWorld(this, { art })

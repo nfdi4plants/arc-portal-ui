@@ -630,6 +630,7 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
     }
 
     if (tellText) tellText.setPosition(body.x, y - height - (dizzy ? 20 : 8)).setAlpha(Math.min(1, tellMs / 300))
+    telegraphs.update(now)
   }
 
   function destroy() {
