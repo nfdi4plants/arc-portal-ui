@@ -5,9 +5,16 @@ import { deferred, renderWithTheme } from '../../test/helpers.tsx'
 import ArcDashboard from './ArcDashboard.tsx'
 import { crateJson } from '../../../tests/helpers/sampleCrate.ts'
 
-vi.mock('./ArcViewer/ArcViewer.tsx', () => ({ default: () => <div>ARC viewer</div> }))
+// The loaded dashboard now includes the asynchronous viewer and provenance graph.
+vi.setConfig({ testTimeout: 15000 })
 
-beforeEach(() => vi.spyOn(console, 'log').mockImplementation(() => {}))
+const viewer = vi.hoisted(() => vi.fn())
+vi.mock('./ArcViewer/ArcViewer.tsx', () => ({ default: (props: { jsonString?: string; embedded?: boolean }) => {
+  viewer(props)
+  return <div>ARC viewer</div>
+} }))
+
+beforeEach(() => viewer.mockClear())
 
 describe('ArcDashboard', () => {
   it('shows loading followed by the loaded dashboard without a context provider', async () => {
@@ -19,12 +26,16 @@ describe('ArcDashboard', () => {
       source="https://datahub.example" projectId={42} onBack={onBack} />)
 
     expect(screen.getByText('Loading…')).toBeVisible()
-    expect(screen.queryByText(/Arc Dashboard: Selected ARC/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'ARC-Dashboard' })).not.toBeInTheDocument()
     expect(screen.queryByText('ARC viewer')).not.toBeInTheDocument()
     await act(async () => pending.resolve(new Response(crateJson)))
-    expect(screen.getByText(/Arc Dashboard: Selected ARC/)).toBeVisible()
-    expect(screen.getByRole('link', { name: 'Link' })).toHaveAttribute('href', 'https://datahub.example/lab/arc')
-    expect(await screen.findByText('ARC viewer')).toBeVisible()
+    expect(screen.getByRole('heading', { level: 1, name: 'Facultative CAM in Talinum triangulare' })).toBeVisible()
+    expect(screen.getByRole('region', { name: 'Investigation details' })).toBeVisible()
+    expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('link', { name: 'Selected ARC' })).toHaveAttribute('href', 'https://datahub.example/lab/arc')
+    expect(await screen.findByText('ARC viewer', {}, { timeout: 5000 })).toBeVisible()
+    expect(viewer).toHaveBeenCalledWith({ jsonString: expect.stringContaining('Facultative CAM in Talinum triangulare'), embedded: true, repositoryUrl: "https://datahub.example/lab/arc", token: undefined })
+    expect(fetch).toHaveBeenCalledOnce()
     await user.click(screen.getByRole('button', { name: 'Back' }))
     expect(onBack).toHaveBeenCalledOnce()
   })
@@ -35,7 +46,7 @@ describe('ArcDashboard', () => {
       source="https://datahub.example" projectId={42} onBack={vi.fn()} />)
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not load ARC.')
-    expect(screen.queryByText(/Arc Dashboard: Selected ARC/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'ARC-Dashboard' })).not.toBeInTheDocument()
     expect(screen.queryByText('ARC viewer')).not.toBeInTheDocument()
   })
 
@@ -45,7 +56,7 @@ describe('ArcDashboard', () => {
       source="https://datahub.example" projectId={42} onBack={vi.fn()} />)
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not load ARC.')
-    expect(screen.queryByText(/Arc Dashboard: Selected ARC/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'ARC-Dashboard' })).not.toBeInTheDocument()
     expect(screen.queryByText('ARC viewer')).not.toBeInTheDocument()
   })
 })

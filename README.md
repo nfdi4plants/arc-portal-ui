@@ -80,7 +80,7 @@ Import APIs from `src/api/gitlab/index.ts`. DTOs and options live in
 
 ```ts
 import {
-  getTopStarredProjects, searchProjects, listProjects, getProject,
+  getTopStarredProjects, searchProjects, listProjects, getProject, getProjectCount,
   getCurrentUser, listGroups, listAllGroups, getGroupProjects,
 } from './src/api/gitlab/index.ts'
 
@@ -96,6 +96,7 @@ if (featured.success === true) {
 // Anonymous search remains public; supplying a runtime token expands access.
 const matches = await searchProjects(source, 'plant growth', { page: 1, perPage: 10 })
 const active = await listProjects(source, { archived: false, visibility: 'public' })
+const count = await getProjectCount(source) // Result<number>, public repositories including archives
 const arc = await getProject(source, 'group/subgroup/arc-name')
 const user = await getCurrentUser(source, { token: runtimeToken })
 const publicGroups = await listAllGroups(source, { visibility: 'public' })
@@ -124,6 +125,19 @@ Page size is between 1 and 100. Missing total headers yield `null`; an exposed
 empty `X-Next-Page` marks the end. If CORS hides pagination headers, a full page
 enables Next, which may lead to an empty final page with Previous still available.
 `listAllGroups` accumulates every catalogue page into `Result<GitLabGroup[]>`.
+
+`getProjectCount` returns `Result<number>` without downloading the full catalogue.
+It counts public projects anonymously, or all projects accessible to a supplied
+token, including archives. It uses a one-project request and `X-Total` below
+10,000. At or above that boundary, or when GitLab omits totals for larger results,
+it sums counts from disjoint `id_after`/`id_before` ranges. No admin API is needed.
+If CORS hides pagination headers, it counts simple project pages of 100 using ID
+filters, keeping memory bounded and avoiding the offset pagination limit. That
+fallback requires more requests. Counts across requests are not atomic snapshots
+if projects are created, deleted, or change visibility during the operation.
+`DataHubDashboard` starts a separate count for each configured DataHUB on mount
+and when connections change, logging its URL and completed Result to the console.
+These requests do not feed the dashboard's existing statistics or loading state.
 
 The API supports an explicit `fetchCall` transport for callers and tests,
 defaulting to native fetch. Project search uses the

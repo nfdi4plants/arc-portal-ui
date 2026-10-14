@@ -33,7 +33,7 @@ export function openInvestigationPopup(metadata: InvestigationMetadata) {
     <ThemeProvider>
       <BaseStyles>
         <h1>{metadata.title || 'Investigation Details'}</h1>
-        <InvestigationDetails metadata={metadata} showFullDescription />
+        <InvestigationDetails metadata={metadata} />
       </BaseStyles>
     </ThemeProvider>,
   )

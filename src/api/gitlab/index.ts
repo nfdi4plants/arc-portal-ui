@@ -1,4 +1,5 @@
 export { listProjects, getProject, getTopStarredProjects, searchProjects, listAllProjects, listMemberProjectIds } from './projects.ts'
+export { getProjectCount } from './projectCount.ts'
 export { getContributors, getLatestCommit } from './repository.ts'
 export { getCurrentUser } from './users.ts'
 export { listGroups, listAllGroups, getGroupProjects } from './groups.ts'

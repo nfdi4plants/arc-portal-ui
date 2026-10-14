@@ -1,4 +1,5 @@
 .dashlet {
+  --dashlet-content-padding: 16px;
   width: 100%;
   min-width: 0;
   max-height: calc(var(--dashboard-window-height, 100dvh) / 3);
@@ -22,14 +23,19 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
+  padding: var(--dashlet-content-padding);
+}
+
+.dashlet .dashboard-component-content:has(.arc-portal-embedded) {
+  padding: 0;
 }
 
 @media (max-height: 480px) {
+  .dashlet {
+    --dashlet-content-padding: 8px;
+  }
   .dashlet .dashboard-window-bar {
     min-height: 28px;
   }
 
-  .dashlet .dashboard-component-content {
-    padding: 8px;
-  }
 }

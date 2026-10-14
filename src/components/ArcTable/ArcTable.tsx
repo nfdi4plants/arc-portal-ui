@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ActionList, ActionMenu, Button, ButtonGroup, IconButton, Label, Link, Tooltip } from '@primer/react'
+import { Stack, ActionList, ActionMenu, Button, ButtonGroup, IconButton, Label, Link, Tooltip } from '@primer/react'
 import { DataTable, SkeletonBox, Table, type Column } from '@primer/react/experimental'
 import { GlobeIcon, LinkExternalIcon, LockIcon, TriangleDownIcon } from '@primer/octicons-react'
 import type { ArcSummary, DetailsMap, SortState } from '../../types/dashboard.ts'
@@ -43,7 +43,7 @@ function colorFor(id: string) {
 
 type Row = ArcSummary & { id: string }
 
-export function ArcTable({ arcs, hubNames, sort, onSortChange, now, onOpen, resetKey = '', onClearFilters, details }: ArcTableProps) {
+export function ArcsTable({ arcs, hubNames, sort, onSortChange, now, onOpen, resetKey = '', onClearFilters, details }: ArcTableProps) {
   const [pageIndex, setPageIndex] = useState(0)
   const [seenKey, setSeenKey] = useState(resetKey)
   if (seenKey !== resetKey) {
@@ -77,13 +77,12 @@ export function ArcTable({ arcs, hubNames, sort, onSortChange, now, onOpen, rese
     {
       id: 'title', header: 'Title', sortBy: true, rowHeader: true, width: 'grow',
       renderCell: arc => (
-        <div className={styles.title}>
-          <Link as="button" className={styles.titleLink} onClick={() => onOpen(arc)}>{arc.title}</Link>
-          <Link href={arc.url} target="_blank" rel="noopener noreferrer" aria-label={`View ${arc.title} on ${hubNames.get(arc.hubId) ?? arc.hubId}`}>
-            <LinkExternalIcon size={14} />
-          </Link>
+        <Stack gap="condensed">
+          <span>
+            <Link className={styles.titleLink} href={arc.url} target="_blank" rel="noopener noreferrer" aria-label={`View ${arc.title} on ${hubNames.get(arc.hubId) ?? arc.hubId}`}>{arc.title} <LinkExternalIcon size={14} /></Link>
+          </span>
           <span className={styles.group}>{arc.group.label}</span>
-        </div>
+        </Stack>
       ),
     },
     { id: 'hub', header: 'DataHUB', sortBy: true, width: 'auto', renderCell: arc => hubNames.get(arc.hubId) ?? arc.hubId },
@@ -133,10 +132,15 @@ export function ArcTable({ arcs, hubNames, sort, onSortChange, now, onOpen, rese
   }
 
   return (
-    <Table.Container className={styles.container}>
+    <Table.Container>
       <Table.Title as="h2" id="arc-table-title" className={styles.hidden}>ARCs</Table.Title>
-      <DataTable aria-labelledby="arc-table-title" data={rows} columns={columns} externalSorting
-        initialSortColumn={sort.column} initialSortDirection={sort.direction}
+      <DataTable
+        aria-labelledby="arc-table-title"
+        data={rows}
+        columns={columns}
+        externalSorting
+        initialSortColumn={sort.column}
+        initialSortDirection={sort.direction}
         onToggleSort={(column, direction) => {
           if (SORT_COLUMNS.includes(column as SortState['column'])) onSortChange({ column: column as SortState['column'], direction })
         }} />
@@ -145,3 +149,5 @@ export function ArcTable({ arcs, hubNames, sort, onSortChange, now, onOpen, rese
     </Table.Container>
   )
 }
+
+export { ArcsTable as ArcTable }

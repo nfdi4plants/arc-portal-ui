@@ -1,11 +1,10 @@
-import { Heading, Label, Link, Text } from '@primer/react'
+import { Heading, Link, Text } from '@primer/react'
 import type { ExternalLink } from '../types'
 import { formatBytes } from '../../../../util/formatBytes'
 import type { GitLabVisibility } from '../../../../types/gitlab'
 
 export function InvestigationHeader(props: {
   title: string
-  label?: string
   dataHubLinks?: ExternalLink[]
   releaseLink?: ExternalLink
   archiveSizeBytes?: number
@@ -18,10 +17,7 @@ export function InvestigationHeader(props: {
   return (
     <header className="investigation-header investigation-header-layout">
       <div className="investigation-header-main">
-        <Label variant="secondary">{props.label ?? 'Investigation'}</Label>
-        <Heading as="h1" className="investigation-title">
-          {props.title}
-        </Heading>
+        <Heading as="h1" className="investigation-title">{props.title}</Heading>
         {!!props.dataHubLinks?.length && (
           <nav className="investigation-header-links" aria-label="DataHub links">
             <Text as="span">DataHub</Text>

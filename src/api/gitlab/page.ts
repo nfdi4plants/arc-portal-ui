@@ -2,7 +2,7 @@ import type { GitLabPage, GitLabRequestOptions } from '../../types/gitlab.ts'
 import { Failure, Success, type Result } from '../../types/result.ts'
 import { requestGitLab } from './client.ts'
 
-function headerNumber(headers: Headers, name: string): number | null {
+export function headerNumber(headers: Headers, name: string): number | null {
   const value = headers.get(name)
   if (!value?.trim()) return null
   const number = Number(value)

@@ -1,7 +1,7 @@
 import { BaseStyles } from '@primer/react'
 import { ThemeProvider } from '@primer/react/next'
 import { createRoot, type Root } from 'react-dom/client'
-import ArcViewer from './ArcViewer'
+import { lazy, Suspense } from 'react'
 
 let popupRoot: Root | undefined
 
@@ -26,13 +26,16 @@ export function openArcViewerPopup(jsonString: string, title: string, repository
   const container = popup.document.createElement('main')
   container.style.padding = '24px'
   popup.document.body.appendChild(container)
+  const ArcViewer = lazy(() => import('./ArcViewer'))
   const root = createRoot(container)
   popupRoot = root
   root.render(
     <ThemeProvider>
       <BaseStyles>
         <h1>{title}</h1>
-        <ArcViewer jsonString={jsonString} repositoryUrl={repositoryUrl} token={token} embedded />
+        <Suspense fallback={<p role="status">Loading ARC viewer…</p>}>
+          <ArcViewer jsonString={jsonString} repositoryUrl={repositoryUrl} token={token} embedded />
+        </Suspense>
       </BaseStyles>
     </ThemeProvider>,
   )

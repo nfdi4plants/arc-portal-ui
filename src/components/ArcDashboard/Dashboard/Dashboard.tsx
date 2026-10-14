@@ -1,42 +1,66 @@
 import { ScreenFullIcon } from '@primer/octicons-react'
 import { dataHubRepositoryUrl } from '../../../api/gitlab'
+import { openInvestigationPopup } from '../Investigation/InvestigationDetails/InvestigationPopup'
+import { openArcViewerPopup } from '../ArcViewer/ArcViewerPopup'
 import { Banner, IconButton, Spinner, Stack, Text } from '@primer/react'
+import { lazy, Suspense, type ReactNode } from 'react'
 import { useArcSelector, useArcStatus } from '../../../arc/hooks'
+import { buildProvenanceIndex } from '../../../arc/provenance/buildIndex'
+import type { ProvenanceIndex } from '../../../arc/provenance/types'
 import { Dashlet, DashboardWindow } from '../../DashboardWindow'
 import { ArcDetails, type ArcDetailsProps } from '../ArcDetails'
 import { InvestigationDetails } from '../Investigation/InvestigationDetails'
-import { openInvestigationPopup } from '../Investigation/InvestigationDetails/InvestigationPopup'
-import ArcViewer from '../ArcViewer/ArcViewer'
-import { openArcViewerPopup } from '../ArcViewer/ArcViewerPopup'
+import { GraphviewDashlet } from '../Provenance/GraphviewDashlet'
 import { selectInvestigationMetadata } from '../Investigation/selectInvestigationMetadata'
+import type { InvestigationMetadata } from '../Investigation/types'
 import '../Investigation/investigation.css'
 import './dashboard.css'
 
-export type DashboardProps = Omit<ArcDetailsProps, 'metadata'> & {
-  arcJson: string
-  token?: string
+// The provenance index holds Maps, so it is compared by identity. The comparator lives here and
+// not inline, because a new comparator on every render would build the index again each time.
+const sameIndex = (a: unknown, b: unknown) => a === b
+const ArcViewer = lazy(() => import('../ArcViewer/ArcViewer'))
+
+export type DashboardProps = Omit<ArcDetailsProps, 'metadata'> & { arcJson: string; token?: string; repositoryUrl?: string }
+
+export function DashboardContent({ metadata, provenance, actions, ...props }: DashboardProps & {
+  metadata: InvestigationMetadata
+  provenance?: ProvenanceIndex
+  actions?: ReactNode
+}) {
+  const repositoryUrl = props.repositoryUrl ?? (props.repository ? dataHubRepositoryUrl(props.repository) : undefined)
+  return (
+    <main className="arc-dashboard-layout">
+      {actions && <div className="arc-dashboard-actions">{actions}</div>}
+      <ArcDetails {...props} metadata={metadata} />
+      <Dashlet label="Investigation details" actions={
+        <IconButton icon={ScreenFullIcon} size="small" variant="invisible"
+          aria-label="Open investigation details in popup"
+          onClick={() => openInvestigationPopup(metadata)} />
+      }>
+        <InvestigationDetails metadata={metadata} />
+      </Dashlet>
+      <Dashlet label="ArcWebView" actions={
+        <IconButton icon={ScreenFullIcon} size="small" variant="invisible"
+          aria-label="Open ARC viewer in popup"
+          onClick={() => openArcViewerPopup(props.arcJson, metadata.title, repositoryUrl, props.token)} />
+      }>
+        <Suspense fallback={<Text as="p" role="status">Loading ARC viewer…</Text>}>
+          <ArcViewer jsonString={props.arcJson} repositoryUrl={repositoryUrl} token={props.token} embedded />
+        </Suspense>
+      </Dashlet>
+      {provenance && <GraphviewDashlet index={provenance} />}
+    </main>
+  )
 }
 
 export function Dashboard(props: DashboardProps) {
   const status = useArcStatus()
   const metadata = useArcSelector(selectInvestigationMetadata)
-  const repositoryUrl = props.repository ? dataHubRepositoryUrl(props.repository) : undefined
-
-  const renderActions = () => (
-    <IconButton
-      icon={ScreenFullIcon}
-      size="small"
-      variant="invisible"
-      aria-label="Open investigation details in popup"
-      onClick={(event) => {
-        event.stopPropagation()
-        if (metadata) openInvestigationPopup(metadata)
-      }}
-    />
-  )
+  const provenance = useArcSelector(buildProvenanceIndex, sameIndex)
 
   return (
-    <DashboardWindow title="ARC-Dashboard" fillHeight>
+    <DashboardWindow label="ARC-Dashboard" fillHeight>
       {status.kind === 'error' ? (
         <div className="investigation-feedback">
           <Banner
@@ -51,26 +75,7 @@ export function Dashboard(props: DashboardProps) {
           <Text as="span">Loading ARC…</Text>
         </Stack>
       ) : (
-        <main className="arc-dashboard-layout">
-          <ArcDetails {...props} metadata={metadata} />
-          <Dashlet title={metadata.title} actions={renderActions()}>
-            <InvestigationDetails metadata={metadata} />
-          </Dashlet>
-          <Dashlet title="ArcWebView" actions={
-            <IconButton
-              icon={ScreenFullIcon}
-              size="small"
-              variant="invisible"
-              aria-label="Open ARC viewer in popup"
-              onClick={(event) => {
-                event.stopPropagation()
-                openArcViewerPopup(props.arcJson, metadata.title, repositoryUrl, props.token)
-              }}
-            />
-          }>
-            <ArcViewer jsonString={props.arcJson} repositoryUrl={repositoryUrl} token={props.token} embedded />
-          </Dashlet>
-        </main>
+        <DashboardContent {...props} metadata={metadata} provenance={provenance} />
       )}
     </DashboardWindow>
   )
