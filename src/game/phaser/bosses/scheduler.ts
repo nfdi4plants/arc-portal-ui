@@ -31,6 +31,9 @@ export interface AttackScheduler<A extends SchedulableAttack> {
   next(): A | null
   // The attack from next() is over. Its cooldown starts and the idle time begins.
   complete(idleMs?: number): void
+  // Multiplies the cooldown of every attack that completes from now on (an enraged or tempo boss
+  // recharges faster). The idle time after an attack stays as it is.
+  setCooldownScale(scale: number): void
   // Keeps the boss from starting an attack for at least this long.
   delay(ms: number): void
   busy(): boolean
@@ -43,6 +46,7 @@ export function createScheduler<A extends SchedulableAttack>(rng: Rng): AttackSc
   let idleMs = 0
   let current = -1
   let lastHeavy = false
+  let cooldownScale = 1
   // A list without light attacks would never pick again if heavy attacks could not follow each other.
   let hasLight = false
   const eligible: number[] = []
@@ -78,10 +82,13 @@ export function createScheduler<A extends SchedulableAttack>(rng: Rng): AttackSc
     complete(idleOverrideMs) {
       if (current < 0) return
       const attack = attacks[current]
-      cooldowns[current] = attack.cooldownMs
+      cooldowns[current] = attack.cooldownMs * cooldownScale
       lastHeavy = attack.heavy
       idleMs = idleOverrideMs ?? (attack.heavy ? punishWindowMs(quality) : LIGHT_GAP_MS)
       current = -1
+    },
+    setCooldownScale(scale) {
+      cooldownScale = scale
     },
     delay(ms) {
       idleMs = Math.max(idleMs, ms)

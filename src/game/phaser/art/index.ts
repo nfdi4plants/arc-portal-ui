@@ -3,6 +3,7 @@ import type { ScribbleArt, SpriteRef } from '../../contracts/art'
 import type { MonsterSpec } from '../../contracts/content'
 import { textureBytes } from './atlas'
 import { boss } from './bosses'
+import { bossMarker } from './bossMarkers'
 import { finalBoss } from './finalBoss'
 import { FX_KINDS, fx } from './fx'
 import { frameName, TEXTURE_SCALE } from './layout'
@@ -47,5 +48,5 @@ export function prewarmEffects(scene: Phaser.Scene): void {
 }
 
 export function createScribbleArt(): ScribbleArt {
-  return { pixelsPerUnit: TEXTURE_SCALE, monster, boss, finalBoss, playerWeapon, projectile, tiles, telegraph, fx }
+  return { pixelsPerUnit: TEXTURE_SCALE, monster, boss, finalBoss, bossMarker, playerWeapon, projectile, tiles, telegraph, fx }
 }

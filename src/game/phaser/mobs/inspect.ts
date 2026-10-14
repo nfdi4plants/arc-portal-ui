@@ -1,16 +1,45 @@
 import type Phaser from 'phaser'
 import { PALETTE } from '../../contracts/constants'
+import type { MonsterSpec } from '../../contracts/content'
+import type { MonsterDescription } from '../../model/content'
 import { cssColor } from '../color'
 import { HoverIntent } from '../scenes/hoverIntent'
 import { MOB_ANCHOR_KEY, MOB_HOVER_EVENT, MOB_PANEL_RECT_KEY, type NormRect } from '../scenes/mobInfoEvent'
 import { INSPECT_DIM_DEPTH } from './tuning'
 import type { Mob } from './types'
 
-// Pause-time inspection of mobs: hover highlights one and shows its name, a click picks it. A mob
-// the pointer rests on opens the info panel through MOB_HOVER_EVENT. The
-// mobs are interactive only while the scene says so, so play pays nothing for hover tests.
+// Pause-time inspection of mobs and bosses: hover highlights one and shows its name, a click picks
+// it. A target the pointer rests on opens the info panel through MOB_HOVER_EVENT. The targets are
+// interactive only while the scene says so, so play pays nothing for hover tests.
 
-const mobBySprite = new WeakMap<Phaser.GameObjects.GameObject, Mob>()
+// A boss explains itself with a ready description, a mob through its spec and its segment.
+export interface BossInspectTarget {
+  hurtbox(): Phaser.Geom.Rectangle
+  setInspectable(on: boolean): void
+  setHighlight(level: number): void
+  setRaised(on: boolean): void
+  describe(): MonsterDescription
+}
+
+export type InspectTarget = Mob | BossInspectTarget
+
+// What the info panel explains: a monster spec (the HUD adds its segment) or a description.
+export type InspectInfo = MonsterSpec | MonsterDescription
+
+export function inspectInfo(target: InspectTarget): InspectInfo {
+  return 'describe' in target ? target.describe() : target.spec
+}
+
+export function isDescription(info: InspectInfo): info is MonsterDescription {
+  return 'rows' in info
+}
+
+// The name on the tag above the target. A boss title also names its step, the tag keeps the name.
+function tagOf(target: InspectTarget): string {
+  return 'describe' in target ? target.describe().title.split(' · ')[0] : target.spec.label
+}
+
+const mobBySprite = new WeakMap<Phaser.GameObjects.GameObject, InspectTarget>()
 const PULSE_STEPS = 6
 const PULSE_MS = 700
 const TAG_GAP = 4
@@ -18,31 +47,31 @@ const TAG_MARGIN = 2
 const HOVER_SHOW_MS = 250
 const HOVER_HIDE_MS = 200
 
-export function registerInspectable(sprite: Phaser.GameObjects.GameObject, mob: Mob): void {
+export function registerInspectable(sprite: Phaser.GameObjects.GameObject, mob: InspectTarget): void {
   mobBySprite.set(sprite, mob)
 }
 
 export interface Inspector {
   // Turns hover and click on or off for these mobs. Turning off clears the highlight and the tag.
-  setActive(active: boolean, mobs: readonly Mob[]): void
+  setActive(active: boolean, mobs: readonly InspectTarget[]): void
   // The mob whose info panel is open stays bright. Null clears it.
-  select(mob: Mob | null): void
+  select(mob: InspectTarget | null): void
   // Once per frame while active.
   update(timeMs: number): void
   destroy(): void
 }
 
 // `onPick` gets the clicked mob, or null for a click on empty world.
-export function createInspector(scene: Phaser.Scene, onPick: (mob: Mob | null) => void): Inspector {
+export function createInspector(scene: Phaser.Scene, onPick: (mob: InspectTarget | null) => void): Inspector {
   let active = false
-  let hovered: Mob | null = null
+  let hovered: InspectTarget | null = null
   let tag: Phaser.GameObjects.Text | null = null
-  let shown: Mob[] = []
-  let selected: Mob | null = null
+  let shown: InspectTarget[] = []
+  let selected: InspectTarget | null = null
   let step = -1
   let now = 0
-  let emitted: Mob | null = null
-  const intent = new HoverIntent<Mob>(HOVER_SHOW_MS, HOVER_HIDE_MS)
+  let emitted: InspectTarget | null = null
+  const intent = new HoverIntent<InspectTarget>(HOVER_SHOW_MS, HOVER_HIDE_MS)
 
   function ensureTag(): Phaser.GameObjects.Text {
     tag ??= scene.add
@@ -61,7 +90,7 @@ export function createInspector(scene: Phaser.Scene, onPick: (mob: Mob | null) =
     return tag
   }
 
-  function setHover(mob: Mob | null) {
+  function setHover(mob: InspectTarget | null) {
     if (mob === hovered) return
     const old = hovered
     old?.setHighlight(0)
@@ -73,7 +102,7 @@ export function createInspector(scene: Phaser.Scene, onPick: (mob: Mob | null) =
       tag?.setVisible(false)
       return
     }
-    ensureTag().setText(mob.spec.label).setVisible(true)
+    ensureTag().setText(tagOf(mob)).setVisible(true)
     place()
   }
 
@@ -89,7 +118,7 @@ export function createInspector(scene: Phaser.Scene, onPick: (mob: Mob | null) =
   }
 
   // The mob's box as fractions of the camera view, which the HUD maps into its own view.
-  function anchorOf(mob: Mob): NormRect {
+  function anchorOf(mob: InspectTarget): NormRect {
     const box = mob.hurtbox()
     const view = scene.cameras.main.worldView
     return { x: (box.x - view.x) / view.width, y: (box.y - view.y) / view.height, w: box.width / view.width, h: box.height / view.height }
@@ -104,12 +133,12 @@ export function createInspector(scene: Phaser.Scene, onPick: (mob: Mob | null) =
     return fx >= rect.x && fx <= rect.x + rect.w && fy >= rect.y && fy <= rect.y + rect.h
   }
 
-  function emitHover(mob: Mob | null) {
+  function emitHover(mob: InspectTarget | null) {
     if (mob === emitted) return
     emitted = mob
     if (mob) {
       scene.registry.set(MOB_ANCHOR_KEY, anchorOf(mob))
-      scene.game.events.emit(MOB_HOVER_EVENT, mob.spec, anchorOf(mob))
+      scene.game.events.emit(MOB_HOVER_EVENT, inspectInfo(mob), anchorOf(mob))
     } else scene.game.events.emit(MOB_HOVER_EVENT)
   }
 

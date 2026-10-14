@@ -69,6 +69,9 @@ export const placeholderArt: ScribbleArt = {
     const ref = box(scene, 'finalBoss', 160, 160, PALETTE.navy)
     return { ...ref, parts: {} }
   },
+  bossMarker(scene, kind) {
+    return box(scene, `bossMarker:${kind}`, 14, 14, hueColor(hashString(kind) % 360))
+  },
   playerWeapon(scene, id, tier) {
     // Upright with the grip at the bottom centre, like the scribble weapons.
     return box(scene, `weapon:${id}:${tier}`, 8, 28, PALETTE.yellow)

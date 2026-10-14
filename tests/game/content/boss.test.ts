@@ -4,7 +4,7 @@ import { buildProvenanceIndex } from '../../../src/arc/provenance/buildIndex'
 import type { IoKind } from '../../../src/arc/provenance/types'
 import { createRng } from '../../../src/game/contracts/rng'
 import type { RunNode, RunPlan, Segment } from '../../../src/game/contracts/run'
-import { bossArchetypeFor, bossFromNode, finalBossFromPlan } from '../../../src/game/model/content'
+import { bossArchetypeFor, bossFromNode, bossGenome, FINAL_PHASE_MECHANICS, finalBossFromPlan } from '../../../src/game/model/content'
 import { planRun } from '../../../src/game/model/run'
 import { crateJson } from '../../helpers/sampleCrate'
 
@@ -26,7 +26,7 @@ function nodeOf(kind: IoKind): RunNode {
 }
 
 describe('bossArchetypeFor', () => {
-  it('picks the archetype by node kind', () => {
+  it('picks the fallback archetype of a step without annotations by node kind', () => {
     expect(bossArchetypeFor('source')).toBe('rootTreant')
     expect(bossArchetypeFor('sample')).toBe('specimenJar')
     expect(bossArchetypeFor('material')).toBe('reagentGolem')
@@ -56,41 +56,40 @@ describe('bossFromNode', () => {
     expect(boss.staggerWindowMs).toBe(stagger)
     expect(boss.tells).toBe(node.annotations)
     for (const attack of boss.attacks) expect(attack.telegraphMs).toBe(attack.heavy ? telegraphMs : 250)
+    expect(boss.damageScale).toBe([1.55, 1.28, 1][[0, 0.5, 1].indexOf(quality)])
   })
+
 
   it('scales the HP with the depth and names the node', () => {
     const first = bossFromNode(nodeOf('source'), segmentWith(0, 80, 0), createRng('hp'))
     const third = bossFromNode(nodeOf('source'), segmentWith(0, 80, 2), createRng('hp'))
-    expect(first.hp).toBe(400)
-    expect(third.hp).toBe(680)
+    const dense = first.theme === 'dense' ? 1.15 : 1
+    expect(first.hp).toBe(Math.round(400 * dense))
+    expect(third.hp).toBe(Math.round(680 * dense))
     expect(third.xp).toBe(15)
     expect(third.segmentIndex).toBe(2)
     expect(third.nodeId).toBe(nodeOf('source').id)
     expect(third.nodeKind).toBe('source')
-    expect(third.archetype).toBe('rootTreant')
+    expect(third.archetype).toBe(third.genome.body.archetype)
     expect(third.label).toBe('leaf-material-with-a-lo…')
   })
 
-  it('draws four to six distinct attacks with at least two heavy ones for every archetype', () => {
-    const counts = new Set<number>()
-    for (const kind of ['source', 'sample', 'material', 'data'] as const) {
-      for (let seed = 0; seed < 50; seed++) {
-        const boss = bossFromNode(nodeOf(kind), segmentWith(1, 900), createRng(seed))
-        counts.add(boss.attacks.length)
-        expect(boss.attacks.length).toBeGreaterThanOrEqual(4)
-        expect(boss.attacks.length).toBeLessThanOrEqual(6)
-        expect(boss.attacks.filter((attack) => attack.heavy).length).toBeGreaterThanOrEqual(2)
-        expect(new Set(boss.attacks.map((attack) => attack.id)).size).toBe(boss.attacks.length)
-        for (const attack of boss.attacks) expect(attack.id.startsWith(`${boss.archetype}.${attack.kind}.`)).toBe(true)
-      }
-    }
-    expect([...counts].sort()).toEqual([4, 5, 6])
+  it('takes its attacks, mechanics and theme from the genome of its own step', () => {
+    plan.segments.forEach((segment, i) => {
+      const boss = bossFromNode(plan.nodes[i + 1], segment, createRng(i))
+      const genome = bossGenome(segment, plan.nodes[i + 1].kind)
+      expect(boss.genome).toEqual(genome)
+      const slotted = [...genome.heavy, ...genome.light].flatMap((slot) => (slot.attack ? [slot.attack] : []))
+      expect(boss.attacks).toEqual(slotted)
+      expect(boss.mechanics.map((m) => m.kind)).toEqual(genome.mechanics.flatMap((slot) => (slot.mechanic ? [slot.mechanic] : [])))
+      expect(boss.theme).toBe(genome.theme.kind)
+      expect(new Set(boss.attacks.map((attack) => attack.id)).size).toBe(boss.attacks.length)
+    })
   })
-
 })
 
 describe('finalBossFromPlan', () => {
-  it('has one phase per segment and 600 HP per node boss', () => {
+  it('has one phase per segment, each built from its own step, and 600 HP per node boss', () => {
     const boss = finalBossFromPlan(plan, createRng('final'))
     expect(boss.title).toBe('Talinum')
     expect(boss.hp).toBe(600 * plan.segments.length)
@@ -99,29 +98,26 @@ describe('finalBossFromPlan', () => {
       const segment = plan.segments[i]
       expect(phase.segmentIndex).toBe(segment.index)
       expect(phase.datasetKind).toBe(segment.datasetKind)
-      expect(phase.archetype).toBe(bossArchetypeFor(plan.nodes[i + 1].kind))
+      expect(phase.genome).toEqual(bossGenome(segment, plan.nodes[i + 1].kind))
+      expect(phase.archetype).toBe(phase.genome.body.archetype)
       expect(phase.quality).toBe(segment.quality)
       expect(phase.telegraphMs).toBe(segment.telegraphMs)
     })
   })
 
-  it('draws three archetype attacks, at least one heavy, and ends each phase with the crate', () => {
+  it('keeps the signature heavy, the light attacks and two mechanics of the step and ends with the crate', () => {
     for (const phase of finalBossFromPlan(plan, createRng('final')).phases) {
-      expect(phase.attacks).toHaveLength(4)
-      const [drawn, shared] = [phase.attacks.slice(0, 3), phase.attacks[3]]
-      expect(drawn.some((attack) => attack.heavy)).toBe(true)
-      expect(new Set(phase.attacks.map((attack) => attack.id)).size).toBe(4)
-      expect(shared).toMatchObject({ name: 'Crate Collapse', kind: 'rain', heavy: true })
+      const { genome } = phase
+      const crate = phase.attacks[phase.attacks.length - 1]
+      expect(crate).toMatchObject({ name: 'Crate Collapse', kind: 'rain', heavy: true })
+      expect(phase.attacks[0]).toEqual(genome.heavy[0].attack)
+      const lights = phase.attacks.filter((attack) => !attack.heavy)
+      expect(lights).toEqual(genome.light.flatMap((slot) => (slot.attack ? [slot.attack] : [])))
+      expect(lights.length).toBeGreaterThanOrEqual(1)
+      expect(phase.attacks.filter((attack) => attack.heavy)).toHaveLength(2)
+      expect(phase.mechanics.length).toBeLessThanOrEqual(FINAL_PHASE_MECHANICS)
+      expect(new Set(phase.attacks.map((attack) => attack.id)).size).toBe(phase.attacks.length)
       for (const attack of phase.attacks) expect(attack.telegraphMs).toBe(attack.heavy ? phase.telegraphMs : 250)
-    }
-  })
-
-  it('gives every phase one drawn heavy and two light attacks, so it always has a light one, over 200 seeds', () => {
-    for (let seed = 0; seed < 200; seed++) {
-      for (const phase of finalBossFromPlan(plan, createRng(seed)).phases) {
-        expect(phase.attacks.slice(0, 3).filter((attack) => attack.heavy)).toHaveLength(1)
-        expect(phase.attacks.filter((attack) => !attack.heavy)).toHaveLength(2)
-      }
     }
   })
 
@@ -132,8 +128,8 @@ describe('finalBossFromPlan', () => {
     expect(phase.attacks.filter((attack) => attack.heavy).every((attack) => attack.telegraphMs === 80)).toBe(true)
   })
 
-  it('builds the same final boss for the same seed and falls back to ARC without a title', () => {
-    expect(finalBossFromPlan(plan, createRng('same'))).toEqual(finalBossFromPlan(plan, createRng('same')))
+  it('builds the same final boss for the same plan and falls back to ARC without a title', () => {
+    expect(finalBossFromPlan(plan, createRng('same'))).toEqual(finalBossFromPlan(plan, createRng('other')))
     expect(finalBossFromPlan({ ...plan, arcTitle: '' }, createRng('same')).title).toBe('ARC')
   })
 })

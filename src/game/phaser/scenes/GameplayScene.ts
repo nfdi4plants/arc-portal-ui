@@ -7,7 +7,7 @@ import { createCombatWorld } from '../combat'
 import { createInputLayer, type InputLayer } from '../input/InputLayer'
 import type { Segment } from '../../contracts/run'
 import { INSPECT_DIM_DEPTH, PAUSE_DIM_ALPHA } from '../mobs/tuning'
-import { createInspector, mobXp, type Inspector, type Mob } from '../mobs'
+import { createInspector, inspectInfo, isDescription, mobXp, type InspectTarget, type Inspector } from '../mobs'
 import { attachLoadout, type LoadoutWithStatus } from '../player/weapons'
 import { createPlayer, type Player } from '../player/Player'
 import { followView, viewForBox, type View } from '../view'
@@ -64,8 +64,8 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
   protected onShutdown(): void {}
   // After the FAIR trade store closed, whichever way the player left it.
   protected onStoreClosed(): void {}
-  // The mobs the pause menu lets the player inspect, and the step they come from.
-  protected inspectableMobs(): Mob[] {
+  // The mobs and bosses the pause menu lets the player inspect, and the step the mobs come from.
+  protected inspectableMobs(): InspectTarget[] {
     return []
   }
   protected inspectSegment(): Segment | null {
@@ -288,15 +288,16 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
   }
 
   // Vertical place of the mob in the camera view, 0 at the top to 1 at the bottom.
-  private focusOf(mob: Mob): number {
+  private focusOf(mob: InspectTarget): number {
     const view = this.cameras.main.worldView
     return (mob.hurtbox().centerY - view.y) / view.height
   }
 
-  private pickMob(mob: Mob | null) {
+  private pickMob(mob: InspectTarget | null) {
     this.inspector?.select(mob)
+    const info = mob ? inspectInfo(mob) : null
     const segment = this.inspectSegment()
-    if (mob && segment) this.game.events.emit(MOB_INFO_EVENT, mob.spec, segment, this.focusOf(mob))
+    if (mob && info && (isDescription(info) || segment)) this.game.events.emit(MOB_INFO_EVENT, info, segment, this.focusOf(mob))
     else this.game.events.emit(MOB_INFO_EVENT)
   }
 
