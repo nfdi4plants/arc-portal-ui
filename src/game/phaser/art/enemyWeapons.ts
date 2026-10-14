@@ -1,6 +1,5 @@
 import type { EnemyWeaponKind } from '../../contracts/content'
 import { starPts, wavePts } from './geometry'
-import { ENEMY_WEAPON } from './layout'
 import { bone, fire, glass, gold, metal, wood } from './looks'
 import { MATERIAL } from './palette'
 import type { Swatch } from './palette'
@@ -65,6 +64,72 @@ const flask: WeaponDraw = (pen, L, sw) => {
 
 export const ENEMY_WEAPON_DRAW: Record<EnemyWeaponKind, WeaponDraw> = { claw, spear, bow, wand, bomb, shield, whip, flask }
 
-export function drawEnemyWeapon(pen: Pen, kind: EnemyWeaponKind, hand: { x: number; y: number }, length: number, sw: Swatch): void {
-  pen.at(hand.x, hand.y, ENEMY_WEAPON[kind].angle, () => ENEMY_WEAPON_DRAW[kind](pen, length, sw))
+// Mobs hold their weapon as a sprite of its own, so it can swing. Its length scales with the body
+// height and only mildly with the weapon scale, so a small monster's claw still reads as a claw and a
+// large monster's spear does not dwarf the 48 unit mage.
+const WEAPON_SIZE: Record<EnemyWeaponKind, number> = {
+  claw: 0.6,
+  spear: 1.3,
+  bow: 0.95,
+  wand: 0.9,
+  bomb: 0.6,
+  shield: 0.8,
+  whip: 1.1,
+  flask: 0.65,
+}
+
+export function enemyWeaponLength(kind: EnemyWeaponKind, bodyHeight: number, scale: number): number {
+  const base = 15 + bodyHeight / 2
+  return WEAPON_SIZE[kind] * base * Math.min(1.6, Math.max(0.75, scale)) ** 0.6
+}
+
+// What each drawing covers, in multiples of its length, with the hand at (0, 0).
+const WEAPON_BOUNDS: Record<EnemyWeaponKind, { x0: number; x1: number; y0: number; y1: number }> = {
+  claw: { x0: -0.1, x1: 1.02, y0: -0.55, y1: 0.55 },
+  spear: { x0: -0.52, x1: 0.78, y0: -0.1, y1: 0.1 },
+  bow: { x0: -0.28, x1: 0.48, y0: -0.52, y1: 0.52 },
+  wand: { x0: -0.28, x1: 0.85, y0: -0.3, y1: 0.3 },
+  bomb: { x0: -0.02, x1: 0.74, y0: -0.72, y1: 0.41 },
+  shield: { x0: -0.03, x1: 0.83, y0: -0.58, y1: 0.58 },
+  whip: { x0: -0.28, x1: 1.1, y0: -0.32, y1: 0.22 },
+  flask: { x0: -0.02, x1: 0.72, y0: -0.34, y1: 0.34 },
+}
+
+// The business end (blade tip, arrow head, star, bottle) along the weapon, as a multiple of its length.
+export const WEAPON_TIP: Record<EnemyWeaponKind, number> = {
+  claw: 1,
+  spear: 0.75,
+  bow: 0.42,
+  wand: 0.7,
+  bomb: 0.35,
+  shield: 0.8,
+  whip: 1.08,
+  flask: 0.4,
+}
+
+// Room for the line weight and the roughness around the drawing.
+const WEAPON_MARGIN = 2
+
+export interface WeaponFrame {
+  // Frame size in world units.
+  width: number
+  height: number
+  // Where the hand sits in the frame, from its top left.
+  handX: number
+  handY: number
+}
+
+export function enemyWeaponFrame(kind: EnemyWeaponKind, length: number): WeaponFrame {
+  const b = WEAPON_BOUNDS[kind]
+  return {
+    width: Math.ceil((b.x1 - b.x0) * length + WEAPON_MARGIN * 2),
+    height: Math.ceil((b.y1 - b.y0) * length + WEAPON_MARGIN * 2),
+    handX: WEAPON_MARGIN - b.x0 * length,
+    handY: WEAPON_MARGIN - b.y0 * length,
+  }
+}
+
+// Draws the weapon pointing along +x with the hand at the frame's hand point. The sprite rotates it.
+export function drawEnemyWeapon(pen: Pen, kind: EnemyWeaponKind, frame: WeaponFrame, length: number, sw: Swatch): void {
+  pen.at(frame.handX, frame.handY, 0, () => ENEMY_WEAPON_DRAW[kind](pen, length, sw))
 }
