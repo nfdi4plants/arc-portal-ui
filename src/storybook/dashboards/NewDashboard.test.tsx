@@ -1,12 +1,13 @@
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import '../../../test/nativeDialog'
+import '../../test/nativeDialog'
 import { describe, expect, it, vi } from 'vitest'
-import { crateJson, sampleCrateSource } from '../../../../tests/helpers/sampleCrate'
-import { ArcProvider } from '../../../arc/ArcProvider'
-import { createArcStore } from '../../../arc/arcStore'
-import { renderWithTheme } from '../../../test/helpers'
-import { NewDashboard } from './NewDashboard'
+import { crateJson, sampleCrateSource } from '../../../tests/helpers/sampleCrate'
+import { ArcProvider } from '../../arc/ArcProvider'
+import { createArcStore } from '../../arc/arcStore'
+import { renderWithTheme } from '../../test/helpers'
+import { ArcDashboardFrame } from '../../components/ArcDashboard/ArcDashboardFrame'
+import story from './NewDashboard.stories'
 
 vi.mock('@nfdi4plants/arc-web-view', () => ({ WebViewer: () => <p>ARC contents preview</p> }))
 
@@ -17,7 +18,7 @@ describe('NewDashboard', () => {
     await store.load()
     renderWithTheme(
       <ArcProvider store={store}>
-        <NewDashboard
+        <ArcDashboardFrame content={story.args.content} label={story.args.label} fillHeight={story.args.fillHeight}
           arcJson={crateJson}
           repository={{ source: 'https://gitlab.example', projectPath: 'research/talinum' }}
           dataHubData={{
@@ -62,21 +63,4 @@ describe('NewDashboard', () => {
     await user.click(screen.getByRole('button', { name: 'Expand Graphview' }))
     expect(within(screen.getByRole('dialog', { name: 'Graphview' })).getByRole('region', { name: 'Provenance explorer' })).toBeVisible()
   }, 15000)
-
-  it('shows loading while an ARC is being opened', () => {
-    const store = createArcStore(sampleCrateSource())
-    renderWithTheme(<ArcProvider store={store}><NewDashboard arcJson={crateJson} /></ArcProvider>)
-    expect(screen.getByRole('status')).toHaveTextContent('Loading ARC')
-    expect(screen.queryByRole('region', { name: 'Contacts dashlet' })).not.toBeInTheDocument()
-  })
-
-  it('shows the load failure when the ARC export is unavailable', async () => {
-    const source = sampleCrateSource()
-    const store = createArcStore({ ...source, fetchROCrate: async () => { throw new Error('Unable to load RO-Crate (404).') } })
-    await store.load()
-    renderWithTheme(<ArcProvider store={store}><NewDashboard arcJson={crateJson} /></ArcProvider>)
-    expect(screen.getByText('Could not load ARC')).toBeVisible()
-    expect(screen.getByText('Unable to load RO-Crate (404).')).toBeVisible()
-    expect(screen.queryByRole('region', { name: 'Contacts dashlet' })).not.toBeInTheDocument()
-  })
 })

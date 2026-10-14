@@ -1,0 +1,4 @@
+.investigation-menu { position: relative; display: inline-flex; flex-shrink: 0; }
+.investigation-menu-popups { position: absolute; top: 0; left: 0; width: 100%; }
+.investigation-menu-popups > .popup-dashlet { height: 0; }
+.investigation-menu-popups .popup-dashlet-panel:not([data-expanded]) { display: none; }

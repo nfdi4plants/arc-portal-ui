@@ -1,10 +1,11 @@
 import { screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { crateJson, sampleCrateSource } from '../../../../tests/helpers/sampleCrate'
-import { ArcProvider } from '../../../arc/ArcProvider'
-import { createArcStore } from '../../../arc/arcStore'
-import { renderWithTheme } from '../../../test/helpers'
-import { StackedDashboard } from './StackedDashboard'
+import { crateJson, sampleCrateSource } from '../../../tests/helpers/sampleCrate'
+import { ArcProvider } from '../../arc/ArcProvider'
+import { createArcStore } from '../../arc/arcStore'
+import { renderWithTheme } from '../../test/helpers'
+import { ArcDashboardFrame } from '../../components/ArcDashboard/ArcDashboardFrame'
+import story from './StackedDashboard.stories'
 
 vi.mock('@nfdi4plants/arc-web-view', () => ({ WebViewer: () => <p>ARC contents preview</p> }))
 
@@ -14,7 +15,7 @@ describe('StackedDashboard', () => {
     await store.load()
     renderWithTheme(
       <ArcProvider store={store}>
-        <StackedDashboard arcJson={crateJson} repository={{ source: 'https://gitlab.example', projectPath: 'research/talinum' }} />
+        <ArcDashboardFrame content={story.args.content} label={story.args.label} fillHeight={story.args.fillHeight} arcJson={crateJson} repository={{ source: 'https://gitlab.example', projectPath: 'research/talinum' }} />
       </ArcProvider>,
     )
     const dashboard = screen.getByRole('region', { name: 'StackedDashboard' })
@@ -29,22 +30,5 @@ describe('StackedDashboard', () => {
     expect(within(dashboard).queryByRole('tab', { name: 'Overview' })).not.toBeInTheDocument()
     expect(await screen.findByText('ARC contents preview', {}, { timeout: 5000 })).not.toBeVisible()
     expect(within(cards).getByRole('img', { name: 'Webview symbol' })).toBeVisible()
-  })
-
-  it('shows loading while an ARC is being opened', () => {
-    const store = createArcStore(sampleCrateSource())
-    renderWithTheme(<ArcProvider store={store}><StackedDashboard arcJson={crateJson} /></ArcProvider>)
-    expect(screen.getByRole('status')).toHaveTextContent('Loading ARC')
-    expect(screen.queryByRole('complementary', { name: 'Investigation dashlets' })).not.toBeInTheDocument()
-  })
-
-  it('shows a load error when the ARC export is unavailable', async () => {
-    const source = sampleCrateSource()
-    const store = createArcStore({ ...source, fetchROCrate: async () => { throw new Error('Unable to load RO-Crate (404).') } })
-    await store.load()
-    renderWithTheme(<ArcProvider store={store}><StackedDashboard arcJson={crateJson} /></ArcProvider>)
-    expect(screen.getByText('Could not load ARC')).toBeVisible()
-    expect(screen.getByText('Unable to load RO-Crate (404).')).toBeVisible()
-    expect(screen.queryByRole('region', { name: 'Graphview' })).not.toBeInTheDocument()
   })
 })

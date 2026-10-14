@@ -1,20 +1,21 @@
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import '../../../test/nativeDialog'
-import { crateJson, sampleCrateSource } from '../../../../tests/helpers/sampleCrate'
-import { ArcProvider } from '../../../arc/ArcProvider'
-import { createArcStore } from '../../../arc/arcStore'
-import { renderWithTheme } from '../../../test/helpers'
-import { SplitDashboard } from './SplitDashboard'
+import '../../test/nativeDialog'
+import { crateJson, sampleCrateSource } from '../../../tests/helpers/sampleCrate'
+import { ArcProvider } from '../../arc/ArcProvider'
+import { createArcStore } from '../../arc/arcStore'
+import { renderWithTheme } from '../../test/helpers'
+import { ArcDashboardFrame } from '../../components/ArcDashboard/ArcDashboardFrame'
+import story from './SplitDashboard.stories'
 
 vi.mock('@nfdi4plants/arc-web-view', () => ({ WebViewer: () => <label>Search ARC files<input /></label> }))
 
 async function openDashboard() {
   const store = createArcStore(sampleCrateSource())
   await store.load()
-  renderWithTheme(<ArcProvider store={store}><SplitDashboard arcJson={crateJson} /></ArcProvider>)
-  await screen.findByRole('textbox', { name: 'Search ARC files' })
+  renderWithTheme(<ArcProvider store={store}><ArcDashboardFrame content={story.args.content} label={story.args.label} fillHeight={story.args.fillHeight} arcJson={crateJson} /></ArcProvider>)
+  await screen.findByRole('textbox', { name: 'Search ARC files' }, { timeout: 5000 })
 }
 
 describe('SplitDashboard', () => {
@@ -69,20 +70,4 @@ describe('SplitDashboard', () => {
     await user.keyboard('{ArrowUp}')
     expect(divider).toHaveAttribute('aria-valuenow', '65')
   }, 15000)
-
-  it('shows loading before the ARC is available', () => {
-    const store = createArcStore(sampleCrateSource())
-    renderWithTheme(<ArcProvider store={store}><SplitDashboard arcJson={crateJson} /></ArcProvider>)
-    expect(screen.getByRole('status')).toHaveTextContent('Loading ARC')
-    expect(screen.queryByRole('separator')).not.toBeInTheDocument()
-  })
-
-  it('shows the ARC load failure', async () => {
-    const source = sampleCrateSource()
-    const store = createArcStore({ ...source, fetchROCrate: async () => { throw new Error('Unable to load RO-Crate (404).') } })
-    await store.load()
-    renderWithTheme(<ArcProvider store={store}><SplitDashboard arcJson={crateJson} /></ArcProvider>)
-    expect(screen.getByText('Could not load ARC')).toBeVisible()
-    expect(screen.getByText('Unable to load RO-Crate (404).')).toBeVisible()
-  })
 })

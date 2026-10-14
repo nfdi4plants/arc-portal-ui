@@ -18,6 +18,15 @@ Search and organisation repositories use 10 results per page with Previous/Next
 controls. Archived repositories are included. Sections expose loading, empty,
 error, and retry states.
 
+## Dashboard layout stories
+
+Run `npm run storybook` to explore the alternative ARC dashboards. The circular,
+stacked, combined, split, tabbed, hub, and scrolling layouts live in
+`src/storybook/dashboards` as story compositions, using the shared ARC header, investigation popup dashlets,
+Graphview, viewer workspace, and dashboard frame. Each layout includes examples
+with public, private, and unavailable DataHub data, using the bundled Talinum ARC.
+The application uses the classic ARC dashboard.
+
 ## Optional authentication
 
 Public browsing is available immediately. The navbar Login button opens a Primer
