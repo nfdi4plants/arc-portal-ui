@@ -90,12 +90,19 @@ export function onClick(
 }
 
 // A labelled box. It acts on release after its own press (see onClick).
-export function addButton(scene: Phaser.Scene, label: string, width: number, height: number, onPress: () => void): Button {
+// `onHover` hears when the pointer enters or leaves the box.
+export function addButton(scene: Phaser.Scene, label: string, width: number, height: number, onPress: () => void, onHover?: (over: boolean) => void): Button {
   const box = scene.add.rectangle(0, 0, width, height, PALETTE.navy).setStrokeStyle(1, PALETTE.cream)
   const text = addText(scene, label, Math.round(height * 0.45), { bold: true }).setOrigin(0.5)
   box.setInteractive({ useHandCursor: true })
-  box.on('pointerover', () => box.setFillStyle(PALETTE.blue))
-  box.on('pointerout', () => box.setFillStyle(PALETTE.navy))
+  box.on('pointerover', () => {
+    box.setFillStyle(PALETTE.blue)
+    onHover?.(true)
+  })
+  box.on('pointerout', () => {
+    box.setFillStyle(PALETTE.navy)
+    onHover?.(false)
+  })
   onClick(scene, box, onPress)
   return {
     setPosition(x, y) {

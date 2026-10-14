@@ -9,7 +9,7 @@ import type { Segment } from '../../contracts/run'
 import type { HudControl, RunContext } from './context'
 import { LevelHistoryPanel } from './LevelHistoryPanel'
 import { MobInfoPanel } from './MobInfoPanel'
-import { MOB_INFO_EVENT } from './mobInfoEvent'
+import { MOB_HOVER_EVENT, MOB_INFO_EVENT, MOB_ANCHOR_KEY, type NormRect } from './mobInfoEvent'
 import { addButton, addText, overlayView, type Button } from './ui'
 
 const M = 8
@@ -52,6 +52,7 @@ export class HudScene extends Phaser.Scene implements HudControl {
   private mobInfo!: MobInfoPanel
   private history!: LevelHistoryPanel
   private paused = false
+  private overButtons = 0
 
   // Last drawn values. NaN forces a redraw.
   private hp = NaN
@@ -99,19 +100,34 @@ export class HudScene extends Phaser.Scene implements HudControl {
     // stays invisible and only marks the pause.
     this.pauseDim = this.add.rectangle(0, 0, 1, 1, PALETTE.navy, 0).setOrigin(0, 0)
     this.pauseTitle = addText(this, 'Paused', 16, { bold: true }).setOrigin(0.5)
+    // A button the pointer is on wins over the info panel above it, which fades until the pointer leaves.
+    const onButtonHover = (over: boolean) => {
+      this.overButtons = Math.max(0, this.overButtons + (over ? 1 : -1))
+      this.mobInfo.setDimmed(this.overButtons > 0)
+    }
     this.pauseButtons = [
-      addButton(this, 'Resume', 130, 22, () => this.ctx.gameplay?.resumeFromPause()),
-      addButton(this, 'Level-up provenance', 130, 22, () => this.openHistory()),
-      addButton(this, 'Quit to menu', 130, 22, () => this.ctx.quitToMenu()),
+      addButton(this, 'Resume', 130, 22, () => this.ctx.gameplay?.resumeFromPause(), onButtonHover),
+      addButton(this, 'Level-up provenance', 130, 22, () => this.openHistory(), onButtonHover),
+      addButton(this, 'Quit to menu', 130, 22, () => this.ctx.quitToMenu(), onButtonHover),
     ]
     this.paused = false
-    this.mobInfo = new MobInfoPanel(this, () => this.syncMenu())
+    this.overButtons = 0
+    this.mobInfo = new MobInfoPanel(this)
     this.history = new LevelHistoryPanel(this, () => this.closeHistory())
-    const onMobInfo = (spec?: MonsterSpec, segment?: Segment, focusY?: number) => {
-      if (spec && segment && this.paused && !this.history.isOpen()) this.mobInfo.show(spec, segment, focusY)
+    // A click pins the panel, hovering only shows it until the pointer leaves.
+    const onMobInfo = (spec?: MonsterSpec, segment?: Segment) => {
+      const anchor = this.registry.get(MOB_ANCHOR_KEY) as NormRect | undefined
+      if (spec && segment && anchor && this.paused && !this.history.isOpen()) this.mobInfo.show(spec, segment, anchor, true)
+      else this.mobInfo.hide()
+    }
+    const onMobHover = (spec?: MonsterSpec, anchor?: NormRect) => {
+      if (this.mobInfo.isPinned()) return
+      const segment = spec ? this.ctx.director?.segment(spec.segmentIndex) : undefined
+      if (spec && segment && anchor && this.paused && !this.history.isOpen()) this.mobInfo.show(spec, segment, anchor, false)
       else this.mobInfo.hide()
     }
     this.game.events.on(MOB_INFO_EVENT, onMobInfo)
+    this.game.events.on(MOB_HOVER_EVENT, onMobHover)
     this.bannerMs = 0
     this.setBannerAlpha(0)
     this.showPause(false)
@@ -120,6 +136,7 @@ export class HudScene extends Phaser.Scene implements HudControl {
     this.ctx.hud = this
     this.events.once('shutdown', () => {
       this.game.events.off(MOB_INFO_EVENT, onMobInfo)
+      this.game.events.off(MOB_HOVER_EVENT, onMobHover)
       if (this.ctx.hud === this) this.ctx.hud = null
     })
   }
@@ -192,11 +209,16 @@ export class HudScene extends Phaser.Scene implements HudControl {
     this.syncMenu()
   }
 
-  // The title and buttons make room while a panel is open, so a panel never covers a button.
+  // The info panel draws above the menu, the history panel replaces it.
   private syncMenu() {
-    const shown = this.paused && !this.mobInfo.isOpen() && !this.history.isOpen()
+    const shown = this.paused && !this.history.isOpen()
     this.pauseTitle.setVisible(shown)
     for (const button of this.pauseButtons) button.setVisible(shown)
+    // Hidden buttons send no pointerout, so the count starts over.
+    if (!shown) {
+      this.overButtons = 0
+      this.mobInfo.setDimmed(false)
+    }
   }
 
   private openHistory() {
