@@ -207,7 +207,7 @@ next step (`portalLabel`). There is no enemy, no XP and no pit. The HUD, the pau
 level history work as everywhere, and the path on the HUD marks the beaten node.
 
 What stands in the room comes from `rollEncounters(runSeed, afterSegmentIndex)` in
-`model/run/encounters.ts`: always the FAIR trader, and in 40% of the waystations the Datenkrake
+`model/run/encounters.ts`: always the FAIR trader (or his closed stall once he is beaten, see [Striking the FAIR trader](#striking-the-fair-trader)), and in 40% of the waystations the Datenkrake
 (see [The Datenkrake](#the-datenkrake)). The kinds fill the slots in the order of `ENCOUNTER_SLOTS`
 (centre, right, left), spread over the floor between the entrance and the exit, so a second
 encounter stands between the trader and the exit. In the scene, `ENCOUNTER_SPAWNERS` in `phaser/scenes/encounters.ts` maps each kind to
@@ -454,6 +454,56 @@ each fragment is a term someone forgot to link, and he puts the ontologies back 
 at a time. So the story comes up now and then, not every time. `createLinePicker` never says the
 same line twice in a row.
 
+## Striking the FAIR trader
+
+The trader can be attacked. Behind the counter stands a bystander combatant on the `neutral` team
+(`spawnTrader` in `phaser/scenes/encounters.ts`): every hit of the mage lands on it, deals nothing
+and counts as a strike. Hits closer together than 400 ms (`STRIKE_WINDOW_MS`, sliding with every
+hit) are one strike, so a flame cone, Dual Scalpels or an echo count once. Nothing aims at a
+neutral combatant, so the familiar, the A letter and the chains leave him alone.
+
+| Strike | What happens |
+|---|---|
+| 1 | a warning in his bubble, the stall winces: "Hey! That's not very FAIR." |
+| 2 | a sterner one: "One FAIR warning. Stop it." |
+| 3 | the last: "Last chance. I have a DOI and I'm not afraid to cite it." |
+| 4 | no word. He vaults over the counter and fights. The store is closed for good |
+
+Each stage has six lines (`TRADER_WARNINGS` in `model/progression/traderFight.ts`), picked without
+an immediate repeat. Until the fourth strike the store stays open as before.
+
+The fighting trader is the mage's own body (`createPlayer` with an identity on the enemy team, his
+own look and a hit reaction) with a loadout of his own (`phaser/scenes/traderFight.ts`). His build
+(`traderBuild`) is a mage of the player's level: a random legendary weapon in each slot at full
+power, every legendary augment (Git Revert, Peer Pressure and Preprint take three ability slots),
+and for every level gained the max hp gain of a level-up and a random common card. His hp is then
+doubled (`TRADER_HP_FACTOR`), because a mage's hp alone lasts a few seconds of hitting. Light hits
+only cost him hp, heavy ones make him flinch and fly, he has no hit invulnerability, and Git Revert
+saves him from one lethal hit like it saves the mage. He is drawn as himself, a full standing body
+with hat, moustache and merchant apron in the proportions of the mage sprite (`traderFighterArt`),
+and holds his weapons with the mage's weapon poses.
+
+His buttons are pressed by a brain (`phaser/scenes/traderAi.ts`, pure and seeded by the run): he
+keeps the distance of his light weapon (in close for ARCitect and the Publication Press, 120 to 230
+units off for ARC Commander and Git LFS), plays light strings of two or three presses and heavies,
+and rests 0.38 to 0.72 s after each so they can be read and punished. He dashes away from a heavy
+wind-up of the mage now and then, jumps at a mage above him, closes long gaps with a dash or a
+Preprint super-dash, and shouts before Peer Pressure ("Peer review incoming!"), which he keeps back
+for the first 6 s. His heavies are named on the HUD from the wind-up on, under his bar "The FAIR
+Trader (unFAIR mode)". The exit portal shows "Can't leave mid-fight" and stays shut. If he wins, the
+death screen reads "Out-traded by the FAIR trader" with one of his lines ("Priced in. Paid in
+full.").
+
+When he falls he says a last line and fades. Then `RunDirector.lootTrader` applies his stall like
+purchases (no level, no XP, no hp gain): every card left in his stock, and one bonus, a legendary
+augment or legendary weapon the mage does not have and his stock did not hold this visit, sold or
+not. A card that no longer fits is skipped, and no bonus is given when nothing is left. The loot
+overlay (`TraderLootScene`) shows the cards, the bonus marked, until Walk on (Enter, after 600 ms).
+The level history and the run recap list them as "Looted from the FAIR trader". From then on he is
+gone for the run (`RunDirector.traderGone`, a new run brings him back): every later waystation has
+his closed stall, with a plank across, cobwebs, no goods, no prompt and a note pinned over it
+("Closed. Not FAIR.", "Out of stock. Out of patience.").
+
 ## Running the sandboxes
 
 Start Storybook with `npm run storybook` (port 6006) and open these stories:
@@ -498,7 +548,10 @@ Click the canvas to give it keyboard focus.
 | Store prices, stock size and legendary chance | `model/progression/store.ts` (`PRICES`, `STOCK_SIZE`, `STORE_LEGENDARY_CHANCE`) |
 | Trader lines and story lines | `model/progression/trader.ts` (`TRADE_LINES`, `TRADER_LORE`) |
 | Fragment pop, bob and magnet | `phaser/mobs/pickups.ts` |
-| Trade reach, greeting and goodbye time | `phaser/scenes/encounters.ts` |
+| Trade reach, greeting and goodbye time, strike wince | `phaser/scenes/encounters.ts` |
+| Strike window, trader hp factor, warning and fight lines | `model/progression/traderFight.ts` |
+| Trader ranges, string, rest, shout and dodge timing | `phaser/scenes/traderAi.ts` (`TRADER_RANGES`, `TRADER_TIMING`) |
+| Trader vault and defeat fade | `phaser/scenes/traderFight.ts` |
 | Waystation width and encounter slot positions | `phaser/scenes/WaystationScene.ts` (`ROOM_VIEWS`, `SLOT_AT`) |
 | Staff timing and damage | `phaser/player/staffMoveset.ts` |
 | Other weapons | `phaser/player/weapons/light.ts`, `phaser/player/weapons/heavy.ts` |

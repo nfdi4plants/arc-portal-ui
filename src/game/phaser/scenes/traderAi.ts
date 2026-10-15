@@ -43,8 +43,10 @@ export const TRADER_TIMING = {
   // The breather after a string or a heavy.
   restMinMs: 380,
   restMaxMs: 720,
-  // The shout before Peer Pressure.
+  // The shout before Peer Pressure, and how long into the fight he keeps it back, so the fight
+  // does not open with a hit nobody saw coming.
   shoutMs: 750,
+  pressureAfterMs: 6000,
   heavyCooldownMs: 2200,
   dodgeCooldownMs: 1400,
   dashCooldownMs: 1800,
@@ -90,6 +92,7 @@ export function inRange(selfX: number, foeX: number, reach: Reach): boolean {
 
 export function createTraderBrain(plan: TraderPlan, rng: Rng): TraderBrain {
   let mode: TraderMode = 'move'
+  let fightMs = 0
   let modeMs = 0
   let thinkMs = 0
   // The light presses left in the current string, and the time to the next one.
@@ -129,6 +132,7 @@ export function createTraderBrain(plan: TraderPlan, rng: Rng): TraderBrain {
         return null
       }
       modeMs += dtMs
+      fightMs += dtMs
       thinkMs -= dtMs
       heavyCooldown -= dtMs
       dodgeCooldown -= dtMs
@@ -182,7 +186,7 @@ export function createTraderBrain(plan: TraderPlan, rng: Rng): TraderBrain {
         thinkMs = TRADER_TIMING.thinkMs
         walk = rangeStep(self.x, foe.x, plan.light, sense.room)
         up = false
-        if (sense.pressureReady && plan.pressureSlot >= 0 && rng.chance(0.12)) {
+        if (sense.pressureReady && plan.pressureSlot >= 0 && fightMs >= TRADER_TIMING.pressureAfterMs && rng.chance(0.12)) {
           shout = 'pressure'
           enter('shout')
         } else if (sense.preprintReady && plan.preprintSlot >= 0 && dist > 80 && dist < 240 && Math.abs(self.y - foe.y) < 30 && rng.chance(0.2)) {

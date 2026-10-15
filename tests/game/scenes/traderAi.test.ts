@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Action } from '../../../src/game/contracts/input'
 import { createRng } from '../../../src/game/contracts/rng'
-import { createTraderBrain, inRange, rangeStep, TRADER_RANGES, type TraderPlan, type TraderSense } from '../../../src/game/phaser/scenes/traderAi'
+import { createTraderBrain, inRange, rangeStep, TRADER_RANGES, TRADER_TIMING, type TraderPlan, type TraderSense } from '../../../src/game/phaser/scenes/traderAi'
 
 const room = { left: 0, right: 600 }
 const STEP = 1000 / 120
@@ -71,7 +71,7 @@ describe('the trader brain', () => {
     expect(held.has('light')).toBe(false)
   })
 
-  it('shouts before Peer Pressure and presses it only after the shout', () => {
+  it('keeps Peer Pressure back at the start, shouts before it and presses it only after the shout', () => {
     const brain = createTraderBrain(melee, createRng('shout'))
     const held = new Set<Action>()
     let shoutAt = -1
@@ -81,7 +81,7 @@ describe('the trader brain', () => {
       if (shout === 'pressure' && shoutAt < 0) shoutAt = t
       if (held.has('ability2')) pressAt = t
     }
-    expect(shoutAt).toBeGreaterThanOrEqual(0)
+    expect(shoutAt).toBeGreaterThanOrEqual(TRADER_TIMING.pressureAfterMs)
     expect(pressAt - shoutAt).toBeGreaterThanOrEqual(700)
   })
 
