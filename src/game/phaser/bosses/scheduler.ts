@@ -27,8 +27,10 @@ export interface AttackScheduler<A extends SchedulableAttack> {
   setAttacks(attacks: readonly A[], quality: number, delayMs?: number): void
   // Advances cooldowns and the idle time. Call once per step.
   tick(dtMs: number): void
-  // The next attack, or null while busy, idle or when every candidate is on cooldown.
-  next(): A | null
+  // The next attack, or null while busy, idle or when every candidate is on cooldown. With
+  // weightOf the pick is weighted, and an attack of weight 0 is never picked: while only those are
+  // ready, next() waits for one that weighs more (unless no attack of the list does).
+  next(weightOf?: (attack: A) => number): A | null
   // The attack from next() is over. Its cooldown starts and the idle time begins.
   complete(idleMs?: number): void
   // Multiplies the cooldown of every attack that completes from now on (an enraged or tempo boss
@@ -67,15 +69,29 @@ export function createScheduler<A extends SchedulableAttack>(rng: Rng): AttackSc
         if (cooldowns[i] > 0) cooldowns[i] = Math.max(0, cooldowns[i] - dtMs)
       }
     },
-    next() {
+    next(weightOf) {
       if (current >= 0 || idleMs > 0) return null
       eligible.length = 0
+      let total = 0
       for (let i = 0; i < attacks.length; i++) {
         if (cooldowns[i] > 0) continue
         if (lastHeavy && attacks[i].heavy && hasLight) continue
         eligible.push(i)
+        if (weightOf) total += weightOf(attacks[i])
       }
       if (eligible.length === 0) return null
+      if (weightOf && total > 0) {
+        let roll = rng.next() * total
+        for (const i of eligible) {
+          const weight = weightOf(attacks[i])
+          if (weight <= 0) continue
+          current = i
+          roll -= weight
+          if (roll < 0) break
+        }
+        return attacks[current]
+      }
+      if (weightOf) for (const attack of attacks) if (weightOf(attack) > 0) return null
       current = eligible[rng.int(0, eligible.length - 1)]
       return attacks[current]
     },

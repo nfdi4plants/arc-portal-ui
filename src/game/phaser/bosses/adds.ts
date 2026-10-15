@@ -5,6 +5,8 @@ import { DEPTH } from '../../contracts/constants'
 import type { PlayerHandle } from '../../contracts/player'
 import { addStatus, clearStatus, createStatus, statusTimeScale, tickStatus } from '../combat/status'
 import type { StatusState } from '../combat/status'
+import { addCrouching, createAddMotion, stepAdd } from './reach'
+import type { AddMotion, PerchWatch } from './reach'
 import { applyRef } from './sprites'
 import { clamp } from './zones'
 
@@ -26,6 +28,8 @@ export interface AddsDeps {
   floorY: number
   left: number
   right: number
+  // Where the player stands. The adds hop up to the platform in it.
+  perch: PerchWatch
   // Reads the boss killer on demand, because the final boss changes it per phase.
   killer(): KillerInfo | null
 }
@@ -33,7 +37,8 @@ export interface AddsDeps {
 const MAX_ADDS = 4
 const SIZE = 22
 const HP = 24
-const SPEED = 54
+// The squash of a crouching add, before it hops.
+const CROUCH_SQUASH = { x: 1.18, y: 0.78 }
 const CONTACT_COOLDOWN_MS = 800
 const CONTACT_ACTIVE_MS = 90
 const FLASH_MS = 70
@@ -43,7 +48,8 @@ const FROZEN_TINT = 0x8fd0ff
 interface Slot extends Combatant {
   alive: boolean
   hp: number
-  x: number
+  // Position and hop state, see stepAdd.
+  motion: AddMotion
   face: 1 | -1
   damage: number
   contactMs: number
@@ -54,12 +60,15 @@ interface Slot extends Combatant {
   sprite: Phaser.GameObjects.Sprite
 }
 
-// Small minions that run at the player and hurt on contact. They are Combatants of the boss team
-// and name the boss as the killer. A fixed set of slots is reused, so a summon never creates objects.
+// Small minions that run at the player and hurt on contact. A player up on a platform does not
+// escape them for long: they crouch beside it and hop up, at a quarter of the player's speed (see
+// stepAdd). They are Combatants of the boss team and name the boss as the killer. A fixed set of
+// slots is reused, so a summon never creates objects.
 export function createAdds(deps: AddsDeps): Adds {
   const { scene, combat, player, floorY } = deps
   const box = new Phaser.Geom.Rectangle()
   const spot = { x: 0, y: floorY }
+  const bounds = { left: deps.left, right: deps.right, floorY }
 
   function makeSlot(index: number): Slot {
     const sprite = scene.add.sprite(0, floorY, deps.look.textureKey).setDepth(DEPTH.enemies).setVisible(false)
@@ -72,7 +81,7 @@ export function createAdds(deps: AddsDeps): Adds {
       },
       alive: false,
       hp: 0,
-      x: 0,
+      motion: createAddMotion(0),
       face: 1,
       damage: 0,
       contactMs: 0,
@@ -80,10 +89,11 @@ export function createAdds(deps: AddsDeps): Adds {
       dyingMs: 0,
       status: createStatus(),
       sprite,
-      hurtbox: () => box.setTo(slot.x - SIZE / 2, floorY - SIZE, SIZE, SIZE),
+      hurtbox: () => box.setTo(slot.motion.x - SIZE / 2, floorY - slot.motion.lift - SIZE, SIZE, SIZE),
       facing: () => slot.face,
       position() {
-        spot.x = slot.x
+        spot.x = slot.motion.x
+        spot.y = floorY - slot.motion.lift
         return spot
       },
       isInvulnerable: () => false,
@@ -103,6 +113,7 @@ export function createAdds(deps: AddsDeps): Adds {
   }
 
   const slots = Array.from({ length: MAX_ADDS }, (_, i) => makeSlot(i))
+  const baseScale = { x: slots[0].sprite.scaleX, y: slots[0].sprite.scaleY }
 
   function free(slot: Slot) {
     slot.alive = false
@@ -113,9 +124,9 @@ export function createAdds(deps: AddsDeps): Adds {
 
   function touchesPlayer(slot: Slot): boolean {
     const target = player.hurtbox()
-    return (
-      slot.x - SIZE / 2 < target.right && slot.x + SIZE / 2 > target.left && floorY - SIZE < target.bottom && floorY > target.top
-    )
+    const { x, lift } = slot.motion
+    const feet = floorY - lift
+    return x - SIZE / 2 < target.right && x + SIZE / 2 > target.left && feet - SIZE < target.bottom && feet > target.top
   }
 
   return {
@@ -124,13 +135,17 @@ export function createAdds(deps: AddsDeps): Adds {
       if (!slot) return false
       slot.alive = true
       slot.hp = HP
-      slot.x = clamp(x, deps.left + SIZE, deps.right - SIZE)
+      const m = slot.motion
+      m.x = clamp(x, deps.left + SIZE, deps.right - SIZE)
+      m.lift = 0
+      m.ledge = null
+      m.hopMs = -1
       slot.damage = damage
       slot.contactMs = CONTACT_COOLDOWN_MS / 2
       slot.flashMs = 0
       slot.dyingMs = 0
       clearStatus(slot.status)
-      slot.sprite.setPosition(slot.x, floorY).setVisible(true).setAlpha(1)
+      slot.sprite.setPosition(m.x, floorY).setScale(baseScale.x, baseScale.y).setVisible(true).setAlpha(1)
       combat.register(slot)
       return true
     },
@@ -145,9 +160,13 @@ export function createAdds(deps: AddsDeps): Adds {
         }
         tickStatus(slot.status, dtMs)
         const scale = statusTimeScale(slot.status)
-        const dx = player.position().x - slot.x
-        slot.face = dx >= 0 ? 1 : -1
-        if (Math.abs(dx) > 6) slot.x = clamp(slot.x + slot.face * SPEED * scale * (dtMs / 1000), deps.left + SIZE, deps.right - SIZE)
+        const m = slot.motion
+        const playerX = player.position().x
+        slot.face = playerX >= m.x ? 1 : -1
+        // Stops a few units short of the player on the same surface.
+        if (m.hopMs >= 0 || m.ledge !== deps.perch.ledge || Math.abs(playerX - m.x) > 6) {
+          stepAdd(m, playerX, deps.perch.ledge, bounds, SIZE, dtMs * scale)
+        }
         slot.contactMs = Math.max(0, slot.contactMs - dtMs * scale)
         if (scale > 0 && slot.contactMs <= 0 && !player.isDead() && touchesPlayer(slot)) {
           slot.contactMs = CONTACT_COOLDOWN_MS
@@ -167,7 +186,9 @@ export function createAdds(deps: AddsDeps): Adds {
         if (slot.flashMs > 0) slot.sprite.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL)
         else if (slot.status.freezeMs > 0) slot.sprite.setTint(FROZEN_TINT).setTintMode(Phaser.TintModes.MULTIPLY)
         else slot.sprite.clearTint()
-        slot.sprite.setPosition(slot.x, floorY)
+        const crouch = addCrouching(m)
+        slot.sprite.setScale(baseScale.x * (crouch ? CROUCH_SQUASH.x : 1), baseScale.y * (crouch ? CROUCH_SQUASH.y : 1))
+        slot.sprite.setPosition(m.x, floorY - m.lift)
       }
     },
     clear() {

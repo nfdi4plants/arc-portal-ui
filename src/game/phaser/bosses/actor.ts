@@ -14,6 +14,7 @@ import { registerInspectable } from '../mobs/inspect'
 import { INSPECT_DIM_DEPTH } from '../mobs/tuning'
 import type { Arena, BossDeps, BossHandle } from './index'
 import { createMechanics } from './mechanics'
+import { campWeight, createPerchWatch, isCamping, watchPerch } from './reach'
 import { createScheduler, OPENING_DELAY_MS, windupMs } from './scheduler'
 import { applyRef, setOriginOf, stillTexture } from './sprites'
 import { staggerBarSize, staggerDurationMs, staggerLocked, staggerProgress } from './stagger'
@@ -80,6 +81,11 @@ const ARMS_DROP_MS = 150
 const HOVER = 22
 const HOP_MS = 520
 const HOP_HEIGHT = 36
+// How close the treant walks to a player who camps on a platform, so its sweeps reach up.
+const TREANT_CLOSE_IN = 80
+// How far from the player the daemon blinks, on the floor and when the player camps on a platform.
+const BLINK_FLOOR = [150, 250] as const
+const BLINK_LEDGE = [70, 120] as const
 const EPSILON = 1e-6
 // scenes/arena.ts builds the arena this many camera views wide.
 const ARENA_VIEWS = 1.6
@@ -153,6 +159,8 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
   // A boss is never frozen. A freeze slows its clock instead (addStatus with boss = true).
   const status = createStatus()
   const move = { hopping: false, hopMs: 0, fromX: 0, toX: 0, waitMs: 700, blinkInMs: 2500 }
+  // Where the player stands and for how long, so the boss goes for a player who camps up high.
+  const perch = createPerchWatch()
 
   const first = phases[0]
   // The camera starts at the left wall with the player, so a boss further right than the first view
@@ -215,6 +223,7 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
     floorY,
     left: arena.left,
     right: arena.right,
+    perch,
     killer: () => killer,
   })
   const shotKeys = new Map<ProjectileArt, string>()
@@ -271,6 +280,7 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
     body,
     self,
     adds,
+    perch,
     archetype: first.archetype,
     safeZones: first.safeZones,
     hover: hoverOf(first.archetype),
@@ -407,7 +417,10 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
     }
     switch (env.archetype) {
       case 'rootTreant': {
-        const away = homeX - body.x
+        // It holds the middle of the arena, but walks up to a player who camps on a platform.
+        let goal = homeX
+        if (isCamping(perch)) goal = Math.abs(dx) > TREANT_CLOSE_IN ? playerX - Math.sign(dx) * TREANT_CLOSE_IN : body.x
+        const away = goal - body.x
         if (Math.abs(away) > 2) body.x += Math.sign(away) * Math.min(Math.abs(away), 45 * seconds)
         return true
       }
@@ -444,8 +457,9 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
           move.blinkInMs = rng.int(2200, 3600)
           blinkMs = 220
           const side = rng.chance(0.5) ? -1 : 1
-          let target = playerX + side * rng.int(150, 250)
-          if (target < minX || target > maxX) target = playerX - side * rng.int(150, 250)
+          const [near, far] = isCamping(perch) ? BLINK_LEDGE : BLINK_FLOOR
+          let target = playerX + side * rng.int(near, far)
+          if (target < minX || target > maxX) target = playerX - side * rng.int(near, far)
           body.x = target
         }
         break
@@ -612,6 +626,9 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
       if (tellMs <= 0) releaseTell()
     }
     scheduler.tick(dtMs)
+    // The player's time, not the boss clock: a slowed boss does not make the platforms safer.
+    const feet = player.position()
+    watchPerch(perch, arena.platforms, feet.x, feet.y, player.isGrounded(), realMs)
     adds.update(realMs)
     if (transitionMs > 0) {
       transitionMs = Math.max(0, transitionMs - dtMs)
@@ -633,7 +650,8 @@ export function createActor(scene: Phaser.Scene, config: ActorConfig): Actor {
       return
     }
     if (!moveIdle(dtMs) || player.isDead() || mechanics.busy()) return
-    const next = scheduler.next()
+    // A player who camps on a platform gets the attacks that reach up there, see reach.ts.
+    const next = scheduler.next(isCamping(perch) ? campWeight : undefined)
     if (next) beginAttack(next)
   }
 

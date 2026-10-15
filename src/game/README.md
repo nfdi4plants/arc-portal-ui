@@ -61,6 +61,33 @@ timed mechanics (summoner, spill, teleport, shield) start only while the boss st
 time and at least 2.5 s apart, the boss starts no attack while a spill is marked or burns, and the
 shield never rises in the punish window right after a heavy attack (`phaser/bosses/mechanics.ts`).
 
+A boss arena has a row of one-way platforms, 60 units over the floor and 3 tiles wide
+(`arenaPlatforms` in `phaser/bosses/zones.ts`). A platform is a dodge, not a hiding place
+(`phaser/bosses/reach.ts`). The floor attacks miss a mage up there: the shockwave and the flood, the
+quake, the floor charge, the low and high sweeps (the high swing stays under the platforms) and the
+pillars, which stop at the underside of a platform. Once the mage has stood on the platforms for 2 s
+(`CAMP_MS`, jumps on a platform count, time on the floor takes twice as much off), the boss camps
+them out:
+
+- It picks only attacks that reach the platforms, weighted by `CAMP_WEIGHT`: the leap or root arm,
+  the platform rain and the high or aimed beam most, then the fan and the pillars, then the sweep,
+  the charge and the summon. It never picks the shockwave then, and while only that one is ready
+  it waits. Every light kind reaches, so every boss has an attack that does. The light and heavy
+  rhythm and the stagger lock stay as they are.
+- Those attacks play their platform versions: the slam never quakes, the heavy rain falls on the
+  platforms, the beam aims or runs high, the sweep swings at platform height (from the middle of the
+  boss, so standing right above it does not dodge it), the charge leaps to platform height and
+  dashes through the air, and a pillar under a platform bursts through it. Each spares the floor or
+  leaves gaps on the platform and keeps its telegraph, so dropping down or stepping aside dodges it.
+- The treant walks up to the mage, the daemon blinks closer (70 to 120 units instead of 150 to
+  250), and the teleport mechanic lands 60 to 110 units from a mage on a platform.
+
+The spill lands on the platform the mage stands on and covers most of it, with its usual 0.9 s
+warning. The minions walk at 54 units per second, a quarter of the mage's run, and chase a mage on a
+platform: they walk to a spot just beside it, crouch for 0.38 s and hop up in 0.56 s. A minion on a
+platform the mage has left walks off the edge and drops. The shots of the fan and the mirror aim at
+the middle of the mage, height included, and end at the walls, the floor or the ceiling.
+
 The quality of the step (`annotations / 8`) alone still drives the telegraph time, the hp bar and
 attack names, the safe zones, the weak points, the stagger window and the stagger bar size. It also
 sets a damage multiplier, `1 + 0.55 * (1 - quality)`: 1 at quality 1 up to 1.55 at quality 0, on
@@ -316,6 +343,7 @@ Click the canvas to give it keyboard focus.
 | Boss slots, damage multiplier and hit cap | `model/content/bossGenome.ts` |
 | Boss attack kinds, names, damage and cooldowns | `model/content/bossAttacks.ts` |
 | Boss mechanic timers, armour, shield and spill | `phaser/bosses/mechanics.ts` |
+| Platform camping time, attack weights while camping, minion speed and hop | `phaser/bosses/reach.ts` |
 | Quality and telegraph formulas | `model/run/segment.ts` |
 | XP per level (`20 + 10 * (level - 1)`), hp per level, stat caps, card effects | `model/progression/build.ts` |
 | Card names, texts and rarities (the ids keep the first names, `stat.thickRobe` is Redundant Storage) | `model/progression/catalog.ts`, flavour lines in `flavor.ts` |

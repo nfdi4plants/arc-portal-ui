@@ -7,15 +7,35 @@ import type { PlayerHandle } from '../../contracts/player'
 import type { Rng } from '../../contracts/rng'
 import type { Adds } from './adds'
 import type { Arena } from './index'
+import { isCamping } from './reach'
+import type { PerchWatch } from './reach'
 import type { TelegraphPool, Zone, ZoneSpec } from './telegraph'
-import { clamp, fallMs, flightMs, insideAny, knockback, openIntervals, platformBodyY, platformUnder, safeIntervals, toOwnerShape } from './zones'
+import {
+  clamp,
+  FEET_MARGIN,
+  fallMs,
+  flightMs,
+  insideAny,
+  knockback,
+  openIntervals,
+  PLATFORM_LIFT,
+  PLATFORM_THICKNESS,
+  platformBodyY,
+  platformUnder,
+  safeIntervals,
+  toOwnerShape,
+} from './zones'
 import type { ArenaPlatform, Facing, Interval } from './zones'
 
 // The nine attack kinds. Each one is written once. It takes its damage and timing from the spec,
 // its reach from the arena and its look from the boss archetype. A heavy attack in an arena with
 // platforms sometimes plays a platform variant: the quake and the flood cover the whole floor and
 // spare the platforms, the platform rain, the high beam and a leap onto the player's platform hit
-// the platforms and spare the floor. The boss runs every attack through
+// the platforms and spare the floor. Once the player camps up there (reach.ts), every attack but the
+// shockwave plays a version that reaches the platforms: the slam leaps or reaches up, the beam aims
+// or runs high, the heavy rain falls on the platforms, the sweep and the charge rise to platform
+// height and the pillars under a platform burst through it. Each of them spares the floor or leaves
+// gaps, so dropping down or stepping aside still dodges it. The boss runs every attack through
 // the same cycle: begin (the wind-up starts and the target is locked), windup (every step until the
 // telegraph is full), fire (the hitboxes appear) and active (every step while the attack lasts).
 
@@ -46,6 +66,8 @@ interface Wave {
   dir: Facing
   lifeMs: number
   fired: boolean
+  // A pillar's height.
+  height: number
 }
 
 // The running attack. One object per boss, reset for each attack. Spawning a hitbox or a shot
@@ -133,6 +155,8 @@ export interface AttackEnv {
   body: BossBody
   self: Combatant
   adds: Adds
+  // Where the player stands, shared with the actor that updates it every step.
+  perch: PerchWatch
   // Changes with the phase of the final boss.
   archetype: BossArchetype
   safeZones: number
@@ -285,12 +309,13 @@ const QUAKE_HEIGHT = 44
 const slam: AttackKind = {
   begin(run, env) {
     const { arena, body } = env
-    const quake = run.spec.heavy && (env.safeZones > 0 || hasLedges(env)) && env.rng.chance(0.5)
+    // A player who camps on a platform gets the leap or the root arm, never the floor quake.
+    const quake = run.spec.heavy && !isCamping(env.perch) && (env.safeZones > 0 || hasLedges(env)) && env.rng.chance(0.5)
     const feet = env.player.position()
     const playerX = feet.x
     run.variant = quake ? 2 : env.archetype === 'rootTreant' ? 1 : 0
     // The root arm reaches high enough to hit a platform anyway.
-    if (run.variant === 0) run.ledge = platformUnder(arena.platforms, playerX, feet.y)
+    if (run.variant === 0) run.ledge = platformUnder(arena.platforms, playerX, feet.y, FEET_MARGIN)
     run.startX = body.x
     run.targetX = quake ? body.x : clamp(playerX, env.minX, env.maxX)
     run.dir = faceToward(env, quake ? playerX : run.targetX)
@@ -353,16 +378,30 @@ const slam: AttackKind = {
 }
 
 // Sweep: a horizontal zone in front of the boss, either on the ground (jump it) or at head height
-// (dash through it or jump high).
+// (dash through it or jump high). The high swing stays under the platforms. Against a player who
+// camps on a platform it rises to the height of that platform instead, and the floor below stays
+// safe, so dropping down or jumping high clears it.
+const HIGH_SWEEP = { top: PLATFORM_LIFT - 4, bottom: 36 }
+const RISING_SWEEP = { over: 48, under: 4 }
+
 const sweep: AttackKind = {
   begin(run, env) {
     const floor = env.arena.floorY
     run.dir = faceToward(env, env.player.position().x)
-    run.variant = env.rng.chance(0.5) ? 0 : 1
+    const ledge = isCamping(env.perch) ? env.perch.ledge : null
+    run.variant = ledge ? 2 : env.rng.chance(0.5) ? 0 : 1
     run.targetX = env.body.x + run.dir * (env.body.hurtW / 2)
     run.length = (run.spec.heavy ? 150 : 115) * env.reach
-    run.top = floor - (run.variant === 0 ? 24 : 64)
-    run.bottom = floor - (run.variant === 0 ? 0 : 36)
+    if (ledge) {
+      // The swing rises over the boss's head too, so standing right above it does not dodge it.
+      run.targetX = env.body.x
+      run.length += env.body.hurtW / 2
+      run.top = ledge.top - RISING_SWEEP.over
+      run.bottom = ledge.top + RISING_SWEEP.under
+    } else {
+      run.top = floor - (run.variant === 0 ? 24 : HIGH_SWEEP.top)
+      run.bottom = floor - (run.variant === 0 ? 0 : HIGH_SWEEP.bottom)
+    }
     show(run, env, {
       shape: 'rect',
       x: run.targetX,
@@ -431,13 +470,23 @@ const projectileFan: AttackKind = {
 }
 
 // Charge: the boss dashes along the lane it showed, toward the player's side of the arena. Only its
-// lower body hurts, so a well-timed jump or dash clears it.
+// lower body hurts, so a well-timed jump or dash clears it. Against a player who camps on a platform
+// the boss leaps to platform height first and charges through the air there, over the floor, which
+// stays safe.
 const CHARGE_HEIGHT = 56
+// How fast the boss sinks back after a charge at platform height, units per second.
+const CHARGE_SINK = 360
+
+// Height of the feet during the charge.
+function chargeLift(run: AttackRun, env: AttackEnv): number {
+  return run.ledge ? env.arena.floorY - run.ledge.top : 0
+}
 
 const charge: AttackKind = {
   begin(run, env) {
     const { arena, body } = env
     run.dir = faceToward(env, env.player.position().x)
+    run.ledge = isCamping(env.perch) ? env.perch.ledge : null
     const edge = body.x + run.dir * (body.hurtW / 2)
     const toWall = run.dir === 1 ? arena.right - edge : edge - arena.left
     run.length = Math.max(40, run.spec.heavy ? toWall : Math.min(280 * env.reach, toWall))
@@ -446,7 +495,7 @@ const charge: AttackKind = {
     show(run, env, {
       shape: 'rect',
       x: edge,
-      y: arena.floorY - CHARGE_HEIGHT / 2,
+      y: arena.floorY - chargeLift(run, env) - CHARGE_HEIGHT / 2,
       w: run.length,
       h: CHARGE_HEIGHT,
       fill: run.dir === 1 ? 'right' : 'left',
@@ -454,9 +503,15 @@ const charge: AttackKind = {
   },
   windup(run, env, progress) {
     env.body.lean = -run.dir * 0.2 * progress
+    if (!run.ledge) return
+    // Up to the lane in the last LEAP_MS, so the boss is there when it fills.
+    const leapMs = Math.min(run.windupMs, LEAP_MS)
+    const u = clamp((run.elapsedMs - (run.windupMs - leapMs)) / leapMs, 0, 1)
+    env.body.lift = env.hover + (chargeLift(run, env) - env.hover) * u + 4 * u * (1 - u) * 16
   },
   fire(run, env) {
     const { body } = env
+    if (run.ledge) body.lift = chargeLift(run, env)
     body.lean = run.dir * 0.12
     run.speed = run.spec.heavy ? 560 : 660
     const travelMs = (Math.abs(run.targetX - body.x) / run.speed) * 1000
@@ -472,7 +527,10 @@ const charge: AttackKind = {
   },
   active(run, env, dtMs) {
     const { body } = env
-    if ((run.targetX - body.x) * run.dir <= 0) return
+    if ((run.targetX - body.x) * run.dir <= 0) {
+      if (run.ledge) body.lift = Math.max(env.hover, body.lift - CHARGE_SINK * (dtMs / 1000))
+      return
+    }
     body.x += run.dir * run.speed * (dtMs / 1000)
     if ((run.targetX - body.x) * run.dir <= 0) body.x = run.targetX
   },
@@ -531,7 +589,8 @@ const rain: AttackKind = {
   begin(run, env) {
     const { arena } = env
     run.dir = faceToward(env, env.player.position().x)
-    run.variant = run.spec.heavy && hasLedges(env) && env.rng.chance(0.4) ? 1 : 0
+    // A player who camps on a platform always gets the platform rain.
+    run.variant = run.spec.heavy && hasLedges(env) && (isCamping(env.perch) || env.rng.chance(0.4)) ? 1 : 0
     if (run.variant === 1) {
       for (const p of arena.platforms) show(run, env, { shape: 'rect', x: p.x + p.w / 2, y: p.top - RAIN_BAND / 2, w: p.w + 12, h: RAIN_BAND, fill: 'wide' })
       return
@@ -579,7 +638,10 @@ const beam: AttackKind = {
   begin(run, env) {
     const { arena, body } = env
     run.dir = faceToward(env, env.player.position().x)
-    run.variant = run.spec.heavy && hasLedges(env) && env.rng.chance(1 / 3) ? 2 : env.rng.chance(0.5) ? 0 : 1
+    // A player who camps on a platform gets the high beam more often, and never the level one.
+    const camping = isCamping(env.perch)
+    const high = run.spec.heavy && hasLedges(env) && env.rng.chance(camping ? 0.5 : 1 / 3)
+    run.variant = high ? 2 : camping ? 1 : env.rng.chance(0.5) ? 0 : 1
     if (run.variant === 2) {
       beginHighBeam(run, env)
       return
@@ -693,7 +755,7 @@ const shockwave: AttackKind = {
         const stop = dir === 1 ? part.to : part.from
         const at = (Math.abs(start - edge) / WAVE_SPEED) * 1000
         const lifeMs = (Math.abs(stop - start) / WAVE_SPEED) * 1000
-        run.waves.push({ at, x: start, dir, lifeMs, fired: false })
+        run.waves.push({ at, x: start, dir, lifeMs, fired: false, height: 0 })
         end = Math.max(end, at + lifeMs)
       }
     }
@@ -724,8 +786,21 @@ const shockwave: AttackKind = {
 
 // Pillars: columns burst from the floor in a row, one under the player and the others a fixed
 // pitch apart, so the gaps between them are the safe spots. A light version raises three columns
-// around the player.
+// around the player. A column under a platform stops at its underside, unless the player camps up
+// there: then it bursts through the platform and hits a player standing on it, and the gaps stay
+// safe on the platforms as on the floor.
 const PILLAR = { w: 32, h: 64, pitch: 112 }
+// How far a column that bursts through a platform rises over it.
+const PILLAR_OVER = 52
+
+function pillarHeight(env: AttackEnv, x: number, camping: boolean): number {
+  for (const p of env.arena.platforms) {
+    if (x + PILLAR.w / 2 <= p.x || x - PILLAR.w / 2 >= p.x + p.w) continue
+    const lift = env.arena.floorY - p.top
+    return camping ? lift + PILLAR_OVER : lift - PLATFORM_THICKNESS
+  }
+  return PILLAR.h
+}
 
 const pillars: AttackKind = {
   begin(run, env) {
@@ -735,11 +810,13 @@ const pillars: AttackKind = {
     run.waves.length = 0
     const half = PILLAR.w / 2
     const reach = run.spec.heavy ? Infinity : PILLAR.pitch
+    const camping = isCamping(env.perch)
     const first = playerX - Math.floor((playerX - arena.left - half) / PILLAR.pitch) * PILLAR.pitch
     for (let x = first; x <= arena.right - half; x += PILLAR.pitch) {
       if (Math.abs(x - playerX) > reach) continue
-      run.waves.push({ at: 0, x, dir: 1, lifeMs: 0, fired: false })
-      show(run, env, { shape: 'rect', x, y: arena.floorY, w: PILLAR.w, h: PILLAR.h, fill: 'up' })
+      const height = pillarHeight(env, x, camping)
+      run.waves.push({ at: 0, x, dir: 1, lifeMs: 0, fired: false, height })
+      show(run, env, { shape: 'rect', x, y: arena.floorY, w: PILLAR.w, h: height, fill: 'up' })
     }
   },
   windup(run, env, progress) {
@@ -749,7 +826,7 @@ const pillars: AttackKind = {
     const floor = env.arena.floorY
     for (const column of run.waves) {
       const away: Facing = env.player.position().x >= column.x ? 1 : -1
-      hit(run, env, { kind: 'rect', x: column.x - PILLAR.w / 2, y: floor - PILLAR.h, w: PILLAR.w, h: PILLAR.h }, 260, knockback(away, env.self.facing(), 120, 260))
+      hit(run, env, { kind: 'rect', x: column.x - PILLAR.w / 2, y: floor - column.height, w: PILLAR.w, h: column.height }, 260, knockback(away, env.self.facing(), 120, 260))
     }
     run.activeMs = 300
   },
