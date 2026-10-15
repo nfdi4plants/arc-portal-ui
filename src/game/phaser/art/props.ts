@@ -77,6 +77,48 @@ export function doorArt(scene: Phaser.Scene, width: number, height: number): Spr
   })
 }
 
+const PORTAL_SWIRL_SIZE = 30
+
+// The swirl of a forming portal, drawn on its own so the boss arena can grow and spin it in front
+// of the arch. The sprite turns around its centre.
+export function portalSwirlArt(scene: Phaser.Scene): SpriteRef {
+  const s = PORTAL_SWIRL_SIZE
+  const c = s / 2
+  return spriteFrom(scene, {
+    key: 'scribble:portal:swirl',
+    width: s,
+    height: s,
+    anchors: { weapon: { x: 0, y: -c }, head: { x: 0, y: -s } },
+    draw(pen) {
+      pen.glow(c, c, c, 'rgba(75, 174, 214, 0.5)')
+      for (let arm = 0; arm < 2; arm++) {
+        const swirl: Pt[] = []
+        for (let i = 0; i <= 12; i++) {
+          const angle = i * 0.62 + arm * Math.PI
+          const radius = 1 + i * 1.05
+          swirl.push([c + Math.cos(angle) * radius, c + Math.sin(angle) * radius])
+        }
+        pen.curve(swirl, { line: arm === 0 ? YELLOW : CREAM, weight: 1, rough: 0.4 })
+      }
+      pen.dot(c, c, 1.4, CREAM)
+    },
+  })
+}
+
+// A spark that spirals into a forming portal.
+export function portalSparkArt(scene: Phaser.Scene): SpriteRef {
+  return spriteFrom(scene, {
+    key: 'scribble:portal:spark',
+    width: 7,
+    height: 7,
+    anchors: { weapon: { x: 0, y: -3.5 }, head: { x: 0, y: -7 } },
+    draw(pen) {
+      pen.glow(3.5, 3.5, 3.5, 'rgba(245, 190, 0, 0.45)')
+      sparkle(pen, 3.5, 3.5, 2.6, YELLOW)
+    },
+  })
+}
+
 const SHARD_WIDTH = 14
 const SHARD_HEIGHT = 16
 

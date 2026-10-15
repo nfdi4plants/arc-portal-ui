@@ -28,8 +28,10 @@ time. `model/run/` turns the index into a `RunPlan`:
    visible tells (the node's own annotations), a longer stagger and a smaller stagger bar
    (`bosses/stagger.ts`): a boss at quality 0 is nearly unstaggerable.
 
-The node after each segment is a boss, see [Bosses](#bosses). The player is healed to full before
-the final boss. The same annotation always has the same look and kind, because the monster is
+The node after each segment is a boss, see [Bosses](#bosses). A beaten node boss leaves a portal to
+a waystation, see [The waystation](#the-waystation), and the exit portal of the waystation leads to
+the next step, or to the final boss after the last node. The player is healed to full before the
+final boss. The same annotation always has the same look and kind, because the monster is
 derived from a hash of the annotation. Its stats scale with the segment depth,
 `1 + 0.12 * segmentIndex`.
 
@@ -71,6 +73,18 @@ from the genome of its own step, so the fight replays the path: the first heavy 
 slots, the first two mechanics and the theme, plus the shared Crate Collapse. A phase moves like the
 archetype of its genome and uses its step's telegraph timing.
 
+When a node boss falls, its fragments drop where it fell, and a portal forms in the middle of the
+arena on the floor, wherever the boss died (`phaser/scenes/bossPortal.ts`, timeline in
+`portalSpawn.ts`). Forming takes 3 s (`PORTAL_SPAWN_MS`): a swirl grows from a point, sparks spiral
+in and the arch draws in from the floor up, dim and flickering under an "Opening…" sign. Then a
+flash, a pulse of the swirl and the sign "To the waystation" with the next step show that it is
+open. Only from then on does walking into it lead on, so a mage standing on the spot goes through
+when it opens, and nobody goes through by chance before. The portal clock runs with the world, so
+the level-up screen for the boss XP, the pause menu and hit-stop hold it. A platform over the middle
+of the arena may cross the arch. The arch is drawn behind it, and the enter box is the lower two
+tiles of the arch, so a mage standing on that platform stays put. The textures (arch, swirl, spark,
+glow) are drawn when the fight starts, and the sparks are created once per portal.
+
 In the fight, badges over the boss show its mechanics and its theme (`art/bossMarkers.ts`, drawn
 once and cached), and the body is the cached archetype texture drawn at the genome size. In the
 pause menu the boss can be hovered and clicked like a mob. The panel lists every slot: the
@@ -99,8 +113,9 @@ src/game/
     player/weapons/ the other weapons, mechanics, legendaries and abilities (the loadout)
     mobs/          mob AI, passives, pickups and speech bubbles
     bosses/        node bosses, the final boss, telegraphs and safe zones
-    scenes/        Boot, Stretch, Boss, FinalBoss, Hud, LevelUp, Store, Death and Victory, the run flow
-                   (RunDirector, RunContext) and the level generator
+    scenes/        Boot, Stretch, Boss, Waystation, FinalBoss, Hud, LevelUp, Store, Death and Victory,
+                   the run flow (RunDirector, RunContext), the waystation encounters and the level
+                   generator
     dev/           Storybook sandboxes
     config.ts      the Phaser game config that the game and the sandboxes share
     color.ts       cssColor, a number to "#rrggbb" for Phaser text styles
@@ -109,7 +124,28 @@ src/game/
 ```
 
 `RunDirector` holds the run state (build, rng, clock, stage) free of Phaser. Scenes come and go per
-stage and read it through `RunContext`.
+stage and read it through `RunContext`. The stages run stretch, boss, waystation for every step,
+then the final boss and the victory: `completeStretch`, `defeatBoss`, `leaveWaystation` and
+`defeatFinalBoss` move the run on.
+
+## The waystation
+
+After every node boss, never the final boss, the mage walks through the boss's portal into a
+waystation (`phaser/scenes/WaystationScene.ts`): one room about 1.15 view widths wide, without
+platforms, with the tiles and background of the boss's step. The mage enters on the left, where the
+portal it came through closes, and leaves through the exit portal on the right, whose sign names the
+next step (`portalLabel`). There is no enemy, no XP and no pit. The HUD, the pause menu and the
+level history work as everywhere, and the path on the HUD marks the beaten node.
+
+What stands in the room comes from `rollEncounters(runSeed, afterSegmentIndex)` in
+`model/run/encounters.ts`. For now that is always exactly the FAIR trader. The kinds fill the slots
+in the order of `ENCOUNTER_SLOTS` (centre, left, right), spread over the floor between the entrance
+and the exit. In the scene, `ENCOUNTER_SPAWNERS` in `phaser/scenes/encounters.ts` maps each kind to
+a spawner that puts it at the x of its slot and returns an `Encounter`: an interaction zone, the
+prompt word, and hooks for the arrival, the approach, the interaction and the closed overlay. The
+scene shows the prompt with the key of `up` and calls `interact` when it is pressed in the zone. A
+new chance encounter is a new `EncounterKind`, an entry with its chance in `CHANCE_ENCOUNTERS` and
+a spawner.
 
 ## Phantoms
 
@@ -213,10 +249,10 @@ texture, `fragmentArt` in `phaser/art/props.ts`). `RunDirector.fragments` keeps 
 whole run, a pit costs none, and the HUD shows it with the same shard under the right end of the
 hp bar.
 
-After a node boss, never the final boss, the FAIR trader puts up a stall next to the portal in the
-arena (`traderArt` in `phaser/art/props.ts`). Near the stall the prompt shows the key of the `up`
-action (W by default). Pressing it holds the world and opens `StoreScene`. The pause key, a move key
-or the Leave button close it again, and the portal works as before.
+The FAIR trader keeps a stall in the middle of every waystation (`traderArt` in
+`phaser/art/props.ts`) and calls out a greeting when the mage arrives. Near the stall the prompt
+shows the key of the `up` action (W by default). Pressing it holds the world and opens `StoreScene`.
+The pause key, a move key or the Leave button close it again, and the trader says goodbye.
 
 The stock is 4 cards drawn like a level-up offer (`rollStock` in `model/progression/store.ts`, with
 the same canApply rules and at least one card that is not a weapon), but with a fixed 3% legendary
@@ -288,13 +324,15 @@ Click the canvas to give it keyboard focus.
 | Store prices, stock size and legendary chance | `model/progression/store.ts` (`PRICES`, `STOCK_SIZE`, `STORE_LEGENDARY_CHANCE`) |
 | Trader lines and story lines | `model/progression/trader.ts` (`TRADE_LINES`, `TRADER_LORE`) |
 | Fragment pop, bob and magnet | `phaser/mobs/pickups.ts` |
-| Trader distance to the portal, trade reach, goodbye time | `phaser/scenes/BossScene.ts` |
+| Trade reach, greeting and goodbye time | `phaser/scenes/encounters.ts` |
+| Waystation width and encounter slot positions | `phaser/scenes/WaystationScene.ts` (`ROOM_VIEWS`, `SLOT_AT`) |
 | Staff timing and damage | `phaser/player/staffMoveset.ts` |
 | Other weapons | `phaser/player/weapons/light.ts`, `phaser/player/weapons/heavy.ts` |
 | Weapon numbers on the level-up screen (follow the movesets, a test compares them) | `model/progression/weaponStats.ts` |
 | Attack buffer and combo grace | `phaser/player/attacks.ts` |
 | Ability cooldowns, reach and damage | `phaser/player/weapons/abilities.ts` |
 | Boss freeze and slow rules | `phaser/combat/status.ts` |
+| Boss portal timeline (forming time, flash, sparks) | `phaser/scenes/portalSpawn.ts` |
 | Player i-frames and flinch | `phaser/player/Player.ts` |
 | Pit damage, banner time, mob wake distance, monster prewarm rate | `phaser/scenes/StretchScene.ts` |
 | Level layout | `phaser/scenes/levelGen.ts` |
