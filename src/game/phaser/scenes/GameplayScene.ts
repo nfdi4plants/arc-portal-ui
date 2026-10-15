@@ -14,8 +14,11 @@ import { followView, viewForBox, type View } from '../view'
 import { MOB_INFO_EVENT } from './mobInfoEvent'
 import type { GameplayControl, RunContext } from './context'
 import { PIT_KILLER, type RunDirector } from './RunDirector'
+import type { DatenkrakeDeal } from '../../model/progression'
 
-type Hold = 'banner' | 'levelUp' | 'store' | 'pause' | 'external' | 'over'
+// 'encounter' holds the world while a waystation encounter plays out on its own (the Datenkrake's
+// grab), 'datenkrake' while its overlay is open.
+type Hold = 'banner' | 'levelUp' | 'store' | 'datenkrake' | 'encounter' | 'pause' | 'external' | 'over'
 
 export interface LevelSetup {
   colliders: Phaser.Types.Physics.Arcade.ArcadeColliderType[]
@@ -64,6 +67,8 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
   protected onShutdown(): void {}
   // After the FAIR trade store closed, whichever way the player left it.
   protected onStoreClosed(): void {}
+  // After the Datenkrake overlay closed with a choice.
+  protected onDatenkrakeClosed(): void {}
   // The mobs and bosses the pause menu lets the player inspect, and the step the mobs come from.
   protected inspectableMobs(): InspectTarget[] {
     return []
@@ -129,6 +134,8 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
     })
     this.loadout.sync(director.build)
     this.combat.on('kill', (event) => this.onKill(event))
+    // Data Leak: a hit spills fragments.
+    this.player.on('damaged', () => this.director.leakFragments())
     this.combat.on('hit', (event) => this.onHit(event))
     this.inspector = createInspector(this, (mob) => this.pickMob(mob))
     // Drawn here, not in the HUD, so the mob under the pointer can sit above it at full brightness.
@@ -193,7 +200,15 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
       if (pressed.has('pause') || pressed.has('left') || pressed.has('right')) this.closeStore()
       return
     }
+    // In the Datenkrake's grip there is nothing to do but choose.
+    if (this.holds.has('datenkrake') || this.holds.has('encounter')) return
     if (pressed.has('pause')) this.togglePause()
+  }
+
+  // The direction left or right holds, 0 for neither or both. Valid inside stepWorld.
+  protected heldDirection(): -1 | 0 | 1 {
+    const held = this.frame.held
+    return held.has('left') === held.has('right') ? 0 : held.has('right') ? 1 : -1
   }
 
   // Went down since the previous step. Valid inside stepWorld.
@@ -202,7 +217,8 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
   }
 
   private togglePause() {
-    if (this.holds.has('levelUp') || this.holds.has('store') || this.holds.has('over') || this.holds.has('external')) return
+    if (this.holds.has('levelUp') || this.holds.has('store') || this.holds.has('datenkrake') || this.holds.has('encounter')) return
+    if (this.holds.has('over') || this.holds.has('external')) return
     const paused = !this.holds.has('pause')
     this.setHold('pause', paused)
     this.inspector?.setActive(paused, paused ? this.inspectableMobs() : [])
@@ -262,6 +278,19 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
     this.ctx.openStore(index)
   }
 
+  // Holds the world while an encounter plays an animation of its own.
+  protected holdForEncounter(on: boolean) {
+    this.setHold('encounter', on)
+  }
+
+  // Opens the Datenkrake overlay of the waystation after node boss `index`. It may open while the
+  // encounter hold of the grab is still on.
+  protected openDatenkrake(index: number) {
+    if (this.holds.has('over') || this.holds.has('datenkrake')) return
+    this.setHold('datenkrake', true)
+    this.ctx.openDatenkrake(index)
+  }
+
   protected die(killer: KillerInfo) {
     if (this.holds.has('over')) return
     this.setHold('over', true)
@@ -306,7 +335,11 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
       this.die(event.attacker.killer ?? PIT_KILLER)
       return
     }
-    if (event.attacker.team === 'player') this.gainXp(this.xpFor(event.target))
+    if (event.attacker.team !== 'player') return
+    // Accept All Cookies: every kill raises max HP for good.
+    this.director.setHp(this.player.hp())
+    if (this.director.eatCookie()) this.player.setBuild(this.director.build)
+    this.gainXp(this.xpFor(event.target))
   }
 
   // Shots a beaten boss fired earlier must not kill the player during the outro. An unregistered
@@ -350,6 +383,7 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
     if (this.director.pendingLevelUps === 0) {
       this.ctx.closeLevelUp()
       this.setHold('levelUp', false)
+      this.loadout.readEula()
     }
   }
 
@@ -358,6 +392,27 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
     this.ctx.closeStore()
     this.setHold('store', false)
     this.onStoreClosed()
+  }
+
+  // "Submit": the Datenkrake swaps an augment for a corrupted one. The overlay shows the deal.
+  submitToDatenkrake(index: number): DatenkrakeDeal | null {
+    this.director.setHp(this.player.hp())
+    const deal = this.director.submitToDatenkrake(index)
+    if (!deal) return null
+    this.player.setBuild(this.director.build)
+    this.loadout.sync(this.director.build)
+    return deal
+  }
+
+  fightDatenkrake(index: number) {
+    this.director.fightDatenkrake(index)
+  }
+
+  closeDatenkrake() {
+    if (!this.holds.has('datenkrake')) return
+    this.ctx.closeDatenkrake()
+    this.setHold('datenkrake', false)
+    this.onDatenkrakeClosed()
   }
 
   // Only the card applies, like a level-up card without the level: hp, level and XP stay.

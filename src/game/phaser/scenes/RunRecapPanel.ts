@@ -1,8 +1,8 @@
 import type Phaser from 'phaser'
 import { PALETTE } from '../../contracts/constants'
 import type { PlayerBuild } from '../../contracts/progression'
-import { CARDS } from '../../model/progression'
-import { RARITY_COLOR } from '../art'
+import { CARDS, corruptedAugment } from '../../model/progression'
+import { CORRUPTED_COLOR, RARITY_COLOR } from '../art'
 import type { View } from '../view'
 import { BuildPanel } from './BuildPanel'
 import { fitLine, runRecap, type LevelUpRecord, type RecapEntry } from './levelHistory'
@@ -82,7 +82,7 @@ export class RunRecapPanel {
     this.scene = scene
     this.entries = runRecap(records)
     const bought = this.entries.filter((entry) => entry.tag === 'Bought').length
-    const taken = this.entries.filter((entry) => !entry.skipped).length
+    const taken = this.entries.filter((entry) => !entry.skipped && !entry.datenkrake).length
     this.summaryLine = taken === 0 ? '' : `${plural(taken, 'augment')}${bought > 0 ? `, ${bought} bought at the FAIR trade store` : ''}. Hover one for its card.`
     this.blocker = scene.add.rectangle(0, 0, 1, 1, PALETTE.navy, 0.6).setOrigin(0, 0).setVisible(false)
     onClick(scene, this.blocker, () => this.setOpen(false))
@@ -254,7 +254,9 @@ export class RunRecapPanel {
   private refreshFooter(): void {
     const entry = this.entries[this.hovered]
     const card = entry?.cardId ? CARDS.find((c) => c.id === entry.cardId) : undefined
-    this.footer.setText(fitLine(card ? `${card.name}: ${card.description}` : this.summaryLine, this.footerChars))
+    const augment = entry?.datenkrake === 'corrupted' && entry.cardId ? corruptedAugment(entry.cardId) : undefined
+    const text = augment ? `${augment.name}: ${augment.boon} Curse: ${augment.curse}` : card ? `${card.name}: ${card.description}` : this.summaryLine
+    this.footer.setText(fitLine(text, this.footerChars))
   }
 
   private refresh(): void {
@@ -270,7 +272,7 @@ export class RunRecapPanel {
       if (!visible) continue
       const top = y + i * this.rowH
       const alpha = entry.skipped ? 0.45 : 1
-      row.marker.setPosition(x, top + 1).setFillStyle(entry.rarity ? RARITY_COLOR[entry.rarity] : GREY).setAlpha(alpha)
+      row.marker.setPosition(x, top + 1).setFillStyle(markerColor(entry)).setAlpha(alpha)
       row.tag.setText(entry.tag).setPosition(x + 6, top + 2).setAlpha(alpha)
       const nameX = x + 6 + tagW
       const room = w - (nameX - x)
@@ -293,4 +295,10 @@ export class RunRecapPanel {
     }
     this.refreshFooter()
   }
+}
+
+// The Datenkrake's entries glitch purple. What it took keeps the rarity of the card.
+function markerColor(entry: RecapEntry): number {
+  if (entry.datenkrake === 'corrupted' || entry.datenkrake === 'fought') return CORRUPTED_COLOR
+  return entry.rarity ? RARITY_COLOR[entry.rarity] : GREY
 }

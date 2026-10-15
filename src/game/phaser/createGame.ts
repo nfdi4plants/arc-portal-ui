@@ -4,6 +4,7 @@ import { baseGameConfig } from './config'
 import { createGameHandle, createLoopPause } from './gameHandle'
 import { BootScene } from './scenes/BootScene'
 import { BossScene } from './scenes/BossScene'
+import { DatenkrakeScene } from './scenes/DatenkrakeScene'
 import { RunContext } from './scenes/context'
 import { DeathScene } from './scenes/DeathScene'
 import { FinalBossScene } from './scenes/FinalBossScene'
@@ -63,6 +64,7 @@ export const createGame: CreateGame = (parent, { bindings }) => {
     new HudScene(ctx),
     new LevelUpScene(ctx),
     new StoreScene(ctx),
+    new DatenkrakeScene(ctx),
     new DeathScene(ctx),
     new VictoryScene(ctx),
   ]

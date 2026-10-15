@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import { DEPTH, PALETTE, SCENE, TILE } from '../../contracts/constants'
 import { bindingLabel } from '../../model/input'
 import { ENCOUNTER_SLOTS, rollEncounters } from '../../model/run'
-import { applySpriteRef, doorArt, traderArt } from '../art'
+import { applySpriteRef, datenkrakeArmArt, datenkrakeArt, doorArt, traderArt } from '../art'
 import type { Arena } from '../bosses'
 import { cssColor } from '../color'
 import type { View } from '../view'
@@ -25,7 +25,7 @@ const ENTRANCE_CLOSE_MS = 700
 const SLOT_AT = { left: 0.18, centre: 0.5, right: 0.82 } as const
 
 // The waystation after a node boss: one quiet room of the boss's theme. The mage comes in on the
-// left, meets the encounters of `rollEncounters` (always the FAIR trader) and leaves through the
+// left, meets the encounters of `rollEncounters` (the FAIR trader, sometimes the Datenkrake) and leaves through the
 // portal on the right, which leads to the next step or to the ARC itself.
 export class WaystationScene extends GameplayScene {
   private index = 0
@@ -85,10 +85,24 @@ export class WaystationScene extends GameplayScene {
 
     // Drawn up front, so the first encounter does not stall the frame.
     traderArt(this)
-    const host: EncounterHost = { scene: this, director, floorY: floor, openStore: () => this.openStore(index) }
+    const kinds = rollEncounters(director.plan.seed, index)
+    if (kinds.includes('datenkrake')) {
+      datenkrakeArt(this)
+      datenkrakeArmArt(this)
+    }
+    const host: EncounterHost = {
+      scene: this,
+      director,
+      index,
+      floorY: floor,
+      player: this.player,
+      openStore: () => this.openStore(index),
+      hold: (on) => this.holdForEncounter(on),
+      openDatenkrake: () => this.openDatenkrake(index),
+    }
     const from = this.spawnX + 2 * T
     const to = this.exit.x - 2 * T
-    rollEncounters(director.plan.seed, index).forEach((kind, i) => {
+    kinds.forEach((kind, i) => {
       const x = Math.round(from + (to - from) * SLOT_AT[ENCOUNTER_SLOTS[i]])
       this.encounters.push(ENCOUNTER_SPAWNERS[kind](host, x))
     })
@@ -110,6 +124,10 @@ export class WaystationScene extends GameplayScene {
     this.parallax?.layout(view)
   }
 
+  protected onFrame(deltaMs: number) {
+    for (const encounter of this.encounters) encounter.frame?.(deltaMs)
+  }
+
   protected stepWorld(dtMs: number) {
     const box = this.player.hurtbox()
     let near = -1
@@ -118,14 +136,21 @@ export class WaystationScene extends GameplayScene {
       encounter.update(dtMs)
       if (near < 0 && !encounter.zone.isEmpty() && Phaser.Geom.Intersects.RectangleToRectangle(box, encounter.zone)) near = i
     }
+    const encounter = this.encounters[near]
     if (near !== this.nearIndex) {
       this.encounters[this.nearIndex]?.near(false)
-      this.encounters[near]?.near(true)
+      encounter?.near(true)
       this.nearIndex = near
+      // The Datenkrake does not wait for a key.
+      if (encounter?.auto) {
+        this.showPrompt(null)
+        this.engaged = encounter
+        encounter.interact()
+        return
+      }
     }
-    const encounter = this.encounters[near]
-    this.showPrompt(encounter && !encounter.talking() ? encounter : null)
-    if (encounter && this.pressed('up')) {
+    this.showPrompt(encounter && !encounter.auto && !encounter.talking() ? encounter : null)
+    if (encounter && !encounter.auto && this.pressed('up')) {
       this.showPrompt(null)
       this.engaged = encounter
       encounter.interact()
@@ -153,6 +178,11 @@ export class WaystationScene extends GameplayScene {
   }
 
   protected onStoreClosed() {
+    this.engaged?.closed()
+    this.engaged = null
+  }
+
+  protected onDatenkrakeClosed() {
     this.engaged?.closed()
     this.engaged = null
   }

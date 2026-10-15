@@ -6,6 +6,7 @@ import type { PlayerHandle } from '../../contracts/player'
 import type { RunPlan } from '../../contracts/run'
 import type { BossHandle } from '../bosses'
 import type { LoadoutWithStatus } from '../player/weapons'
+import type { DatenkrakeDeal } from '../../model/progression'
 import { getArt } from './art'
 import { RunDirector, type RunStage } from './RunDirector'
 
@@ -27,6 +28,11 @@ export interface GameplayControl {
   // purchase did not happen.
   buyCard(index: number, cardId: string): boolean
   closeStore(): void
+  // The Datenkrake in the waystation after node boss `index`. submitToDatenkrake is null when the
+  // deal cannot happen.
+  submitToDatenkrake(index: number): DatenkrakeDeal | null
+  fightDatenkrake(index: number): void
+  closeDatenkrake(): void
   setBindings(bindings: Bindings): void
 }
 
@@ -37,7 +43,9 @@ export interface HudControl {
 
 const GAMEPLAY_SCENES = [SCENE.stretch, SCENE.boss, SCENE.waystation, SCENE.finalBoss]
 const GAMEPLAY_SCENE_OF = { stretch: SCENE.stretch, boss: SCENE.boss, waystation: SCENE.waystation, finalBoss: SCENE.finalBoss } as const
-const RUN_SCENES = [...GAMEPLAY_SCENES, SCENE.hud, SCENE.levelUp, SCENE.store, SCENE.death, SCENE.victory]
+const RUN_SCENES = [...GAMEPLAY_SCENES, SCENE.hud, SCENE.levelUp, SCENE.store, SCENE.datenkrake, SCENE.death, SCENE.victory]
+// Overlays that end with the stage they opened in.
+const STAGE_OVERLAYS = [SCENE.levelUp, SCENE.store, SCENE.datenkrake]
 
 // Shared by every scene of one game. It holds the run and switches the scenes when the run
 // moves on to the next stage.
@@ -120,6 +128,14 @@ export class RunContext {
     this.sceneOp('stop', SCENE.store)
   }
 
+  openDatenkrake(index: number): void {
+    this.sceneOp('start', SCENE.datenkrake, { index })
+  }
+
+  closeDatenkrake(): void {
+    this.sceneOp('stop', SCENE.datenkrake)
+  }
+
   private enter(stage: RunStage): void {
     const scenes = this.game?.scene
     if (!scenes) return
@@ -129,24 +145,21 @@ export class RunContext {
       case 'waystation':
       case 'finalBoss': {
         this.stopGameplay(scenes)
-        this.sceneOp('stop', SCENE.levelUp)
-        this.sceneOp('stop', SCENE.store)
+        for (const key of STAGE_OVERLAYS) this.sceneOp('stop', key)
         this.sceneOp('start', GAMEPLAY_SCENE_OF[stage.kind], stage.kind === 'finalBoss' ? {} : { index: stage.index })
         break
       }
       case 'victory':
         this.stopGameplay(scenes)
         this.sceneOp('stop', SCENE.hud)
-        this.sceneOp('stop', SCENE.levelUp)
-        this.sceneOp('stop', SCENE.store)
+        for (const key of STAGE_OVERLAYS) this.sceneOp('stop', key)
         this.sceneOp('start', SCENE.victory)
         break
       case 'dead':
         // The frozen world stays visible behind the death screen.
         for (const key of GAMEPLAY_SCENES) if (scenes.isActive(key)) this.sceneOp('pause', key)
         this.sceneOp('stop', SCENE.hud)
-        this.sceneOp('stop', SCENE.levelUp)
-        this.sceneOp('stop', SCENE.store)
+        for (const key of STAGE_OVERLAYS) this.sceneOp('stop', key)
         this.sceneOp('start', SCENE.death, { killer: stage.killer })
         break
     }

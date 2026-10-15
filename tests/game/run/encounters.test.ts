@@ -8,9 +8,26 @@ describe('rollEncounters', () => {
     }
   })
 
-  it('meets only the trader while there are no chance encounters', () => {
-    expect(CHANCE_ENCOUNTERS).toHaveLength(0)
-    expect(rollEncounters('storybook', 0)).toEqual(['trader'])
+  it('meets the Datenkrake in about two waystations of five, never in the slot of the trader', () => {
+    expect(CHANCE_ENCOUNTERS).toEqual([{ kind: 'datenkrake', chance: 0.4 }])
+    let met = 0
+    const rolls = 2000
+    for (let i = 0; i < rolls; i++) {
+      const kinds = rollEncounters(`run-${i}`, i % 6)
+      if (!kinds.includes('datenkrake')) continue
+      met++
+      // The trader keeps the centre, the kraken stands between it and the exit.
+      expect(kinds).toEqual(['trader', 'datenkrake'])
+      expect(ENCOUNTER_SLOTS[kinds.indexOf('datenkrake')]).toBe('right')
+    }
+    expect(met / rolls).toBeGreaterThan(0.36)
+    expect(met / rolls).toBeLessThan(0.44)
+  })
+
+  it('rolls each waystation of a run on its own', () => {
+    const pattern = Array.from({ length: 12 }, (_, index) => rollEncounters('one run', index).includes('datenkrake'))
+    expect(pattern).toContain(true)
+    expect(pattern).toContain(false)
   })
 
   it('meets the same encounters for the same run and waystation', () => {

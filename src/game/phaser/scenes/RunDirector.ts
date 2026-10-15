@@ -5,9 +5,28 @@ import type { PlayerBuild, PowerUpCard } from '../../contracts/progression'
 import { createRng, type Rng } from '../../contracts/rng'
 import type { RunPlan, Segment } from '../../contracts/run'
 import { bossFromNode, finalBossFromPlan } from '../../model/content'
-import { appendLevelUp, sourceText, storeSourceText, type LevelUpRecord } from './levelHistory'
-import { addXp, applyCard, buyCard, createBossCharge, createBuild, createLinePicker, levelUpSummary, priceOf, rollOffer, rollStock, TRADER_LINES } from '../../model/progression'
-import type { BossCharge, LevelUpSummary, TraderMood } from '../../model/progression'
+import { appendLevelUp, datenkrakeSourceText, sourceText, statStacks, storeSourceText, type LevelUpRecord } from './levelHistory'
+import {
+  addXp,
+  applyCard,
+  buyCard,
+  canSubmit,
+  CARDS,
+  CORRUPTION,
+  corruptedAugment,
+  corruptedCardId,
+  createBossCharge,
+  createBuild,
+  createLinePicker,
+  DATENKRAKE_LINES,
+  levelUpSummary,
+  priceOf,
+  rollOffer,
+  rollStock,
+  submitToDatenkrake,
+  TRADER_LINES,
+} from '../../model/progression'
+import type { BossCharge, DatenkrakeDeal, DatenkrakeMood, LevelUpSummary, TraderMood } from '../../model/progression'
 
 export type RunStage =
   | { kind: 'stretch'; index: number }
@@ -68,6 +87,9 @@ export class RunDirector {
   // fixed from then on.
   private readonly stocks = new Map<number, PowerUpCard[]>()
   private readonly traderLines: Record<TraderMood, () => string>
+  private readonly datenkrakeLines: Record<DatenkrakeMood, () => string>
+  // The waystations whose Datenkrake was dealt with, so leaving and coming back does not repeat it.
+  private readonly datenkrakeDone = new Map<number, 'fought' | 'submitted'>()
   private history: LevelUpRecord[] = []
   // The build just before the first of the pending levels, for the level-up summary.
   private levelUpBase: PlayerBuild | null = null
@@ -87,6 +109,10 @@ export class RunDirector {
       poor: createLinePicker(TRADER_LINES.poor, lines.fork('poor')),
       unusable: createLinePicker(TRADER_LINES.unusable, lines.fork('unusable')),
     }
+    const kraken = this.rng.fork('datenkrake-lines')
+    const pickers = {} as Record<DatenkrakeMood, () => string>
+    for (const mood of Object.keys(DATENKRAKE_LINES) as DatenkrakeMood[]) pickers[mood] = createLinePicker(DATENKRAKE_LINES[mood], kraken.fork(mood))
+    this.datenkrakeLines = pickers
   }
 
   start(): void {
@@ -187,7 +213,76 @@ export class RunDirector {
   }
 
   addFragments(amount: number): void {
-    if (amount > 0 && !this.isOver()) this.fragments += amount
+    // Data Leak: every fragment counts three times.
+    const gain = this.build.corrupted.includes('dataLeak') ? CORRUPTION.dataLeak.gain : 1
+    if (amount > 0 && !this.isOver()) this.fragments += amount * gain
+  }
+
+  // Data Leak: a hit on the mage spills fragments. Returns how many were lost.
+  leakFragments(): number {
+    if (!this.build.corrupted.includes('dataLeak') || this.isOver()) return 0
+    const lost = Math.min(this.fragments, CORRUPTION.dataLeak.leakPerHit)
+    this.fragments -= lost
+    return lost
+  }
+
+  // Accept All Cookies: a kill raises max HP for the rest of the run. The scene writes the hp back
+  // first. False without the augment.
+  eatCookie(): boolean {
+    if (!this.build.corrupted.includes('acceptAllCookies') || this.isOver()) return false
+    const gain = CORRUPTION.acceptAllCookies.maxHpPerKill
+    this.build = { ...this.build, hp: this.build.hp + gain, stats: { ...this.build.stats, maxHp: this.build.stats.maxHp + gain } }
+    return true
+  }
+
+  datenkrakeLine(mood: DatenkrakeMood): string {
+    return this.datenkrakeLines[mood]()
+  }
+
+  // The Datenkrake in the waystation after node boss `index` grabs only once, and only a build it
+  // can take something from.
+  datenkrakeWaits(index: number): boolean {
+    return !this.datenkrakeDone.has(index)
+  }
+
+  // How the mage dealt with the Datenkrake after node boss `index`, null while it still waits.
+  datenkrakeOutcome(index: number): 'fought' | 'submitted' | null {
+    return this.datenkrakeDone.get(index) ?? null
+  }
+
+  datenkrakeHasPrey(): boolean {
+    return canSubmit(this.build, statStacks(this.history))
+  }
+
+  // "Fight back": the mage keeps everything, the history keeps the story.
+  fightDatenkrake(index: number): void {
+    if (this.datenkrakeDone.has(index)) return
+    this.datenkrakeDone.set(index, 'fought')
+    this.recordDatenkrake(index, { cardId: null, cardName: null, rarity: null, datenkrake: 'fought' })
+  }
+
+  // "Submit": a random eligible augment goes, a random corrupted augment comes. Seeded per
+  // waystation, so the same run and choices meet the same deal. Null when the deal cannot happen.
+  submitToDatenkrake(index: number): DatenkrakeDeal | null {
+    if (this.datenkrakeDone.has(index)) return null
+    const deal = submitToDatenkrake(this.build, statStacks(this.history), this.rng.fork(`datenkrake/${index}`))
+    if (!deal) return null
+    this.datenkrakeDone.set(index, 'submitted')
+    this.build = deal.build
+    const taken = CARDS.find((card) => card.id === deal.taken)
+    this.recordDatenkrake(index, { cardId: deal.taken, cardName: taken?.name ?? deal.taken, rarity: taken?.rarity ?? null, datenkrake: 'taken' })
+    const given = corruptedAugment(deal.given)
+    this.recordDatenkrake(index, { cardId: corruptedCardId(deal.given), cardName: given?.name ?? deal.given, rarity: null, datenkrake: 'corrupted' })
+    return deal
+  }
+
+  private recordDatenkrake(index: number, entry: Pick<LevelUpRecord, 'cardId' | 'cardName' | 'rarity' | 'datenkrake'>): void {
+    this.history = appendLevelUp(this.history, {
+      ...entry,
+      level: this.build.level,
+      offered: [],
+      source: datenkrakeSourceText(this.plan, index, this.bossSpec(index).label),
+    })
   }
 
   // The cards the trader in the waystation after node boss `index` still has. Rolled against the build of the first
