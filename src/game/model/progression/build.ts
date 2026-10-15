@@ -1,6 +1,7 @@
 import type {
   AddXp,
   ApplyCard,
+  CorruptedId,
   CreateBuild,
   LegendaryId,
   MechanicId,
@@ -53,6 +54,7 @@ export const createBuild: CreateBuild = () => ({
   legendaries: [],
   abilitySlots: [null, null, null, null],
   offerSize: 3,
+  corrupted: [],
 })
 
 export const xpForNextLevel: XpForNextLevel = (level) => 20 + 10 * (level - 1)
@@ -68,6 +70,8 @@ export const addXp: AddXp = (build, amount) => {
     levelsGained += 1
     maxHp = Math.round(maxHp * 1.1)
     hp = Math.min(maxHp, hp + Math.round(0.3 * maxHp))
+    // Terms of Service: every level-up heals to full (and makes the mage read the EULA afterwards).
+    if (build.corrupted.includes('termsOfService')) hp = maxHp
   }
   return {
     build: { ...build, level, xp, hp, stats: { ...build.stats, maxHp } },
@@ -198,9 +202,18 @@ const EFFECTS = new Map<string, Effect>([
   ['legendary.labCoat', legendary('labCoat')],
 ])
 
+// Cards a corrupted augment makes useless are not offered: no jump means no extra jumps or glide,
+// and Rogue Admin crits every hit already.
+const BLOCKED_BY: Partial<Record<CorruptedId, readonly string[]>> = {
+  deprecatedJump: ['mechanic.doubleJump', 'mechanic.wallJump', 'mechanic.hatGlide'],
+  rogueAdmin: ['stat.keenEye'],
+}
+
+const blocked = (build: PlayerBuild, cardId: string): boolean => build.corrupted.some((id) => BLOCKED_BY[id]?.includes(cardId) ?? false)
+
 export const canApply = (build: PlayerBuild, cardId: string): boolean => {
   const effect = EFFECTS.get(cardId)
-  return effect !== undefined && effect.applies(build)
+  return effect !== undefined && effect.applies(build) && !blocked(build, cardId)
 }
 
 export const applyCard: ApplyCard = (build, cardId) => {

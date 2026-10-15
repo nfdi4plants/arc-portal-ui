@@ -17,3 +17,18 @@ export { PRICES, STOCK_SIZE, buyCard, priceOf, rollStock, stockState } from './s
 export type { StockState } from './store'
 export { FAIR_WORDS, TRADER_LINES, TRADER_LORE, createLinePicker } from './trader'
 export type { TraderMood } from './trader'
+export {
+  CORRUPTED,
+  CORRUPTION,
+  applyCorrupted,
+  corruptedAugment,
+  corruptedCardId,
+  corruptedChoices,
+  corruptionFlags,
+  createHitMemory,
+  incomingFactor,
+  outgoingFactor,
+} from './corrupted'
+export type { CorruptedAugment, CorruptionFlags, HitMemory } from './corrupted'
+export { DATENKRAKE_LINES, canSubmit, eligibleAugments, fillDealLine, removeAugment, submitToDatenkrake } from './datenkrake'
+export type { DatenkrakeDeal, DatenkrakeMood } from './datenkrake'

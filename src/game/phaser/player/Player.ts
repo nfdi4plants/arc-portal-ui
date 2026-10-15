@@ -5,6 +5,7 @@ import { DEPTH, MAGE_FRAME, MAGE_TEXTURE, PALETTE, PLAYER_HEIGHT } from '../../c
 import type { Action, InputFrame } from '../../contracts/input'
 import type { AbilityHandler, AttackContext, PlayerEvents, PlayerHandle, WeaponMoveset } from '../../contracts/player'
 import type { PlayerBuild, PlayerWeaponId, WeaponSlot } from '../../contracts/progression'
+import { CORRUPTION } from '../../model/progression/corrupted'
 import { EMPTY_MOTOR_INPUT, JUMP_VELOCITY, MOTOR, createMotorState, plungeBounced, runSpeed } from '../../model/input/motor'
 import type { MotorEnv, MotorInput, MotorState } from '../../model/input/motor'
 import type { InputLayer } from '../input/InputLayer'
@@ -55,7 +56,13 @@ export interface PlayerDebugState {
   damageIframesMs: number
 }
 
-export type Player = PlayerHandle & { destroy(): void; debugState(): PlayerDebugState }
+export type Player = PlayerHandle & {
+  destroy(): void
+  debugState(): PlayerDebugState
+  // Lets the body collide with a body added after the player, such as a bridge of the kraken
+  // intern. Returns the function that removes the collider.
+  collideWith(target: Phaser.Types.Physics.Arcade.ArcadeColliderType): () => void
+}
 
 export { markOneWay } from './oneWay'
 
@@ -78,7 +85,7 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
     touchingWallLeft: false,
     touchingWallRight: false,
     stats: { moveSpeed: 1, dashCooldownMs: 0 },
-    mechanics: { doubleJump: false, airDash: false, wallJump: false, hatGlide: false },
+    mechanics: { doubleJump: false, airDash: false, wallJump: false, hatGlide: false, noJump: false, infiniteAirDash: false },
     speedScale: 1,
     actionsLocked: false,
   }
@@ -89,6 +96,8 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
     motorEnv.mechanics.airDash = build.mechanics.includes('airDash')
     motorEnv.mechanics.wallJump = build.mechanics.includes('wallJump')
     motorEnv.mechanics.hatGlide = build.mechanics.includes('hatGlide')
+    motorEnv.mechanics.noJump = build.corrupted.includes('deprecatedJump')
+    motorEnv.mechanics.infiniteAirDash = build.corrupted.includes('infiniteScroll')
   }
   readBuild()
 
@@ -98,6 +107,10 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
   let grounded = false
   let lastVy = 0
   let flinchMs = 0
+  // Corrupted augments: no control while stunned (Terms of Service, cookie banners), left and right
+  // swapped while mirrored (Mirror Site).
+  let stunMs = 0
+  let mirrorMs = 0
   let damageIframesMs = 0
   // Hits miss while this runs (blockHits).
   let blockMs = 0
@@ -125,6 +138,22 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
   const mergedPressed = new Set<Action>()
   const mergedReleased = new Set<Action>()
   const mergedFrame: InputFrame = { held: mergedPressed, pressed: mergedPressed, released: mergedReleased, aim: { x, y } }
+  // Mirror Site swaps left and right into these, so a mirrored step allocates nothing.
+  const mirrorHeld = new Set<Action>()
+  const mirrorPressed = new Set<Action>()
+  const mirrorReleased = new Set<Action>()
+  const mirroredFrame: InputFrame = { held: mirrorHeld, pressed: mirrorPressed, released: mirrorReleased, aim: { x, y } }
+  const swapSides = (from: ReadonlySet<Action>, to: Set<Action>) => {
+    to.clear()
+    for (const action of from) to.add(action === 'left' ? 'right' : action === 'right' ? 'left' : action)
+  }
+  const mirrorFrame = (frame: InputFrame): InputFrame => {
+    swapSides(frame.held, mirrorHeld)
+    swapSides(frame.pressed, mirrorPressed)
+    swapSides(frame.released, mirrorReleased)
+    mirroredFrame.aim = frame.aim
+    return mirroredFrame
+  }
   // The held set of the step an attack started in, kept past the step for attackStarted listeners.
   const attackHeld = new Set<Action>()
   // The dash speed a dash attack with keepsMomentum carries, 0 for any other attack.
@@ -344,9 +373,12 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
 
     let frame = deps.input.frame()
     if (carriedPressed.size > 0 || carriedReleased.size > 0) frame = mergeCarried(frame)
+    mirrorMs = Math.max(0, mirrorMs - dt)
+    if (mirrorMs > 0) frame = mirrorFrame(frame)
     held = frame.held
     aim = frame.aim
     flinchMs = Math.max(0, flinchMs - dt)
+    stunMs = Math.max(0, stunMs - dt)
     damageIframesMs = Math.max(0, damageIframesMs - dt)
     blockMs = Math.max(0, blockMs - dt)
     dropMs = Math.max(0, dropMs - dt)
@@ -362,9 +394,9 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
       }
     }
 
-    const controllable = flinchMs <= 0 && hp > 0
+    const controllable = flinchMs <= 0 && stunMs <= 0 && hp > 0
     let input: MotorInput = controllable ? frame : EMPTY_MOTOR_INPUT
-    if (controllable && grounded && onOneWay && frame.held.has('down') && frame.pressed.has('jump')) {
+    if (controllable && grounded && onOneWay && !motorEnv.mechanics.noJump && frame.held.has('down') && frame.pressed.has('jump')) {
       dropMs = DROP_THROUGH_MS
       dropPressed.clear()
       for (const action of frame.pressed) if (action !== 'jump') dropPressed.add(action)
@@ -568,6 +600,7 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
       flinchMs = FLINCH_MS
       damageIframesMs = DAMAGE_IFRAMES_MS
       flashMs = 70
+      if (build.corrupted.includes('mirrorSite')) mirrorMs = CORRUPTION.mirrorSite.mirrorMs
       emit('damaged', { hit })
       return taken
     },
@@ -586,6 +619,20 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
     shieldCount: () => shields,
     blockHits(ms) {
       blockMs = Math.max(blockMs, ms)
+    },
+    stun(ms) {
+      stunMs = Math.max(stunMs, ms)
+      attacks.cancel()
+    },
+    isStunned: () => stunMs > 0,
+    collideWith(target) {
+      const collider = scene.physics.add.collider(body, target, undefined, processCollision)
+      colliders.push(collider)
+      return () => {
+        const index = colliders.indexOf(collider)
+        if (index >= 0) colliders.splice(index, 1)
+        collider.destroy()
+      }
     },
     heal(amount) {
       if (hp <= 0) return

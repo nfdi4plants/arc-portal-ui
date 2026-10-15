@@ -182,12 +182,23 @@ export function rollHit(base: number, state: DamageState, roll: number): { damag
 // Attacks owned by `owner` use the build's multiplier and crit. Everything else, including
 // hits the loadout spawns with a final damage, passes through unchanged. The state object is
 // read on every call, so the loadout updates it in place.
+// The corrupted augments of the owner's build: a factor on its own hits and one on hits it takes.
+export interface DamageCorruption {
+  outgoing(tags: readonly string[], target: Combatant): number
+  incoming(): number
+}
+
 export function createDamageModifier(
   owner: Combatant,
   state: DamageState,
   roll: () => number,
-): (attacker: Combatant, base: number) => { damage: number; crit: boolean } {
-  return (attacker, base) => (attacker === owner ? rollHit(base, state, roll()) : { damage: base, crit: false })
+  corruption?: DamageCorruption,
+): (attacker: Combatant, base: number, tags?: readonly string[], target?: Combatant) => { damage: number; crit: boolean } {
+  return (attacker, base, tags = [], target = attacker) => {
+    if (attacker === owner) return rollHit(corruption ? base * corruption.outgoing(tags, target) : base, state, roll())
+    if (corruption && target === owner) return { damage: base * corruption.incoming(), crit: false }
+    return { damage: base, crit: false }
+  }
 }
 
 // Up attacks without moves of their own turn their hitboxes to point overhead. The box starts a

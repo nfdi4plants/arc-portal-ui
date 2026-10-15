@@ -53,7 +53,7 @@ export interface MotorEnv {
   touchingWallLeft: boolean
   touchingWallRight: boolean
   stats: { moveSpeed: number; dashCooldownMs: number }
-  mechanics: { doubleJump: boolean; airDash: boolean; wallJump: boolean; hatGlide: boolean }
+  mechanics: { doubleJump: boolean; airDash: boolean; wallJump: boolean; hatGlide: boolean; noJump?: boolean; infiniteAirDash?: boolean }
   // Multiplies the horizontal target speed, for example while attacking on the ground. Default 1.
   speedScale?: number
   // Blocks starting jumps and dashes and turning around. Jump and dash presses still fill their buffers.
@@ -146,6 +146,8 @@ export type JumpKind = 'ground' | 'wall' | 'air' | null
 
 // Which jump a press would start now. The player uses it to decide whether a jump may cancel an attack.
 export function availableJump(state: MotorState, env: MotorEnv): JumpKind {
+  // Deprecated jump(): no jump of any kind. The stretch builds bridges and hoists the mage instead.
+  if (env.mechanics.noJump) return null
   const grounded = onGround(state, env)
   if (grounded || state.coyoteMs > 0) return 'ground'
   if (env.mechanics.wallJump && (wallSide(env) !== 0 || state.wallGraceMs > 0)) return 'wall'
@@ -156,6 +158,8 @@ export function availableJump(state: MotorState, env: MotorEnv): JumpKind {
 export function canDash(state: MotorState, env: MotorEnv): boolean {
   if (state.dashMs > 0 || state.dashCooldownMs > 0) return false
   if (onGround(state, env) || state.coyoteMs > 0) return true
+  // Infinite Scroll: dashes in mid-air as often as the cooldown allows.
+  if (env.mechanics.infiniteAirDash) return true
   return env.mechanics.airDash && !state.airDashUsed
 }
 

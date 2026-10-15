@@ -57,7 +57,9 @@ export function createMoveLayer(core: Core): MoveLayer {
       note(hit, null)
       return real.spawnHitbox(hit)
     },
-    spawnProjectile(shot, origin) {
+    spawnProjectile(spec, origin) {
+      // In Silico: the mage's shots pierce every enemy.
+      const shot = spec.owner === player && core.build.corrupted.includes('inSilico') ? { ...spec, pierce: Infinity, maxTargets: Infinity } : spec
       note(shot, origin)
       return real.spawnProjectile(shot, origin)
     },

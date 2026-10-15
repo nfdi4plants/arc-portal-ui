@@ -112,7 +112,10 @@ export interface CombatWorld {
   livingCombatants(team: Team): readonly Combatant[]
   on(event: 'hit' | 'kill', listener: (event: HitEvent) => void): () => void
   // Lets the attacker's build decide crits and damage multipliers before the hit lands.
-  setDamageModifier(modifier: ((attacker: Combatant, base: number) => { damage: number; crit: boolean }) | null): void
+  // `tags` are the hit's tags ('projectile' included for shots) and `target` the one it lands on.
+  setDamageModifier(
+    modifier: ((attacker: Combatant, base: number, tags: readonly string[], target: Combatant) => { damage: number; crit: boolean }) | null,
+  ): void
   // Called once per fixed step.
   update(deltaMs: number): void
   // Scenes freeze their actors while this is above zero.

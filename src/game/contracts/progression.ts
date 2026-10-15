@@ -39,6 +39,26 @@ export type MechanicId =
 
 export type LegendaryId = 'theOntology' | 'gitRevert' | 'doiExcalibur' | 'fairPrinciples' | 'peerReview' | 'peerPressure' | 'labCoat'
 
+// Corrupted augments come only from the Datenkrake in a waystation: one strong boon and one harsh
+// curse each (model/progression/corrupted.ts).
+export type CorruptedId =
+  | 'bigData'
+  | 'deprecatedJump'
+  | 'shadowIt'
+  | 'dataLake'
+  | 'blockchain'
+  | 'overfitting'
+  | 'rogueAdmin'
+  | 'dataLeak'
+  | 'termsOfService'
+  | 'mirrorSite'
+  | 'inSilico'
+  | 'inVitro'
+  | 'heavyMetadata'
+  | 'reviewer2'
+  | 'acceptAllCookies'
+  | 'infiniteScroll'
+
 export interface PlayerStats {
   maxHp: number
   // Multipliers, 1 is the base value.
@@ -68,6 +88,8 @@ export interface PlayerBuild {
   abilitySlots: (MechanicId | LegendaryId | null)[]
   // Cards per level-up: 3, or 4 with extraChoice.
   offerSize: number
+  // Given by the Datenkrake, in the order received.
+  corrupted: CorruptedId[]
 }
 
 export interface PowerUpCard {

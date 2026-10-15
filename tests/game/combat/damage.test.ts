@@ -12,6 +12,6 @@ describe('applyDamageModifier', () => {
   it('lets the modifier decide the final damage and crit', () => {
     const modifier = vi.fn((_attacker: Combatant, base: number) => ({ damage: base * 2, crit: true }))
     expect(applyDamageModifier(modifier, attacker, 12)).toEqual({ damage: 24, crit: true })
-    expect(modifier).toHaveBeenCalledWith(attacker, 12)
+    expect(modifier).toHaveBeenCalledWith(attacker, 12, [], attacker)
   })
 })
