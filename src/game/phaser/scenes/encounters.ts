@@ -1,10 +1,14 @@
 import Phaser from 'phaser'
-import { DEPTH, TILE } from '../../contracts/constants'
+import type { Combatant, CombatWorld, HitEvent } from '../../contracts/combat'
+import { DEPTH, PALETTE, TILE } from '../../contracts/constants'
+import { HOSTILE_STRIKE } from '../../model/progression'
 import type { EncounterKind } from '../../model/run'
-import { ARM_LENGTH, applySpriteRef, DATENKRAKE_ARMS, DATENKRAKE_HEIGHT, DATENKRAKE_WIDTH, datenkrakeArmArt, datenkrakeArt, TRADER_HEIGHT, TRADER_WIDTH, traderArt } from '../art'
+import { ARM_LENGTH, applySpriteRef, DATENKRAKE_ARMS, DATENKRAKE_HEIGHT, DATENKRAKE_WIDTH, datenkrakeArmArt, datenkrakeArt, stallArt, TRADER_HEIGHT, TRADER_WIDTH, traderArt } from '../art'
+import { cssColor } from '../color'
 import { acquireBubble } from '../mobs/bubbles'
 import type { Player } from '../player/Player'
 import type { RunDirector } from './RunDirector'
+import { addText } from './ui'
 
 // The encounters of the waystation. Each kind of `model/run/encounters.ts` has a spawner here that
 // puts it on the floor at the x of its slot. The waystation scene shows the interaction prompt and
@@ -14,7 +18,11 @@ import type { RunDirector } from './RunDirector'
 const REACH = TILE / 2
 const GOODBYE_MS = 3800
 const CALL_OUT_MS = 3200
+const WARNING_MS = 2600
 const BUBBLE_WRAP = 150
+// The trader winces when struck: his stall shakes this long, this far.
+const WINCE_MS = 260
+const WINCE = 2
 
 // What the waystation offers its encounters.
 export interface EncounterHost {
@@ -24,12 +32,15 @@ export interface EncounterHost {
   readonly index: number
   readonly floorY: number
   readonly player: Player
+  readonly combat: CombatWorld
   // Holds the world and opens the FAIR trade store of this waystation.
   openStore(): void
   // Holds the world while an encounter animates on its own.
   hold(on: boolean): void
   // Holds the world and opens the Datenkrake overlay.
   openDatenkrake(): void
+  // The fourth strike: the trader vaults over his counter, from (x, counterY), and fights.
+  startTraderFight(x: number, counterY: number): void
 }
 
 export interface Encounter {
@@ -60,9 +71,13 @@ export interface Encounter {
 export type EncounterSpawner = (host: EncounterHost, x: number) => Encounter
 
 // The FAIR trader behind the stall. He calls out a greeting when the mage arrives, opens the store on
-// up and says goodbye in a bubble when the store closes.
+// up and says goodbye in a bubble when the store closes. He can be hit: a bystander on the neutral
+// team stands where he does, takes no damage and counts the mage's strikes. The first three get a
+// warning each, the fourth no word: he vaults over the counter and the fight starts. Once he is
+// beaten, every later waystation shows his closed stall instead.
 function spawnTrader(host: EncounterHost, x: number): Encounter {
-  const { scene, director, floorY } = host
+  const { scene, director, floorY, combat, index } = host
+  if (director.traderGone) return closedStall(host, x)
   const ref = traderArt(scene)
   const sprite = scene.add.sprite(x, floorY, ref.textureKey).setDepth(DEPTH.tiles + 1)
   applySpriteRef(sprite, ref)
@@ -72,6 +87,11 @@ function spawnTrader(host: EncounterHost, x: number): Encounter {
   let bubbleMs = 0
   // A greeting called out across the room gives way to the prompt once the mage is near.
   let callOut = false
+  // The waystation clock for the strikes, and the wince of the last one.
+  let clock = 0
+  let winceMs = 0
+  // The fourth strike lands inside a combat step, so the fight starts with the next one.
+  let vault = false
 
   const hide = () => {
     bubbleMs = 0
@@ -82,6 +102,38 @@ function spawnTrader(host: EncounterHost, x: number): Encounter {
     bubble.setText(line).setOrigin(0.5, 1).setPosition(x, top - 4).setVisible(true)
     bubbleMs = ms
   }
+
+  const body = new Phaser.Geom.Rectangle(x - 10, top + 14, 20, 36)
+  const strike = (hit: HitEvent) => {
+    if (hit.attacker.team !== 'player') return
+    const count = director.strikeTrader(index, clock)
+    if (count === 0) return
+    winceMs = WINCE_MS
+    callOut = false
+    if (count < HOSTILE_STRIKE) {
+      say(director.traderWarning(count as 1 | 2 | 3), WARNING_MS)
+      return
+    }
+    hide()
+    zone.setEmpty()
+    combat.unregister(bystander)
+    vault = true
+  }
+  const bystander: Combatant = {
+    id: 'trader-calm',
+    team: 'neutral',
+    killer: null,
+    hurtbox: () => body,
+    facing: () => -1,
+    position: () => ({ x, y: floorY }),
+    isInvulnerable: () => false,
+    isDead: () => false,
+    receiveHit(hit) {
+      strike(hit)
+      return 0
+    },
+  }
+  combat.register(bystander)
 
   return {
     zone,
@@ -105,10 +157,51 @@ function spawnTrader(host: EncounterHost, x: number): Encounter {
     },
     talking: () => bubbleMs > 0,
     update(dtMs) {
+      clock += dtMs
+      if (vault) {
+        vault = false
+        applySpriteRef(sprite, stallArt(scene, 'empty'))
+        sprite.setX(x)
+        host.startTraderFight(x, top + 26)
+      }
       if (bubbleMs <= 0) return
       bubbleMs -= dtMs
       if (bubbleMs <= 0) hide()
     },
+    frame(deltaMs) {
+      if (winceMs <= 0) return
+      winceMs = Math.max(0, winceMs - deltaMs)
+      sprite.setX(x + (winceMs > 0 ? Math.sin(winceMs * 0.12) * WINCE : 0))
+    },
+  }
+}
+
+// The stall of the beaten trader, for the rest of the run: closed, empty, a plank across, and a
+// note pinned over it. Nothing to trade and nothing to hit.
+function closedStall(host: EncounterHost, x: number): Encounter {
+  const { scene, director, floorY } = host
+  const sprite = scene.add.sprite(x, floorY, stallArt(scene, 'closed').textureKey).setDepth(DEPTH.tiles + 1)
+  applySpriteRef(sprite, stallArt(scene, 'closed'))
+  const top = floorY - TRADER_HEIGHT
+  addText(scene, director.traderFightLine('closed'), 6, { color: PALETTE.navy, bold: true, align: 'center', wrap: TRADER_WIDTH - 10 })
+    .setOrigin(0.5, 1)
+    .setBackgroundColor(cssColor(PALETTE.cream))
+    .setPadding(3, 2, 3, 2)
+    .setPosition(x, top + 2)
+    .setRotation(-0.05)
+    .setDepth(DEPTH.tiles + 2)
+  const zone = new Phaser.Geom.Rectangle()
+  return {
+    zone,
+    action: '',
+    promptX: x,
+    promptY: top,
+    interact() {},
+    closed() {},
+    near() {},
+    arrived() {},
+    talking: () => false,
+    update() {},
   }
 }
 

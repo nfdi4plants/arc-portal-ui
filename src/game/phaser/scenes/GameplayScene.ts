@@ -14,15 +14,15 @@ import { attachLoadout, type LoadoutWithStatus } from '../player/weapons'
 import { createPlayer, type Player } from '../player/Player'
 import { followView, viewForBox, type View } from '../view'
 import { MOB_INFO_EVENT } from './mobInfoEvent'
-import type { GameplayControl, RunContext } from './context'
+import type { GameplayControl, RunContext, TraderLoot } from './context'
 import { interactPressed } from './interaction'
 import { addText } from './ui'
 import { PIT_KILLER, type RunDirector } from './RunDirector'
 import type { DatenkrakeDeal } from '../../model/progression'
 
 // 'encounter' holds the world while a waystation encounter plays out on its own (the Datenkrake's
-// grab), 'datenkrake' while its overlay is open.
-type Hold = 'banner' | 'levelUp' | 'store' | 'datenkrake' | 'encounter' | 'pause' | 'external' | 'over'
+// grab), 'datenkrake' while its overlay is open, 'loot' while the beaten FAIR trader's loot shows.
+type Hold = 'banner' | 'levelUp' | 'store' | 'datenkrake' | 'encounter' | 'loot' | 'pause' | 'external' | 'over'
 
 export interface LevelSetup {
   colliders: Phaser.Types.Physics.Arcade.ArcadeColliderType[]
@@ -78,6 +78,9 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
   protected onStoreClosed(): void {}
   // After the Datenkrake overlay closed with a choice.
   protected onDatenkrakeClosed(): void {}
+  // Freezes or thaws what else acts like the player (the fighting FAIR trader), with the player:
+  // for every hold and every hit-stop.
+  protected freezeActors(_frozen: boolean): void {}
   // The mobs and bosses the pause menu lets the player inspect, and the step the mobs come from.
   protected inspectableMobs(): InspectTarget[] {
     return []
@@ -201,6 +204,7 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
     const stopped = this.combat.hitStopRemainingMs() > 0
     // A kill in this step may have opened the level-up and held the world.
     this.player.setFrozen(stopped || this.frozen)
+    this.freezeActors(stopped || this.frozen)
     if (!stopped && !this.frozen) {
       this.loadout.update(dt)
       this.stepWorld(dt)
@@ -217,8 +221,8 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
       if (pressed.has('pause') || pressed.has('left') || pressed.has('right')) this.closeStore()
       return
     }
-    // In the Datenkrake's grip there is nothing to do but choose.
-    if (this.holds.has('datenkrake') || this.holds.has('encounter')) return
+    // In the Datenkrake's grip there is nothing to do but choose, and the loot is read to the end.
+    if (this.holds.has('datenkrake') || this.holds.has('encounter') || this.holds.has('loot')) return
     if (pressed.has('pause')) this.togglePause()
   }
 
@@ -262,7 +266,7 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
   }
 
   private togglePause() {
-    if (this.holds.has('levelUp') || this.holds.has('store') || this.holds.has('datenkrake') || this.holds.has('encounter')) return
+    if (this.holds.has('levelUp') || this.holds.has('store') || this.holds.has('datenkrake') || this.holds.has('encounter') || this.holds.has('loot')) return
     if (this.holds.has('over') || this.holds.has('external')) return
     const paused = !this.holds.has('pause')
     this.setHold('pause', paused)
@@ -280,6 +284,7 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
     if (frozen === this.frozen) return
     this.frozen = frozen
     this.player?.setFrozen(frozen)
+    this.freezeActors(frozen)
     if (frozen) {
       this.physics.world.pause()
       this.time.paused = true
@@ -334,6 +339,13 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
     if (this.holds.has('over') || this.holds.has('datenkrake')) return
     this.setHold('datenkrake', true)
     this.ctx.openDatenkrake(index)
+  }
+
+  // Holds the world and shows what the beaten FAIR trader left. The cards are applied already.
+  protected openTraderLoot(loot: TraderLoot) {
+    if (this.holds.has('over') || this.holds.has('loot')) return
+    this.setHold('loot', true)
+    this.ctx.openTraderLoot(loot)
   }
 
   protected die(killer: KillerInfo) {
@@ -458,6 +470,12 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
     this.ctx.closeDatenkrake()
     this.setHold('datenkrake', false)
     this.onDatenkrakeClosed()
+  }
+
+  closeTraderLoot() {
+    if (!this.holds.has('loot')) return
+    this.ctx.closeTraderLoot()
+    this.setHold('loot', false)
   }
 
   // Only the card applies, like a level-up card without the level: hp, level and XP stay.

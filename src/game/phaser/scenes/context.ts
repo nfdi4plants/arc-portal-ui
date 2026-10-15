@@ -4,18 +4,36 @@ import type { GameEvent } from '../../contracts/events'
 import type { Bindings } from '../../contracts/input'
 import type { PlayerHandle } from '../../contracts/player'
 import type { RunPlan } from '../../contracts/run'
-import type { BossHandle } from '../bosses'
+import type { StaggerState } from '../bosses'
 import type { LoadoutWithStatus } from '../player/weapons'
+import type { PowerUpCard } from '../../contracts/progression'
 import type { DatenkrakeDeal } from '../../model/progression'
 import { getArt } from './art'
 import { RunDirector, type RunStage } from './RunDirector'
+
+// The boss bar of the HUD: a node boss, the final boss or the fighting FAIR trader. A null stagger
+// state shows no stagger bar.
+export interface HudBoss {
+  hpFraction(): number
+  showHpBar(): boolean
+  currentAttackName(): string | null
+  staggerFraction(): number
+  staggerState(): StaggerState | null
+}
 
 // What the HUD reads from the running gameplay scene.
 export interface ActiveFight {
   player: PlayerHandle
   loadout: LoadoutWithStatus
-  boss: BossHandle | null
+  boss: HudBoss | null
   bossName: string
+}
+
+// What the beaten FAIR trader left, for the loot overlay.
+export interface TraderLoot {
+  cards: PowerUpCard[]
+  bonus: PowerUpCard | null
+  line: string
 }
 
 // What the overlay scenes may ask of the running gameplay scene.
@@ -33,6 +51,8 @@ export interface GameplayControl {
   submitToDatenkrake(index: number): DatenkrakeDeal | null
   fightDatenkrake(index: number): void
   closeDatenkrake(): void
+  // The loot overlay of the beaten FAIR trader was read.
+  closeTraderLoot(): void
   setBindings(bindings: Bindings): void
 }
 
@@ -43,9 +63,9 @@ export interface HudControl {
 
 const GAMEPLAY_SCENES = [SCENE.stretch, SCENE.boss, SCENE.waystation, SCENE.finalBoss]
 const GAMEPLAY_SCENE_OF = { stretch: SCENE.stretch, boss: SCENE.boss, waystation: SCENE.waystation, finalBoss: SCENE.finalBoss } as const
-const RUN_SCENES = [...GAMEPLAY_SCENES, SCENE.hud, SCENE.levelUp, SCENE.store, SCENE.datenkrake, SCENE.death, SCENE.victory]
+const RUN_SCENES = [...GAMEPLAY_SCENES, SCENE.hud, SCENE.levelUp, SCENE.store, SCENE.datenkrake, SCENE.traderLoot, SCENE.death, SCENE.victory]
 // Overlays that end with the stage they opened in.
-const STAGE_OVERLAYS = [SCENE.levelUp, SCENE.store, SCENE.datenkrake]
+const STAGE_OVERLAYS = [SCENE.levelUp, SCENE.store, SCENE.datenkrake, SCENE.traderLoot]
 
 // Shared by every scene of one game. It holds the run and switches the scenes when the run
 // moves on to the next stage.
@@ -134,6 +154,14 @@ export class RunContext {
 
   closeDatenkrake(): void {
     this.sceneOp('stop', SCENE.datenkrake)
+  }
+
+  openTraderLoot(loot: TraderLoot): void {
+    this.sceneOp('start', SCENE.traderLoot, loot)
+  }
+
+  closeTraderLoot(): void {
+    this.sceneOp('stop', SCENE.traderLoot)
   }
 
   private enter(stage: RunStage): void {

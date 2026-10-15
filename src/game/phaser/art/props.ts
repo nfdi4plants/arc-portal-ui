@@ -165,55 +165,145 @@ export function fragmentArt(scene: Phaser.Scene): SpriteRef {
   })
 }
 
-export const TRADER_WIDTH = 72
-export const TRADER_HEIGHT = 72
-
 // The FAIR trader behind a market stall: a striped awning, a counter with a "FAIR trade" sign,
 // a heap of Ontology Fragments, a card and a flask on top. The sprite stands on the bottom centre of
-// the stall.
+// the stall. The stall without him is drawn on its own (stallArt), and so is the trader as a fighter
+// with a full body (traderFighterArt).
+export const TRADER_WIDTH = 72
+export const TRADER_HEIGHT = 72
+const SKIN = '#f6d7b8'
+const ROBE = { tint: '#9ad8c9', hatch: '#22c3a6' }
+const HAT = { tint: '#7a5a3a', hatch: '#5a3f26' }
+
+function stallBack(pen: Pen, w: number, h: number): void {
+  pen.rect(5, 12, 3, h - 13, { ...wood, weight: 0.8, rough: 0.4 })
+  pen.rect(w - 8, 12, 3, h - 13, { ...wood, weight: 0.8, rough: 0.4 })
+}
+
+// Robe, head, hat and a big moustache, with the hands on the counter.
+function traderBehind(pen: Pen, mid: number): void {
+  pen.poly([[mid - 11, 50], [mid - 8, 36], [mid + 8, 36], [mid + 11, 50]], { ...ROBE, gap: 2.2, weight: 1, rough: 0.5 })
+  pen.poly([[mid - 3, 36], [mid, 41], [mid + 3, 36]], { tint: YELLOW, weight: 0.7, rough: 0.3 })
+  pen.ellipse(mid, 29, 14, 14, { tint: SKIN, weight: 1, rough: 0.4 })
+  pen.ellipse(mid, 23, 22, 4.5, { ...HAT, weight: 0.9, rough: 0.4 })
+  pen.poly([[mid - 6, 22.5], [mid - 5, 15], [mid + 5, 15], [mid + 6, 22.5]], { ...HAT, fill: 'cross-hatch', gap: 2, weight: 0.9, rough: 0.4 })
+  pen.line(mid - 5.6, 21, mid + 5.6, 21, { line: YELLOW, weight: 1.1, rough: 0.2 })
+  pen.dot(mid - 2.6, 28.4, 0.9)
+  pen.dot(mid + 2.6, 28.4, 0.9)
+  pen.curve([[mid - 5, 32.6], [mid - 2.4, 31.4], [mid, 32], [mid + 2.4, 31.4], [mid + 5, 32.6]], { weight: 1.1, rough: 0.2 })
+  pen.arc(mid, 33.4, 4, 2.4, 0.2, Math.PI - 0.2, false, { weight: 0.6, rough: 0.2 })
+  pen.ellipse(mid - 9, 47, 4, 3, { tint: SKIN, weight: 0.7, rough: 0.3 })
+  pen.ellipse(mid + 9, 47, 4, 3, { tint: SKIN, weight: 0.7, rough: 0.3 })
+}
+
+// Awning, counter and its sign, and the goods on top unless the stall is closed.
+function stallFront(pen: Pen, w: number, h: number, sign: string, goods: boolean): void {
+  const mid = w / 2
+  pen.poly([[1, 4], [w - 1, 4], [w - 1, 14], [1, 14]], { ...wood, tint: CREAM, weight: 1.1, rough: 0.5 })
+  for (let x = 1; x < w - 2; x += 14) pen.rect(x, 4, 7, 10, { tint: goods ? '#22c3a6' : '#9db3ad', line: 'none' })
+  for (let x = 1; x < w - 2; x += 7) pen.arc(x + 3.5, 14, 7, 5, 0, Math.PI, false, { weight: 0.8, rough: 0.3 })
+  pen.rect(7, 47, w - 14, h - 48, { ...wood, weight: 1.1, rough: 0.5 })
+  pen.rect(13, 53, w - 26, 13, { tint: '#fffdf6', weight: 0.9, rough: 0.4 })
+  pen.text([sign], mid, 59.6, 7.4, w - 30, -0.03, NAVY)
+  if (!goods) return
+  pen.poly([[11, 46.6], [13, 41.6], [16, 43], [17.6, 40.4], [21, 46.6]], { tint: '#fff3c4', hatch: YELLOW, gap: 1.5, weight: 0.6, rough: 0.3 })
+  pen.line(13.6, 44.6, 17.4, 43.4, { line: NAVY, weight: 0.5, rough: 0.1 })
+  pen.dot(13.6, 44.6, 0.9, TEAL)
+  pen.dot(17.4, 43.4, 0.9, TEAL)
+  pen.poly([[w - 22, 46], [w - 21, 38], [w - 15, 38.6], [w - 16, 46.6]], { tint: '#dbe8fd', hatch: BLUE, gap: 1.6, weight: 0.7, rough: 0.3 })
+  pen.poly([[w - 12, 46], [w - 13.5, 42], [w - 11.6, 38.5], [w - 11.6, 36.5], [w - 9.4, 36.5], [w - 9.4, 38.5], [w - 7.5, 42], [w - 9, 46]], { tint: '#dcf1e2', hatch: '#2da44e', gap: 1.4, weight: 0.7, rough: 0.3 })
+}
+
 export function traderArt(scene: Phaser.Scene): SpriteRef {
   const w = TRADER_WIDTH
   const h = TRADER_HEIGHT
-  const mid = w / 2
-  const awning = { ...wood, tint: CREAM }
   return spriteFrom(scene, {
     key: 'scribble:trader',
     width: w,
     height: h,
     anchors: { weapon: { x: 0, y: -h / 2 }, head: { x: 0, y: -h + 6 } },
     draw(pen) {
-      // Poles behind everything.
-      pen.rect(5, 12, 3, h - 13, { ...wood, weight: 0.8, rough: 0.4 })
-      pen.rect(w - 8, 12, 3, h - 13, { ...wood, weight: 0.8, rough: 0.4 })
-      // The trader: robe, head, hat and a big moustache.
-      pen.poly([[mid - 11, 50], [mid - 8, 36], [mid + 8, 36], [mid + 11, 50]], { tint: '#9ad8c9', hatch: '#22c3a6', gap: 2.2, weight: 1, rough: 0.5 })
-      pen.poly([[mid - 3, 36], [mid, 41], [mid + 3, 36]], { tint: YELLOW, weight: 0.7, rough: 0.3 })
-      pen.ellipse(mid, 29, 14, 14, { tint: '#f6d7b8', weight: 1, rough: 0.4 })
-      pen.ellipse(mid, 23, 22, 4.5, { tint: '#7a5a3a', hatch: '#5a3f26', weight: 0.9, rough: 0.4 })
-      pen.poly([[mid - 6, 22.5], [mid - 5, 15], [mid + 5, 15], [mid + 6, 22.5]], { tint: '#7a5a3a', hatch: '#5a3f26', fill: 'cross-hatch', gap: 2, weight: 0.9, rough: 0.4 })
-      pen.line(mid - 5.6, 21, mid + 5.6, 21, { line: YELLOW, weight: 1.1, rough: 0.2 })
-      pen.dot(mid - 2.6, 28.4, 0.9)
-      pen.dot(mid + 2.6, 28.4, 0.9)
-      pen.curve([[mid - 5, 32.6], [mid - 2.4, 31.4], [mid, 32], [mid + 2.4, 31.4], [mid + 5, 32.6]], { weight: 1.1, rough: 0.2 })
-      pen.arc(mid, 33.4, 4, 2.4, 0.2, Math.PI - 0.2, false, { weight: 0.6, rough: 0.2 })
-      // Hands on the counter.
-      pen.ellipse(mid - 9, 47, 4, 3, { tint: '#f6d7b8', weight: 0.7, rough: 0.3 })
-      pen.ellipse(mid + 9, 47, 4, 3, { tint: '#f6d7b8', weight: 0.7, rough: 0.3 })
-      // Striped awning with a scalloped edge.
-      pen.poly([[1, 4], [w - 1, 4], [w - 1, 14], [1, 14]], { ...awning, weight: 1.1, rough: 0.5 })
-      for (let x = 1; x < w - 2; x += 14) pen.rect(x, 4, 7, 10, { tint: '#22c3a6', line: 'none' })
-      for (let x = 1; x < w - 2; x += 7) pen.arc(x + 3.5, 14, 7, 5, 0, Math.PI, false, { weight: 0.8, rough: 0.3 })
-      // Counter and its sign.
-      pen.rect(7, 47, w - 14, h - 48, { ...wood, weight: 1.1, rough: 0.5 })
-      pen.rect(13, 53, w - 26, 13, { tint: '#fffdf6', weight: 0.9, rough: 0.4 })
-      pen.text(['FAIR trade'], mid, 59.6, 7.4, w - 30, -0.03, NAVY)
-      // Goods on top: a heap of fragments, a card and a flask.
-      pen.poly([[11, 46.6], [13, 41.6], [16, 43], [17.6, 40.4], [21, 46.6]], { tint: '#fff3c4', hatch: YELLOW, gap: 1.5, weight: 0.6, rough: 0.3 })
-      pen.line(13.6, 44.6, 17.4, 43.4, { line: NAVY, weight: 0.5, rough: 0.1 })
-      pen.dot(13.6, 44.6, 0.9, TEAL)
-      pen.dot(17.4, 43.4, 0.9, TEAL)
-      pen.poly([[w - 22, 46], [w - 21, 38], [w - 15, 38.6], [w - 16, 46.6]], { tint: '#dbe8fd', hatch: BLUE, gap: 1.6, weight: 0.7, rough: 0.3 })
-      pen.poly([[w - 12, 46], [w - 13.5, 42], [w - 11.6, 38.5], [w - 11.6, 36.5], [w - 9.4, 36.5], [w - 9.4, 38.5], [w - 7.5, 42], [w - 9, 46]], { tint: '#dcf1e2', hatch: '#2da44e', gap: 1.4, weight: 0.7, rough: 0.3 })
+      stallBack(pen, w, h)
+      traderBehind(pen, w / 2)
+      stallFront(pen, w, h, 'FAIR trade', true)
+    },
+  })
+}
+
+// The stall without the trader. 'empty' once he has vaulted over the counter, with the goods still
+// on it. 'closed' in every later waystation of the run: no goods, a faded awning, a plank nailed
+// across and cobwebs in the corners. The note on it is a Text of the scene.
+export function stallArt(scene: Phaser.Scene, state: 'empty' | 'closed'): SpriteRef {
+  const w = TRADER_WIDTH
+  const h = TRADER_HEIGHT
+  return spriteFrom(scene, {
+    key: `scribble:stall:${state}`,
+    width: w,
+    height: h,
+    anchors: { weapon: { x: 0, y: -h / 2 }, head: { x: 0, y: -h + 6 } },
+    draw(pen) {
+      stallBack(pen, w, h)
+      if (state === 'empty') {
+        stallFront(pen, w, h, 'FAIR trade', true)
+        return
+      }
+      stallFront(pen, w, h, 'CLOSED', false)
+      pen.poly([[6, 40], [w - 6, 30], [w - 6, 35], [6, 45]], { ...wood, weight: 1, rough: 0.5 })
+      pen.dot(9, 42.4, 0.9)
+      pen.dot(w - 9, 32.4, 0.9)
+      pen.curve([[8.5, 15], [12, 19], [16, 15.5]], { line: '#9aa0a6', weight: 0.5, rough: 0.3 })
+      pen.line(8.5, 15, 13.5, 21, { line: '#9aa0a6', weight: 0.4, rough: 0.2 })
+      pen.curve([[w - 16, 15.5], [w - 12, 19], [w - 8.5, 15]], { line: '#9aa0a6', weight: 0.5, rough: 0.3 })
+      pen.line(w - 8.5, 15, w - 13.5, 21, { line: '#9aa0a6', weight: 0.4, rough: 0.2 })
+    },
+  })
+}
+
+// The trader as a fighter: a full standing body in the proportions of the mage sprite, so the same
+// player body, squash, lean and weapon poses fit him. Hat with its gold band, face and moustache
+// turned right, a teal robe under a cream merchant apron with a fragment in its pocket, a belt and
+// boots. One frame, drawn once.
+export const TRADER_FIGHTER = { width: 30, height: 50 }
+
+export function traderFighterArt(scene: Phaser.Scene): SpriteRef {
+  const { width: w, height: h } = TRADER_FIGHTER
+  const mid = w / 2
+  return spriteFrom(scene, {
+    key: 'scribble:trader:fighter',
+    width: w,
+    height: h,
+    variants: 1,
+    anchors: { weapon: { x: 6, y: -24 }, head: { x: 0, y: -h } },
+    draw(pen) {
+      // Boots and legs.
+      pen.rect(mid - 6.5, 40, 4.6, 7.5, { tint: '#3b4a5c', weight: 0.8, rough: 0.3 })
+      pen.rect(mid + 1.4, 40, 4.6, 7.5, { tint: '#3b4a5c', weight: 0.8, rough: 0.3 })
+      pen.ellipse(mid - 3.6, 48, 7, 3.4, { tint: '#5a3f26', weight: 0.8, rough: 0.3 })
+      pen.ellipse(mid + 4.6, 48, 7, 3.4, { tint: '#5a3f26', weight: 0.8, rough: 0.3 })
+      // Robe, the apron over it, its straps and the pocket with a fragment.
+      pen.poly([[mid - 9, 41.5], [mid - 7, 22], [mid + 7, 22], [mid + 9.5, 41.5]], { ...ROBE, gap: 2.2, weight: 1, rough: 0.5 })
+      pen.poly([[mid - 5.5, 26], [mid + 6, 26], [mid + 7, 40.5], [mid - 6.5, 40.5]], { tint: CREAM, hatch: '#d9c3a5', gap: 2.6, weight: 0.9, rough: 0.4 })
+      pen.line(mid - 5.5, 26, mid - 3, 22, { weight: 0.6, rough: 0.2 })
+      pen.line(mid + 6, 26, mid + 3.5, 22, { weight: 0.6, rough: 0.2 })
+      pen.rect(mid - 1.5, 31.5, 6.5, 5, { tint: '#fff3c4', weight: 0.6, rough: 0.2 })
+      pen.poly([[mid + 0.4, 35.4], [mid + 1.4, 32.6], [mid + 2.8, 33.6], [mid + 3.8, 32.4], [mid + 3.4, 35.4]], { tint: '#fff3c4', hatch: YELLOW, gap: 1.2, weight: 0.5, rough: 0.2 })
+      pen.line(mid - 7.2, 28.5, mid + 7.4, 28.5, { line: '#5a3f26', weight: 1, rough: 0.2 })
+      pen.rect(mid - 1.2, 27.4, 2.6, 2.4, { tint: YELLOW, weight: 0.5, rough: 0.1 })
+      // The back arm. The front hand holds the weapon, which the player body draws.
+      pen.line(mid - 8, 23.5, mid - 10, 33, { line: TEAL, weight: 2.2, rough: 0.2 })
+      pen.ellipse(mid - 10.2, 34, 3.4, 3.4, { tint: SKIN, weight: 0.6, rough: 0.2 })
+      // Head, eyes, brows and the moustache, turned right.
+      pen.ellipse(mid + 0.5, 15.5, 13, 13, { tint: SKIN, weight: 1, rough: 0.4 })
+      pen.dot(mid + 2.4, 14.6, 0.9)
+      pen.dot(mid + 5.6, 14.6, 0.9)
+      pen.line(mid + 1.2, 12.2, mid + 3.6, 11.4, { weight: 0.7, rough: 0.2 })
+      pen.line(mid + 4.6, 11.4, mid + 7, 12.2, { weight: 0.7, rough: 0.2 })
+      pen.curve([[mid - 0.4, 18.6], [mid + 2, 17.4], [mid + 4, 18], [mid + 6, 17.4], [mid + 8.2, 18.6]], { weight: 1.2, rough: 0.2 })
+      pen.arc(mid + 4, 19.6, 3.6, 2, 0.2, Math.PI - 0.2, false, { weight: 0.6, rough: 0.2 })
+      // The hat: brim, crown and its gold band.
+      pen.ellipse(mid + 0.5, 9.6, 21, 4.4, { ...HAT, weight: 0.9, rough: 0.4 })
+      pen.poly([[mid - 5, 9.2], [mid - 4, 1.6], [mid + 5, 1.6], [mid + 6, 9.2]], { ...HAT, fill: 'cross-hatch', gap: 2, weight: 0.9, rough: 0.4 })
+      pen.line(mid - 4.6, 7.6, mid + 5.6, 7.6, { line: YELLOW, weight: 1.1, rough: 0.2 })
     },
   })
 }

@@ -20,7 +20,7 @@ export { carrier } from './carrier'
 export type { MonsterWeaponRef } from './monster'
 export { prewarmTelegraphs, releaseTelegraphs } from './telegraph'
 export type { IsaKind } from './props'
-export { CARD_HEIGHT, CARD_WIDTH, FRAGMENT_SIZE, RARITY_COLOR, TRADER_HEIGHT, TRADER_WIDTH, cardArt, doorArt, fragmentArt, glowTexture, ISA_BLOCKS, isaBlockArt, portalSparkArt, portalSwirlArt, shieldFragmentArt, traderArt } from './props'
+export { CARD_HEIGHT, CARD_WIDTH, FRAGMENT_SIZE, RARITY_COLOR, TRADER_HEIGHT, TRADER_WIDTH, cardArt, doorArt, fragmentArt, glowTexture, ISA_BLOCKS, isaBlockArt, portalSparkArt, portalSwirlArt, shieldFragmentArt, stallArt, TRADER_FIGHTER, traderArt, traderFighterArt } from './props'
 export {
   ARM_LENGTH,
   CORRUPTED_CARD_HEIGHT,

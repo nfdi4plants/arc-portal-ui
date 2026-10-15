@@ -11,6 +11,7 @@ import { FinalBossScene } from './scenes/FinalBossScene'
 import { HudScene } from './scenes/HudScene'
 import { LevelUpScene } from './scenes/LevelUpScene'
 import { StoreScene } from './scenes/StoreScene'
+import { TraderLootScene } from './scenes/TraderLootScene'
 import { StretchScene } from './scenes/StretchScene'
 import { VictoryScene } from './scenes/VictoryScene'
 import { WaystationScene } from './scenes/WaystationScene'
@@ -65,6 +66,7 @@ export const createGame: CreateGame = (parent, { bindings }) => {
     new LevelUpScene(ctx),
     new StoreScene(ctx),
     new DatenkrakeScene(ctx),
+    new TraderLootScene(ctx),
     new DeathScene(ctx),
     new VictoryScene(ctx),
   ]

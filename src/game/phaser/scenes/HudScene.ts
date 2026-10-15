@@ -335,8 +335,8 @@ export class HudScene extends Phaser.Scene implements HudControl {
       this.drawBoss()
     }
     // Under the hp bar and only with it: the stagger bar, grey while a heavy attack locks it.
-    const staggerFill = shown ? Math.ceil(boss.staggerFraction() * STAGGER_STEPS) : -1
     const staggerState = shown ? boss.staggerState() : null
+    const staggerFill = staggerState ? Math.ceil((boss?.staggerFraction() ?? 0) * STAGGER_STEPS) : -1
     let staggerChanged = staggerFill !== this.staggerFill || staggerState !== this.staggerState
     if (staggerState === 'staggered' && this.staggerState !== 'staggered') this.staggerFlashMs = STAGGER_FLASH_MS
     else if (this.staggerFlashMs > 0) {
