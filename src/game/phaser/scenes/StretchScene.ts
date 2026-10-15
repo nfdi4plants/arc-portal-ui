@@ -14,6 +14,7 @@ import { generateStretch, type StretchLayout } from './levelGen'
 import { PIT_KILLER } from './RunDirector'
 import { createKrakenIntern, type KrakenIntern } from './intern'
 import { createRescueFrame, rescueAt, rescueSpot } from './rescue'
+import { ENTER_ACTION, portalOffer } from './interaction'
 import { addText, plural } from './ui'
 
 const T = TILE
@@ -203,13 +204,19 @@ export class StretchScene extends GameplayScene {
       this.fallIntoPit()
       return
     }
-    if (this.intern?.step(dtMs, this.heldDirection())) return
+    if (this.intern?.step(dtMs, this.heldDirection())) {
+      this.showPrompt(null)
+      return
+    }
     if (this.player.isGrounded()) {
       this.safeX = feet.x
       this.safeY = feet.y
     }
-    const box = this.player.hurtbox()
-    if (Phaser.Geom.Intersects.RectangleToRectangle(box, this.door)) this.leave((director) => director.completeStretch())
+    // The door leads on only on the interact key, so a mage chasing a mob past it stays.
+    const offer = portalOffer(Phaser.Geom.Intersects.RectangleToRectangle(this.player.hurtbox(), this.door), true)
+    const door = this.door
+    this.showPrompt(offer === 'enter' ? ENTER_ACTION : null, door.centerX, door.y - 16)
+    if (offer === 'enter' && this.interactPressed()) this.leave((director) => director.completeStretch())
   }
 
   // The pit costs hp first. If the mage lives, the cloud carries it back down onto the last safe

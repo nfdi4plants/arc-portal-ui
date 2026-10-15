@@ -1,16 +1,15 @@
 import Phaser from 'phaser'
 import { DEPTH, PALETTE, SCENE, TILE } from '../../contracts/constants'
-import { bindingLabel } from '../../model/input'
 import { ENCOUNTER_SLOTS, rollEncounters } from '../../model/run'
 import { applySpriteRef, datenkrakeArmArt, datenkrakeArt, doorArt, traderArt } from '../art'
 import type { Arena } from '../bosses'
-import { cssColor } from '../color'
 import type { View } from '../view'
 import { buildArena } from './arena'
 import type { RunContext } from './context'
 import { ENCOUNTER_SPAWNERS, type Encounter, type EncounterHost } from './encounters'
 import { GameplayScene, type LevelSetup } from './GameplayScene'
 import type { Parallax } from './levelArt'
+import { ENTER_ACTION, portalOffer } from './interaction'
 import { portalLabel } from './RunDirector'
 import { addText } from './ui'
 
@@ -38,9 +37,6 @@ export class WaystationScene extends GameplayScene {
   private nearIndex = -1
   // The encounter whose overlay is open.
   private engaged: Encounter | null = null
-  private prompt: Phaser.GameObjects.Text | null = null
-  private promptFor: Encounter | null = null
-  private promptBindings = -1
 
   constructor(ctx: RunContext) {
     super(SCENE.waystation, ctx)
@@ -51,8 +47,6 @@ export class WaystationScene extends GameplayScene {
     this.encounters = []
     this.nearIndex = -1
     this.engaged = null
-    this.prompt = null
-    this.promptFor = null
     const theme = this.director.segment(this.index).datasetKind
     const built = buildArena(this, this.ctx.art, theme, this.view, { views: ROOM_VIEWS, platforms: false })
     this.arena = built.arena
@@ -106,12 +100,6 @@ export class WaystationScene extends GameplayScene {
       const x = Math.round(from + (to - from) * SLOT_AT[ENCOUNTER_SLOTS[i]])
       this.encounters.push(ENCOUNTER_SPAWNERS[kind](host, x))
     })
-    this.prompt = addText(this, '', 7, { color: PALETTE.navy, bold: true, align: 'center' })
-      .setOrigin(0.5, 1)
-      .setBackgroundColor(cssColor(PALETTE.yellow))
-      .setPadding(3, 1, 3, 1)
-      .setDepth(DEPTH.fx)
-      .setVisible(false)
 
     this.showIntro('Waystation', `${director.bossSpec(index).label} is behind you · ${label.title}`, BANNER_MS)
   }
@@ -149,32 +137,20 @@ export class WaystationScene extends GameplayScene {
         return
       }
     }
-    this.showPrompt(encounter && !encounter.auto && !encounter.talking() ? encounter : null)
-    if (encounter && !encounter.auto && this.pressed('up')) {
-      this.showPrompt(null)
-      this.engaged = encounter
-      encounter.interact()
+    if (encounter && !encounter.auto) {
+      if (encounter.talking()) this.showPrompt(null)
+      else this.showPrompt(encounter.action, encounter.promptX, encounter.promptY)
+      if (this.interactPressed()) {
+        this.showPrompt(null)
+        this.engaged = encounter
+        encounter.interact()
+      }
       return
     }
-    if (Phaser.Geom.Intersects.RectangleToRectangle(box, this.exit)) this.leave((director) => director.leaveWaystation())
-  }
-
-  // The key follows the binding of 'up', so the text is set again after a binding change.
-  private showPrompt(encounter: Encounter | null) {
-    const prompt = this.prompt
-    if (!prompt) return
-    if (encounter === this.promptFor && this.promptBindings === this.ctx.bindingsVersion) return
-    this.promptFor = encounter
-    this.promptBindings = this.ctx.bindingsVersion
-    if (!encounter) {
-      prompt.setVisible(false)
-      return
-    }
-    const binding = this.ctx.bindings.up[0]
-    prompt
-      .setText(binding ? `[${bindingLabel(binding)}] ${encounter.action}` : encounter.action)
-      .setPosition(encounter.promptX, encounter.promptY)
-      .setVisible(true)
+    // The exit portal leads on only on the interact key, like every portal.
+    const offer = portalOffer(Phaser.Geom.Intersects.RectangleToRectangle(box, this.exit), true)
+    this.showPrompt(offer === 'enter' ? ENTER_ACTION : null, this.exit.centerX, this.exit.y - 24)
+    if (offer === 'enter' && this.interactPressed()) this.leave((director) => director.leaveWaystation())
   }
 
   protected onStoreClosed() {
@@ -190,7 +166,5 @@ export class WaystationScene extends GameplayScene {
   protected onShutdown() {
     this.encounters = []
     this.engaged = null
-    this.prompt = null
-    this.promptFor = null
   }
 }

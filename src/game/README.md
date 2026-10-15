@@ -46,6 +46,22 @@ card text under the list, and the wheel or a drag scrolls a long list a row at a
 build sits beside it (`BuildPanel`). Views at least 600 units wide put the recap beside the end
 text, narrower ones open it with the "Your run (B)" button as an overlay with larger text.
 
+## Portals
+
+Every door and portal that leads to another scene, the door at the end of a stretch, the portal a
+beaten node boss leaves and the exit portal of the waystation, is entered with the interact key,
+the `up` action (W by default), never by walking in. Standing in one shows a prompt over its sign
+with the key of the current binding, `[W] Enter`, the same prompt the FAIR trader shows for
+`[W] Trade` (`showPrompt` in `GameplayScene`). The rules are pure, in
+`phaser/scenes/interaction.ts`:
+
+- Only a fresh press of up counts. Up held from before, while running into the door, does nothing.
+- An up press with light or heavy pressed in the same step is an up attack, not an interaction, so
+  an up attack next to a door plays and the mage stays. A plain up press starts no attack, so the
+  press that enters never swings.
+- A portal that is still forming shows no prompt and takes nobody, and a portal held shut says why
+  instead (`portalOffer` returns `'blocked'`).
+
 ## Bosses
 
 A boss is built like a monster, from slots that annotations fill (`bossGenome` in
@@ -113,11 +129,11 @@ arena on the floor, wherever the boss died (`phaser/scenes/bossPortal.ts`, timel
 `portalSpawn.ts`). Forming takes 3 s (`PORTAL_SPAWN_MS`): a swirl grows from a point, sparks spiral
 in and the arch draws in from the floor up, dim and flickering under an "Opening…" sign. Then a
 flash, a pulse of the swirl and the sign "To the waystation" with the next step show that it is
-open. Only from then on does walking into it lead on, so a mage standing on the spot goes through
-when it opens, and nobody goes through by chance before. The portal clock runs with the world, so
+open. Only from then on does the `[W] Enter` prompt show over it, and the interact key takes a mage
+standing in it through (see [Portals](#portals)), so nobody goes through by chance. The portal clock runs with the world, so
 the level-up screen for the boss XP, the pause menu and hit-stop hold it. A platform over the middle
 of the arena may cross the arch. The arch is drawn behind it, and the enter box is the lower two
-tiles of the arch, so a mage standing on that platform stays put. The textures (arch, swirl, spark,
+tiles of the arch, so a mage standing on that platform gets no prompt. The textures (arch, swirl, spark,
 glow) are drawn when the fight starts, and the sparks are created once per portal.
 
 In the fight, badges over the boss show its mechanics and its theme (`art/bossMarkers.ts`, drawn

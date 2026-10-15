@@ -15,8 +15,10 @@ const SWIRL_LIFT = 30
 const FLASH_SIZE = 46
 
 export interface BossPortal {
-  // Where the player walks in, once the portal is open (PORTAL_SPAWN_MS).
+  // Where the player can enter, once the portal is open (PORTAL_SPAWN_MS).
   readonly box: Phaser.Geom.Rectangle
+  // The bottom of the interaction prompt, over the sign.
+  readonly promptY: number
   // Poses the portal `elapsedMs` after the boss fell. Allocates nothing.
   update(elapsedMs: number): void
 }
@@ -96,5 +98,5 @@ export function createBossPortal(scene: Phaser.Scene, x: number, floorY: number,
   }
 
   update(0)
-  return { box, update }
+  return { box, promptY: floorY - h - 24, update }
 }

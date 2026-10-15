@@ -1,7 +1,9 @@
 import Phaser from 'phaser'
 import type { Combatant, CombatWorld, HitEvent, KillerInfo } from '../../contracts/combat'
-import { PALETTE } from '../../contracts/constants'
+import { DEPTH, PALETTE } from '../../contracts/constants'
 import type { Action, Bindings, InputFrame } from '../../contracts/input'
+import { bindingLabel } from '../../model/input'
+import { cssColor } from '../color'
 import { preloadCoreAssets } from '../assets'
 import { createCombatWorld } from '../combat'
 import { createInputLayer, type InputLayer } from '../input/InputLayer'
@@ -13,6 +15,8 @@ import { createPlayer, type Player } from '../player/Player'
 import { followView, viewForBox, type View } from '../view'
 import { MOB_INFO_EVENT } from './mobInfoEvent'
 import type { GameplayControl, RunContext } from './context'
+import { interactPressed } from './interaction'
+import { addText } from './ui'
 import { PIT_KILLER, type RunDirector } from './RunDirector'
 import type { DatenkrakeDeal } from '../../model/progression'
 
@@ -48,6 +52,11 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
   private lookAhead = 0
   private inspector: Inspector | null = null
   private pauseDim: Phaser.GameObjects.Rectangle | null = null
+  // The interaction prompt ("[W] Enter", "[W] Trade"), one per scene, shown by showPrompt.
+  private prompt: Phaser.GameObjects.Text | null = null
+  private promptText: string | null = null
+  private promptKeyed = false
+  private promptBindings = -1
 
   constructor(key: string, ctx: RunContext) {
     super(key)
@@ -140,6 +149,14 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
     this.inspector = createInspector(this, (mob) => this.pickMob(mob))
     // Drawn here, not in the HUD, so the mob under the pointer can sit above it at full brightness.
     this.pauseDim = this.add.rectangle(0, 0, 1, 1, PALETTE.navy, PAUSE_DIM_ALPHA).setDepth(INSPECT_DIM_DEPTH).setVisible(false)
+    this.prompt = addText(this, '', 7, { color: PALETTE.navy, bold: true, align: 'center' })
+      .setOrigin(0.5, 1)
+      .setBackgroundColor(cssColor(PALETTE.yellow))
+      .setPadding(3, 1, 3, 1)
+      .setDepth(DEPTH.fx)
+      .setVisible(false)
+    this.promptText = null
+    this.promptBindings = -1
 
     const camera = this.cameras.main
     const { x, y, width, height } = level.bounds
@@ -214,6 +231,34 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
   // Went down since the previous step. Valid inside stepWorld.
   protected pressed(action: Action): boolean {
     return this.frame.pressed.has(action)
+  }
+
+  // An up press that interacts (a portal, the trader), not one that starts an up attack. Valid
+  // inside stepWorld.
+  protected interactPressed(): boolean {
+    return interactPressed(this.frame.pressed)
+  }
+
+  // Shows the interaction prompt with its bottom centre at (x, y), null hides it. With `keyed` the
+  // key of up comes first, "[W] Enter", and follows a binding change. Cheap to call every step:
+  // the text is only set again when it changes.
+  protected showPrompt(text: string | null, x = 0, y = 0, keyed = true) {
+    const prompt = this.prompt
+    if (!prompt) return
+    if (text === null) {
+      if (this.promptText !== null) prompt.setVisible(false)
+      this.promptText = null
+      return
+    }
+    if (text !== this.promptText || keyed !== this.promptKeyed || this.promptBindings !== this.ctx.bindingsVersion) {
+      this.promptText = text
+      this.promptKeyed = keyed
+      this.promptBindings = this.ctx.bindingsVersion
+      const binding = this.ctx.bindings.up[0]
+      prompt.setText(keyed && binding ? `[${bindingLabel(binding)}] ${text}` : text)
+    }
+    if (prompt.x !== x || prompt.y !== y) prompt.setPosition(x, y)
+    prompt.setVisible(true)
   }
 
   private togglePause() {
@@ -433,6 +478,8 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
     this.inspector?.destroy()
     this.inspector = null
     this.pauseDim = null
+    this.prompt = null
+    this.promptText = null
     this.loadout.destroy()
     this.controls.destroy()
     this.ctx.hud?.showPause(false)

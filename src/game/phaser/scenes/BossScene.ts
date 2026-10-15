@@ -12,6 +12,7 @@ import type { View } from '../view'
 import { buildArena } from './arena'
 import { createBossPortal, prewarmBossPortal, type BossPortal } from './bossPortal'
 import { PORTAL_SPAWN_MS } from './portalSpawn'
+import { ENTER_ACTION, portalOffer } from './interaction'
 import type { RunContext } from './context'
 import { GameplayScene, type LevelSetup } from './GameplayScene'
 import type { Parallax } from './levelArt'
@@ -22,7 +23,7 @@ const T = TILE
 const BANNER_MS = 1600
 
 // The fight against the node at the end of a segment. The beaten boss leaves a portal behind, and
-// the run goes on to the waystation when the player walks into it.
+// the run goes on to the waystation when the player enters it with the interact key.
 export class BossScene extends GameplayScene {
   private segment!: Segment
   private spec!: BossSpec
@@ -104,11 +105,13 @@ export class BossScene extends GameplayScene {
     this.portalMs += dtMs
     const fragments = updatePickups(this, this.player, dtMs)
     if (fragments > 0) this.gainFragments(fragments)
-    // Nothing happens while the portal forms. Once it is open, a mage inside it goes through.
+    // Nothing happens while the portal forms. Once it is open, the prompt shows over it and the
+    // interact key takes a mage inside it through.
     const portal = this.portal
-    if (portal && this.portalMs >= PORTAL_SPAWN_MS && Phaser.Geom.Intersects.RectangleToRectangle(this.player.hurtbox(), portal.box)) {
-      this.leave((director) => director.defeatBoss())
-    }
+    if (!portal) return
+    const offer = portalOffer(Phaser.Geom.Intersects.RectangleToRectangle(this.player.hurtbox(), portal.box), this.portalMs >= PORTAL_SPAWN_MS)
+    this.showPrompt(offer === 'enter' ? ENTER_ACTION : null, portal.box.centerX, portal.promptY)
+    if (offer === 'enter' && this.interactPressed()) this.leave((director) => director.defeatBoss())
   }
 
   // The portal animates with the world: a pause, the level-up screen or a hit-stop hold it.
