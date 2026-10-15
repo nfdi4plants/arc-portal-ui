@@ -16,23 +16,26 @@ beforeAll(() => {
   plan = found
 })
 
-// A run standing in the arena of the first node boss, which has just fallen.
+// A run standing in the waystation after the first node boss.
 function atFirstTrader(fragments: number): RunDirector {
   const director = new RunDirector(plan, { emit: () => {}, enter: () => {} })
   director.start()
   director.completeStretch()
+  director.defeatBoss()
   director.addFragments(fragments)
   return director
 }
 
 describe('Ontology Fragments in a run', () => {
-  it('carry over from the stretch to the boss and on to the next stretch', () => {
+  it('carry over from the stretch to the boss, through the waystation and on to the next stretch', () => {
     const director = new RunDirector(plan, { emit: () => {}, enter: () => {} })
     director.start()
     director.addFragments(4)
     director.completeStretch()
     director.addFragments(7)
     director.defeatBoss()
+    director.leaveWaystation()
+    expect(director.stage.kind).toBe('stretch')
     expect(director.fragments).toBe(11)
   })
 })
@@ -80,6 +83,8 @@ describe('the FAIR trade store in a run', () => {
     const row = historyRow(record)
     expect(row.title).toContain(`Bought · ${card.name}`)
     expect(row.source).toContain('FAIR trade store')
+    expect(row.source).toContain('waystation')
     expect(row.source).toContain(director.bossSpec(0).label)
+    expect(row.title).toBe(`Bought · ${card.name} (${card.rarity}) · ${priceOf(card)} fragments`)
   })
 })

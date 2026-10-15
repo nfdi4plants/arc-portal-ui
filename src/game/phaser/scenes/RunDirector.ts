@@ -12,6 +12,8 @@ import type { BossCharge, TraderMood } from '../../model/progression'
 export type RunStage =
   | { kind: 'stretch'; index: number }
   | { kind: 'boss'; index: number }
+  // The waystation after node boss `index`, where the FAIR trader stands.
+  | { kind: 'waystation'; index: number }
   | { kind: 'finalBoss' }
   | { kind: 'victory' }
   | { kind: 'dead'; killer: KillerInfo }
@@ -33,8 +35,9 @@ function lastPart(id: string): string {
   return id.split('/').filter(Boolean).pop() ?? id
 }
 
-// The sign over the portal that opens when node boss `index` falls. It names the next part of the
-// path: the process of the next step and where it leads, or the ARC itself after the last node.
+// The sign over the portal that leaves the waystation after node boss `index`, and over the one the
+// boss leaves behind. It names the next part of the path: the process of the next step and where it
+// leads, or the ARC itself after the last node.
 export function portalLabel(plan: RunPlan, index: number): PortalLabel {
   const next = plan.segments[index + 1]
   if (!next) return { title: `Next: ${plan.arcTitle || 'the ARC'}`, detail: 'The final boss' }
@@ -61,7 +64,8 @@ export class RunDirector {
   // costs none.
   fragments = 0
   private readonly hooks: RunDirectorHooks
-  // The stock of the trader after each node boss, rolled on the first visit and fixed from then on.
+  // The stock of the trader in the waystation after each node boss, rolled on the first visit and
+  // fixed from then on.
   private readonly stocks = new Map<number, PowerUpCard[]>()
   private readonly traderLines: Record<TraderMood, () => string>
   private history: LevelUpRecord[] = []
@@ -111,6 +115,8 @@ export class RunDirector {
   currentNodeIndex(): number {
     const stage = this.stage
     if (stage.kind === 'stretch' || stage.kind === 'boss') return stage.index + 1
+    // The node of the waystation is beaten, the next one is ahead.
+    if (stage.kind === 'waystation') return stage.index + 2
     return this.plan.nodes.length
   }
 
@@ -158,7 +164,7 @@ export class RunDirector {
   private recordLevelUp(cardId: string | null): void {
     const chosen = cardId ? this.lastOffer.find((card) => card.id === cardId) : undefined
     const stage = this.stage
-    const bossLabel = stage.kind === 'boss' ? this.bossSpec(stage.index).label : ''
+    const bossLabel = stage.kind === 'boss' || stage.kind === 'waystation' ? this.bossSpec(stage.index).label : ''
     this.history = appendLevelUp(this.history, {
       level: this.build.level - this.pendingLevelUps + 1,
       cardId,
@@ -174,7 +180,7 @@ export class RunDirector {
     if (amount > 0 && !this.isOver()) this.fragments += amount
   }
 
-  // The cards the trader of node boss `index` still has. Rolled against the build of the first
+  // The cards the trader in the waystation after node boss `index` still has. Rolled against the build of the first
   // visit, with a fork of its own, so leaving and coming back shows the same cards.
   stock(index: number): readonly PowerUpCard[] {
     let stock = this.stocks.get(index)
@@ -189,7 +195,7 @@ export class RunDirector {
     return this.traderLines[mood]()
   }
 
-  // Buys a card from the trader of node boss `index`. Only the card applies: the level, the XP and
+  // Buys a card from the trader in the waystation after node boss `index`. Only the card applies: the level, the XP and
   // the hp stay as they are. False when the card is not in stock, too dear or of no use now.
   buy(index: number, cardId: string): boolean {
     const stock = this.stocks.get(index)
@@ -217,10 +223,18 @@ export class RunDirector {
     if (stage.kind === 'stretch') this.enter({ kind: 'boss', index: stage.index })
   }
 
+  // The player walked into the portal the node boss left behind.
   defeatBoss(): void {
     const stage = this.stage
     if (stage.kind !== 'boss') return
     this.secondWind.recharge()
+    this.enter({ kind: 'waystation', index: stage.index })
+  }
+
+  // The player took the exit portal of the waystation: on to the next step, or to the ARC itself.
+  leaveWaystation(): void {
+    const stage = this.stage
+    if (stage.kind !== 'waystation') return
     const next = stage.index + 1
     this.enter(next < this.plan.segments.length ? { kind: 'stretch', index: next } : { kind: 'finalBoss' })
   }

@@ -24,25 +24,26 @@ export interface LevelUpRecord {
 }
 
 export interface SourceStage {
-  kind: 'stretch' | 'boss' | 'finalBoss' | 'victory' | 'dead'
+  kind: 'stretch' | 'boss' | 'waystation' | 'finalBoss' | 'victory' | 'dead'
   index?: number
 }
 
 export function sourceText(stage: SourceStage, plan: RunPlan, bossLabel: string): string {
-  if (stage.kind === 'stretch' || stage.kind === 'boss') {
+  if (stage.kind === 'stretch' || stage.kind === 'boss' || stage.kind === 'waystation') {
     const segment = plan.segments[stage.index ?? 0]
     const step = segment ? `${segment.datasetId.replace(/\/+$/, '')} · ${segment.processName}` : 'an unknown step'
+    // XP of the boss credits as the boss falls, so a level chosen in the waystation still came from it.
     return stage.kind === 'stretch' ? `earned in ${step}` : `earned against boss ${bossLabel} after ${step}`
   }
   if (stage.kind === 'finalBoss') return 'earned against the final boss'
   return 'earned at the end of the run'
 }
 
-// Where a store purchase was made: the trader stands in the arena of the boss just beaten.
+// Where a store purchase was made: the trader stands in the waystation after the boss just beaten.
 export function storeSourceText(plan: RunPlan, index: number, bossLabel: string): string {
   const segment = plan.segments[index]
-  const step = segment ? ` after ${segment.processName}` : ''
-  return `bought at the FAIR trade store, boss ${bossLabel}${step}`
+  const step = segment ? ` (${segment.processName})` : ''
+  return `bought at the FAIR trade store in the waystation after boss ${bossLabel}${step}`
 }
 
 // Entries stay in level order whatever order they arrive in.

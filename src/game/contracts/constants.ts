@@ -14,6 +14,7 @@ export const SCENE = {
   boot: 'Boot',
   stretch: 'Stretch',
   boss: 'Boss',
+  waystation: 'Waystation',
   finalBoss: 'FinalBoss',
   hud: 'Hud',
   levelUp: 'LevelUp',

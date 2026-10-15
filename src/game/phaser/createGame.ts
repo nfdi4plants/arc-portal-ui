@@ -12,6 +12,7 @@ import { LevelUpScene } from './scenes/LevelUpScene'
 import { StoreScene } from './scenes/StoreScene'
 import { StretchScene } from './scenes/StretchScene'
 import { VictoryScene } from './scenes/VictoryScene'
+import { WaystationScene } from './scenes/WaystationScene'
 
 // Phaser 4.2.1 never calls WEBGL_lose_context, and every Start run from the menu creates a new game.
 // Without this the destroyed games keep their GL contexts until the browser reclaims them.
@@ -57,6 +58,7 @@ export const createGame: CreateGame = (parent, { bindings }) => {
     }),
     new StretchScene(ctx),
     new BossScene(ctx),
+    new WaystationScene(ctx),
     new FinalBossScene(ctx),
     new HudScene(ctx),
     new LevelUpScene(ctx),

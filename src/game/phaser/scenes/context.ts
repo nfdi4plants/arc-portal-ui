@@ -23,7 +23,8 @@ export interface GameplayControl {
   resumeFromPause(): void
   // Null skips a level whose offer was empty.
   chooseCard(cardId: string | null): void
-  // The FAIR trade store of node boss `index`. buyCard is false when the purchase did not happen.
+  // The FAIR trade store in the waystation after node boss `index`. buyCard is false when the
+  // purchase did not happen.
   buyCard(index: number, cardId: string): boolean
   closeStore(): void
   setBindings(bindings: Bindings): void
@@ -34,7 +35,8 @@ export interface HudControl {
   showPause(visible: boolean): void
 }
 
-const GAMEPLAY_SCENES = [SCENE.stretch, SCENE.boss, SCENE.finalBoss]
+const GAMEPLAY_SCENES = [SCENE.stretch, SCENE.boss, SCENE.waystation, SCENE.finalBoss]
+const GAMEPLAY_SCENE_OF = { stretch: SCENE.stretch, boss: SCENE.boss, waystation: SCENE.waystation, finalBoss: SCENE.finalBoss } as const
 const RUN_SCENES = [...GAMEPLAY_SCENES, SCENE.hud, SCENE.levelUp, SCENE.store, SCENE.death, SCENE.victory]
 
 // Shared by every scene of one game. It holds the run and switches the scenes when the run
@@ -124,12 +126,12 @@ export class RunContext {
     switch (stage.kind) {
       case 'stretch':
       case 'boss':
+      case 'waystation':
       case 'finalBoss': {
         this.stopGameplay(scenes)
         this.sceneOp('stop', SCENE.levelUp)
         this.sceneOp('stop', SCENE.store)
-        const key = stage.kind === 'stretch' ? SCENE.stretch : stage.kind === 'boss' ? SCENE.boss : SCENE.finalBoss
-        this.sceneOp('start', key, stage.kind === 'finalBoss' ? {} : { index: stage.index })
+        this.sceneOp('start', GAMEPLAY_SCENE_OF[stage.kind], stage.kind === 'finalBoss' ? {} : { index: stage.index })
         break
       }
       case 'victory':
