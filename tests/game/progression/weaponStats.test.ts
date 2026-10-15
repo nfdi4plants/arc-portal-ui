@@ -47,7 +47,13 @@ function fire(move: AttackMove, tier: 1 | 2): Captured[] {
   const hits: Captured[] = []
   const scene = {} as AttackContext['scene']
   const scheduler = createScheduler()
-  const unbind = bindScheduler(scene, scheduler)
+  const player = {
+    getBuild: () => ({ stats: { attackSpeed: 1 } }),
+    position: () => ({ x: 0, y: 0 }),
+    facing: () => 1,
+    isDead: () => false,
+  }
+  const unbind = bindScheduler(player, scheduler)
   const ctx = {
     scene,
     tier,
@@ -55,12 +61,7 @@ function fire(move: AttackMove, tier: 1 | 2): Captured[] {
     aim: { x: 100, y: -20 },
     held: new Set(),
     art: { projectile: () => ({ textureKey: 't', animKey: 'a' }) },
-    player: {
-      getBuild: () => ({ stats: { attackSpeed: 1 } }),
-      position: () => ({ x: 0, y: 0 }),
-      facing: () => 1,
-      isDead: () => false,
-    },
+    player,
     combat: {
       spawnHitbox(box: Box) {
         const { shape } = box

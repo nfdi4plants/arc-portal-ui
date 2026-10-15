@@ -129,6 +129,7 @@ export function attachLoadout(deps: LoadoutDeps): LoadoutWithStatus {
   const movesets = [...WEAPON_MOVESETS, staffMoveset].map((moveset) => moves.wrap(moveset))
   const critRoll = deps.rng.fork('loadout-crit')
   const modifier = createDamageModifier(player, core.damage, () => critRoll.next(), corruption.damage)
+  const removeModifier = combat.addDamageModifier(modifier)
   // Ids last given to each ability slot, so a sync keeps the cooldown of a slot that did not change.
   const applied: (string | null | undefined)[] = [undefined, undefined, undefined, undefined]
   let destroyed = false
@@ -157,7 +158,7 @@ export function attachLoadout(deps: LoadoutDeps): LoadoutWithStatus {
     destroyed = true
     scene.events.off('postupdate', render)
     scene.events.off('shutdown', destroy)
-    combat.setDamageModifier(null)
+    removeModifier()
     player.setLethalHitInterceptor(null)
     for (let slot = 0; slot < applied.length; slot++) if (applied[slot]) player.setAbilityHandler(slot, null)
     core.destroy()
@@ -173,7 +174,6 @@ export function attachLoadout(deps: LoadoutDeps): LoadoutWithStatus {
       // Rogue Admin: every hit crits.
       core.damage.critChance = build.corrupted.includes('rogueAdmin') ? 1 : build.stats.critChance
       core.damage.critMultiplier = build.stats.critMultiplier
-      combat.setDamageModifier(modifier)
       core.version++
 
       for (const moveset of movesets) player.registerMoveset(moveset)

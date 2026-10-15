@@ -4,7 +4,7 @@ import { DEPTH, PALETTE, TILE } from '../../../contracts/constants'
 import { createBossCharge } from '../../../model/progression/charge'
 import { cssColor } from '../../color'
 import type { Core } from './core'
-import { createMark, inCone, nearestAhead } from './helpers'
+import { createMark, inCone, nearestAhead, opposingTeam } from './helpers'
 import type { Point } from './helpers'
 import type { AbilityFeature } from './mechanics'
 
@@ -169,7 +169,7 @@ const HOOD_COOLDOWN_MS = 12000
 // the combat world) and enemies inside are slowed to 70%. Pressing again later moves it.
 export function createFumeHood(core: Core): AbilityFeature {
   const { scene, combat, player } = core.deps
-  const zone: SlowZone = { x: 0, y: 0, w: HOOD_W, h: HOOD_H, factor: HOOD_SHOT_FACTOR, team: 'player' }
+  const zone: SlowZone = { x: 0, y: 0, w: HOOD_W, h: HOOD_H, factor: HOOD_SHOT_FACTOR, team: player.team }
   const middle = { x: 0, y: 0 }
   let removeZone: (() => void) | null = null
   let hood: Phaser.GameObjects.Graphics | null = null
@@ -473,7 +473,7 @@ export function createPeerPressure(core: Core): AbilityFeature {
         area.y = view.y
         area.w = view.width
         area.h = view.height
-        combat.cancelShots('enemy', area)
+        combat.cancelShots(opposingTeam(player.team), area)
         core.fx.burst(feet.x, feet.y - MIDDLE, 'levelUp', 3)
         scene.cameras.main.shake(140, 0.004)
       },

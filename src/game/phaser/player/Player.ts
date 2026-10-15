@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import type { ScribbleArt, SpriteRef } from '../../contracts/art'
-import type { CombatWorld, HitEvent } from '../../contracts/combat'
+import type { CombatWorld, HitEvent, KillerInfo, Team } from '../../contracts/combat'
 import { DEPTH, MAGE_FRAME, MAGE_TEXTURE, PALETTE, PLAYER_HEIGHT } from '../../contracts/constants'
 import type { Action, InputFrame } from '../../contracts/input'
 import type { AbilityHandler, AttackContext, PlayerEvents, PlayerHandle, WeaponMoveset } from '../../contracts/player'
@@ -39,7 +39,7 @@ const SMEAR_ALPHA = [0.25, 0.17, 0.1, 0.05]
 const SMEAR_LIGHT_COUNT = 3
 const SMEAR_FADE_MS = 90
 // Weapons that shoot. Their moves get no smear, only their projectile art.
-const RANGED_WEAPONS: ReadonlySet<PlayerWeaponId> = new Set(['wand', 'pipettePistol', 'centrifugeDisc', 'arcCommander', 'gitLfs'])
+const RANGED_WEAPONS: ReadonlySet<PlayerWeaponId> = new Set(['wand', 'pipettePistol', 'centrifugeDisc', 'arcitect', 'arcCommander', 'gitLfs'])
 const WEAPON_SLOTS: readonly WeaponSlot[] = ['light', 'heavy']
 
 export interface PlayerDeps {
@@ -48,6 +48,15 @@ export interface PlayerDeps {
   input: InputLayer
   build: PlayerBuild
   colliders: Phaser.Types.Physics.Arcade.ArcadeColliderType[]
+  // Who this player is. The mage by default. The FAIR trader runs the same body on the enemy team,
+  // driven by its own input (scenes/traderAi.ts).
+  identity?: { id: string; team: Team; killer: KillerInfo | null }
+  // The body texture and frame. The mage sprite by default.
+  look?: { texture: string; frame?: string }
+  // How the body takes hits. By default every hit flinches, cancels the attack, knocks back and
+  // leaves DAMAGE_IFRAMES_MS of invulnerability. `poise` returns true for a hit that only deals
+  // its damage, and `iframesMs` replaces the invulnerability.
+  hits?: { iframesMs: number; poise(hit: HitEvent): boolean }
 }
 
 export interface PlayerDebugState {
@@ -180,8 +189,9 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
   const colliders = deps.colliders.map((target) => scene.physics.add.collider(body, target, undefined, processCollision))
 
   // Visuals. The container sits at the feet, the mage image hangs above it.
-  const mageFrame = scene.textures.get(MAGE_TEXTURE).has(MAGE_FRAME) ? MAGE_FRAME : undefined
-  const mage = scene.add.image(0, 0, MAGE_TEXTURE, mageFrame).setOrigin(0.5, 1)
+  const bodyTexture = deps.look?.texture ?? MAGE_TEXTURE
+  const mageFrame = deps.look ? deps.look.frame : scene.textures.get(MAGE_TEXTURE).has(MAGE_FRAME) ? MAGE_FRAME : undefined
+  const mage = scene.add.image(0, 0, bodyTexture, mageFrame).setOrigin(0.5, 1)
   const baseScale = PLAYER_HEIGHT / Math.max(1, mage.height)
   // The weapon art stands upright with the grip at its origin, so the sprite rotates around the hand.
   const weapon = scene.add.sprite(0, 0, MAGE_TEXTURE)
@@ -218,7 +228,7 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
   // A fixed pool for the dash smear, reused in turn.
   const ghosts = Array.from({ length: GHOST_COUNT }, () =>
     scene.add
-      .image(0, 0, MAGE_TEXTURE, mageFrame)
+      .image(0, 0, bodyTexture, mageFrame)
       .setOrigin(0.5, 1)
       .setTint(PALETTE.blue)
       .setTintMode(Phaser.TintModes.FILL)
@@ -569,9 +579,9 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
   scene.events.on('postupdate', onRender)
 
   const handle: Player = {
-    id: 'player',
-    team: 'player',
-    killer: null,
+    id: deps.identity?.id ?? 'player',
+    team: deps.identity?.team ?? 'player',
+    killer: deps.identity?.killer ?? null,
     gameObject: container,
     // The same rectangle every call. Read it, do not keep it.
     hurtbox: () => hurtbox.setTo(body.x, body.y, W, H),
@@ -595,13 +605,19 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
       }
       const taken = Math.min(hp, hit.damage)
       hp -= taken
+      flashMs = 70
+      if (deps.hits) damageIframesMs = Math.max(damageIframesMs, deps.hits.iframesMs)
+      // A poised body (the trader) shrugs the hit off and goes on with what it does.
+      if (deps.hits?.poise(hit) && hp > 0) {
+        emit('damaged', { hit })
+        return taken
+      }
       attacks.cancel()
       motor.dashMs = 0
       motor.jumpHeld = false
       handle.setVelocity(hit.knockback.x, hit.knockback.y)
       flinchMs = FLINCH_MS
-      damageIframesMs = DAMAGE_IFRAMES_MS
-      flashMs = 70
+      if (!deps.hits) damageIframesMs = DAMAGE_IFRAMES_MS
       if (build.corrupted.includes('mirrorSite')) mirrorMs = CORRUPTION.mirrorSite.mirrorMs
       emit('damaged', { hit })
       return taken

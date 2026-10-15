@@ -3,7 +3,9 @@ import type { Annotation } from '../../arc/provenance/types'
 import type { BossSpec } from './content'
 import type { Segment } from './run'
 
-export type Team = 'player' | 'enemy'
+// 'neutral' is a bystander, the FAIR trader before he fights: every hit lands on it, but nothing
+// looks for it as a target.
+export type Team = 'player' | 'enemy' | 'neutral'
 
 // What the death screen names.
 export type KillerInfo =
@@ -113,9 +115,11 @@ export interface CombatWorld {
   on(event: 'hit' | 'kill', listener: (event: HitEvent) => void): () => void
   // Lets the attacker's build decide crits and damage multipliers before the hit lands.
   // `tags` are the hit's tags ('projectile' included for shots) and `target` the one it lands on.
-  setDamageModifier(
-    modifier: ((attacker: Combatant, base: number, tags: readonly string[], target: Combatant) => { damage: number; crit: boolean }) | null,
-  ): void
+  // Every loadout adds its own, and each passes hits that are not its owner's on unchanged, so a
+  // hit runs through all of them in turn. Returns the function that removes it.
+  addDamageModifier(
+    modifier: (attacker: Combatant, base: number, tags: readonly string[], target: Combatant) => { damage: number; crit: boolean },
+  ): () => void
   // Called once per fixed step.
   update(deltaMs: number): void
   // Scenes freeze their actors while this is above zero.

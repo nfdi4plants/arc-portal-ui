@@ -176,7 +176,7 @@ export class CombatSandboxScene extends Phaser.Scene {
     for (const dummy of this.dummies) this.combat.register(dummy)
 
     const rng = createRng('combat-sandbox')
-    this.combat.setDamageModifier((_attacker, base) => {
+    this.combat.addDamageModifier((_attacker, base) => {
       const crit = rng.chance(0.25)
       return { damage: crit ? base * 2 : base, crit }
     })

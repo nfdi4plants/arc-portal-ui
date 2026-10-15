@@ -1,4 +1,3 @@
-import type Phaser from 'phaser'
 import type { FxArt, ProjectileArt } from '../../../contracts/art'
 import type { HitShape } from '../../../contracts/combat'
 import type { AttackContext, AttackMove, WeaponMoveset } from '../../../contracts/player'
@@ -58,13 +57,14 @@ export function activeMs(ctx: AttackContext, self: AttackMove): number {
 }
 
 // The movesets are module constants that know nothing of the loadout, so the move layer binds the
-// loadout's scheduler to its scene and `later` looks it up there.
-const schedulers = new WeakMap<Phaser.Scene, Scheduler>()
+// loadout's scheduler to its wielder and `later` looks it up there. Per wielder, not per scene:
+// the FAIR trader wields a loadout of his own in the same scene as the mage.
+const schedulers = new WeakMap<object, Scheduler>()
 
-export function bindScheduler(scene: Phaser.Scene, scheduler: Scheduler): () => void {
-  schedulers.set(scene, scheduler)
+export function bindScheduler(wielder: object, scheduler: Scheduler): () => void {
+  schedulers.set(wielder, scheduler)
   return () => {
-    if (schedulers.get(scene) === scheduler) schedulers.delete(scene)
+    if (schedulers.get(wielder) === scheduler) schedulers.delete(wielder)
   }
 }
 
@@ -75,17 +75,17 @@ export const SUB_HITS = 1
 // Delays inside a move run on the loadout's fixed-step scheduler, so they stand still during
 // hit-stop like the hitboxes and projectiles they spawn.
 export function later(ctx: AttackContext, delayMs: number, run: () => void, group = SUB_HITS): void {
-  schedulers.get(ctx.scene)?.at(delayMs, run, group)
+  schedulers.get(ctx.player)?.at(delayMs, run, group)
 }
 
 // The loadout's effect pool, bound the same way as the scheduler. Without a loadout (the test
 // room) the effects are skipped and the hits still land.
-const fxPools = new WeakMap<Phaser.Scene, FxPool>()
+const fxPools = new WeakMap<object, FxPool>()
 
-export function bindFx(scene: Phaser.Scene, fx: FxPool): () => void {
-  fxPools.set(scene, fx)
+export function bindFx(wielder: object, fx: FxPool): () => void {
+  fxPools.set(wielder, fx)
   return () => {
-    if (fxPools.get(scene) === fx) fxPools.delete(scene)
+    if (fxPools.get(wielder) === fx) fxPools.delete(wielder)
   }
 }
 
@@ -110,11 +110,11 @@ export function placeBlock(ctx: AttackContext, kind: 'assay' | 'study' | 'invest
 }
 
 export function burst(ctx: AttackContext, x: number, y: number, kind: FxArt, size = 1): void {
-  fxPools.get(ctx.scene)?.burst(x, y, kind, size)
+  fxPools.get(ctx.player)?.burst(x, y, kind, size)
 }
 
 export function streak(ctx: AttackContext, x1: number, y1: number, x2: number, y2: number, durationMs: number): void {
-  fxPools.get(ctx.scene)?.line(x1, y1, x2, y2, durationMs)
+  fxPools.get(ctx.player)?.line(x1, y1, x2, y2, durationMs)
 }
 
 // The top of the nearest floor (any static body, one-way platforms included) below a world point,

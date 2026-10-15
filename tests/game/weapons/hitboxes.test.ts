@@ -24,7 +24,6 @@ function boxesOf(move: AttackMove, tier: 1 | 2, hook: 'onActive' | 'onLand' = 'o
   const spawned: HitboxSpec[] = []
   const scene = { physics: { overlapRect: () => [] } }
   const scheduler = createScheduler()
-  const unbind = bindScheduler(scene as unknown as AttackContext['scene'], scheduler)
   const player = {
     position: () => ({ x: 0, y: 0 }),
     facing: () => 1,
@@ -32,6 +31,7 @@ function boxesOf(move: AttackMove, tier: 1 | 2, hook: 'onActive' | 'onLand' = 'o
     isGrounded: () => true,
     isDead: () => false,
   }
+  const unbind = bindScheduler(player, scheduler)
   const ctx = {
     scene,
     art: { projectile: () => ({ textureKey: 't', animKey: 'a' }) },

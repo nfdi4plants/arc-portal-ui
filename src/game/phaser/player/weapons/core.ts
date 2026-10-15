@@ -68,7 +68,8 @@ export interface ExtraBox {
   stagger?: number
 }
 
-// Secondary hits (echo, chain, reviewer, DOI) belong to a stand-in attacker on the player's team.
+// Secondary hits (echo, chain, reviewer, DOI) belong to a stand-in attacker on the wielder's team,
+// who also names the wielder on the death screen (the FAIR trader wields a loadout too).
 // The damage modifier and every player-hit listener skip them, so a secondary hit never triggers
 // another one and its damage is exactly what the caller computed.
 export interface ExtraAttacks {
@@ -105,9 +106,9 @@ function createExtraAttacks(deps: LoadoutDeps): ExtraAttacks {
   const state = { x: 0, y: 0, face: 1 as 1 | -1 }
   const hurtbox = new Phaser.Geom.Rectangle(0, 0, 0, 0)
   const standIn: Combatant = {
-    id: 'player-extra',
-    team: 'player',
-    killer: null,
+    id: `${deps.player.id}-extra`,
+    team: deps.player.team,
+    killer: deps.player.killer,
     hurtbox: () => hurtbox,
     facing: () => state.face,
     position: () => state,

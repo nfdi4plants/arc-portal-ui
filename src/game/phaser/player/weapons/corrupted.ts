@@ -123,7 +123,7 @@ export function createCorruption(core: Core): CorruptionFeature {
   core.own(
     player.on('damaged', ({ hit }) => {
       const attacker = hit.attacker
-      if (!flags.mirrorSite || attacker.team !== 'enemy' || attacker.isDead() || hit.damage <= 0) return
+      if (!flags.mirrorSite || attacker.team === player.team || attacker.isDead() || hit.damage <= 0) return
       const box = attacker.hurtbox()
       const damageBack = hit.damage * CORRUPTION.mirrorSite.thorns
       core.extra.box({ cx: box.centerX, cy: box.centerY, w: box.width, h: box.height, face: player.facing(), damage: damageBack, tags: ['extra', 'thorns'] })

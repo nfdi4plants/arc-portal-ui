@@ -4,7 +4,7 @@ import { DEPTH, MAGE_FRAME, MAGE_TEXTURE, PALETTE, PLAYER_HEIGHT } from '../../.
 import { cssColor } from '../../color'
 import type { AbilityFeature } from './mechanics'
 import type { Core, Feature } from './core'
-import { centerOf, createRingBuffer, nearestLiving, pickChainTarget } from './helpers'
+import { centerOf, createRingBuffer, nearestLiving, opposingTeam, pickChainTarget } from './helpers'
 import type { Point } from './helpers'
 
 // The Ontology: a hit tags the enemy. Every later hit on a tagged enemy adds half its damage as a
@@ -25,7 +25,7 @@ export function createOntology(core: Core): Feature {
 
   core.own(
     combat.on('hit', (event) => {
-      if (!core.flags.theOntology || event.attacker !== player || event.target.team !== 'enemy') return
+      if (!core.flags.theOntology || event.attacker !== player || event.target.team !== opposingTeam(player.team)) return
       const wasTagged = tagged.has(event.target)
       tagged.add(event.target)
       if (!wasTagged || event.target.isDead()) return
