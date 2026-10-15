@@ -408,6 +408,17 @@ The target is a steady 60 fps on an integrated GPU.
   and cached by spec id. `ScribbleArt.pixelsPerUnit` is 2, so raw texture keys need a scale of 1/2.
   The stretch scene draws all effect and projectile textures on the first banner frame and the
   monster textures a few per frame behind the intro banner.
+- Generated art is drawn on canvases opened with `artContext` (`phaser/art/canvas.ts`), which asks
+  for `willReadFrequently` and so keeps the canvas in main memory. Phaser uploads every texture
+  from its canvas again when the WebGL context comes back after a GPU reset (a driver hang or
+  update, or waking the PC from sleep while the game sat minimized). A GPU-backed canvas
+  is cleared in the same reset, so every mob, tile and effect came back invisible, including the
+  mobs that spawn later. Uploading a canvas from main memory costs about 1 ms more per texture
+  (2 per monster), almost all of it behind the banners. `tests/game/art/canvas.test.ts` fails on a new
+  `getContext('2d')` without it. To check by hand, run the game in Chrome and open
+  `chrome://gpucrash` in another tab: the scene goes blank for a moment and then returns whole. A
+  lost and restored WebGL context alone (`WEBGL_lose_context` in the console) keeps the canvases and
+  must also come back whole.
 - Textures have a limited lifetime. Each stretch frees the monster textures of earlier segments
   (`releaseMonsters`). Danger zone sizes snap to powers of two, and the boss scenes draw the common
   zones up front and free them on shutdown (`prewarmTelegraphs`, `releaseTelegraphs`).

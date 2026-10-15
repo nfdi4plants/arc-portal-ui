@@ -1,5 +1,6 @@
 import type Phaser from 'phaser'
 import type { PartRef, SpriteRef } from '../../contracts/art'
+import { artContext } from '../art/canvas'
 
 type BossArtRef = SpriteRef & { parts: Record<string, PartRef> }
 
@@ -49,7 +50,7 @@ export function stillTexture(scene: Phaser.Scene, ref: SpriteRef): string {
   const canvas = document.createElement('canvas')
   canvas.width = frame.cutWidth
   canvas.height = frame.cutHeight
-  const context = canvas.getContext('2d')
+  const context = artContext(canvas)
   if (!context) return ref.textureKey
   context.drawImage(texture.getSourceImage() as CanvasImageSource, frame.cutX, frame.cutY, frame.cutWidth, frame.cutHeight, 0, 0, frame.cutWidth, frame.cutHeight)
   const still = scene.textures.create(key, canvas)

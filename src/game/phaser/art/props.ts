@@ -3,6 +3,7 @@ import type { SpriteRef } from '../../contracts/art'
 import { PALETTE } from '../../contracts/constants'
 import type { PowerUpKind, Rarity } from '../../contracts/progression'
 import { cached, spriteFrom } from './atlas'
+import { artContext } from './canvas'
 import { gearPts, starPts, wavePts } from './geometry'
 import type { Pt } from './geometry'
 import { gold, metal, stone, wood } from './looks'
@@ -301,7 +302,7 @@ export function glowTexture(scene: Phaser.Scene): string {
     const canvas = document.createElement('canvas')
     canvas.width = 64
     canvas.height = 64
-    const ctx = canvas.getContext('2d')
+    const ctx = artContext(canvas)
     if (ctx) {
       const gradient = ctx.createRadialGradient(32, 32, 4, 32, 32, 32)
       gradient.addColorStop(0, 'rgba(255, 255, 255, 0.9)')
