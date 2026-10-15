@@ -191,14 +191,90 @@ next step (`portalLabel`). There is no enemy, no XP and no pit. The HUD, the pau
 level history work as everywhere, and the path on the HUD marks the beaten node.
 
 What stands in the room comes from `rollEncounters(runSeed, afterSegmentIndex)` in
-`model/run/encounters.ts`. For now that is always exactly the FAIR trader. The kinds fill the slots
-in the order of `ENCOUNTER_SLOTS` (centre, left, right), spread over the floor between the entrance
-and the exit. In the scene, `ENCOUNTER_SPAWNERS` in `phaser/scenes/encounters.ts` maps each kind to
+`model/run/encounters.ts`: always the FAIR trader, and in 40% of the waystations the Datenkrake
+(see [The Datenkrake](#the-datenkrake)). The kinds fill the slots in the order of `ENCOUNTER_SLOTS`
+(centre, right, left), spread over the floor between the entrance and the exit, so a second
+encounter stands between the trader and the exit. In the scene, `ENCOUNTER_SPAWNERS` in `phaser/scenes/encounters.ts` maps each kind to
 a spawner that puts it at the x of its slot and returns an `Encounter`: an interaction zone, the
 prompt word, and hooks for the arrival, the approach, the interaction and the closed overlay. The
-scene shows the prompt with the key of `up` and calls `interact` when it is pressed in the zone. A
-new chance encounter is a new `EncounterKind`, an entry with its chance in `CHANCE_ENCOUNTERS` and
-a spawner.
+scene shows the prompt with the key of `up` and calls `interact` when it is pressed in the zone, or
+at once when the player walks into the zone of an `auto` encounter. A new chance encounter is a new
+`EncounterKind`, an entry with its chance in `CHANCE_ENCOUNTERS` and a spawner.
+
+## The Datenkrake
+
+The Datenkrake (the old German meme, a data octopus) is a chance encounter of the waystation, rolled
+from the run seed with a 40% chance per waystation (`CHANCE_ENCOUNTERS`). It sits in front of a
+server rack between the trader and the exit, its tentacles sway and it calls out to the mage
+(`spawnDatenkrake` in `phaser/scenes/encounters.ts`, art in `phaser/art/datenkrake.ts`). When the
+mage walks into its reach, a tentacle grabs the mage and lifts it a little while the world is held,
+then `DatenkrakeScene` opens over the world with a line of the kraken and two choices:
+
+- Fight back (1): the kraken lets go with an indignant line and the mage walks on with every augment.
+- Submit (2): the kraken takes a random augment and gives a random corrupted augment back. The
+  overlay shows the card taken and the corrupted card with its boon in green and its curse in red
+  until Walk on (Enter, after 600 ms).
+
+There is no other way out of the grip, neither the pause key nor walking away. The kraken grabs once
+per waystation (`RunDirector.datenkrakeOutcome`). It takes one stack of a stat card (the level
+history counts the stacks, `statStacks` in `levelHistory.ts`), a mechanic or an ability card (whose
+slot becomes free again), never a weapon, a legendary or a corrupted augment
+(`model/progression/datenkrake.ts`). A build with nothing it may take is only mocked and keeps
+walking. Both choices go into the level history and the run recap: "Fought off the Datenkrake",
+"Taken by the Datenkrake: X" and "Corrupted: Y", marked purple. The build panel lists the corrupted
+augments as dark purple chips. The lines (`DATENKRAKE_LINES`) mix the meme with research data
+management and never repeat right away.
+
+A corrupted augment (`model/progression/corrupted.ts`) has one strong boon and one harsh curse, and
+most of them only shine or only hurt on some builds. None is given twice, and In Silico and In Vitro
+never together. Their stat parts go past the card limits on purpose.
+
+| Augment | Boon | Curse | Loves it | Hates it |
+|---|---|---|---|---|
+| Big Data | +100% damage | 75% more damage taken | dodgers, ranged | face-tanking melee |
+| Deprecated jump() | max HP x2.5, healed | no jump of any kind, a kraken intern helps | grounded melee | double jump, wall jump, glide |
+| Shadow IT | the dash hits for 22 | dash cooldown x2 | Rapid Release, Cloud Upload | builds that dodge with the dash |
+| Data Lake | standing still heals 5% max HP/s | move speed -30% | turrets: wand, pipette, disc | melee chasers |
+| Blockchain | hits chain to 2 more enemies for 50% | every attack costs 1 HP (never the last) | Data Reuse, crowds | low HP, fast mashing |
+| Overfitting | +150% on the enemy hit last | -50% on any other | boss fights, single target | crowds, spread hits |
+| Rogue Admin | every hit crits | ability cooldowns x3 | builds without abilities | ability builds |
+| Data Leak | fragments picked up count x3 | a hit taken leaks 3 fragments | careful shoppers | tanks |
+| Terms of Service | level-ups heal to full | a 2 s EULA stun after each level-up card | slow, careful play | level-ups mid-fight |
+| Mirror Site | attackers take 4x the damage back | left and right swap for 2 s after a hit | tanky melee | platforming near pits |
+| In Silico | shots pierce all and +60% | melee -50% | wand, pipette, disc | staff, scalpel, hammer |
+| In Vitro | melee +60% and +40% reach | shots -60% | scalpel, whip, hammer | wand, pipette, disc |
+| Heavy Metadata | heavy attacks +150% | light attacks -50% | Beaker Hammer, DOI Excalibur | light strings, Reproducibility |
+| Reviewer 2 | every 10th hit deals 10x | the first hit on each enemy deals 0 | fast hits (pipette, dual scalpels) | slow single hits |
+| Accept All Cookies | +2 max HP per kill for good | a 1 s cookie banner stun every 25 s | long runs, crowds | boss fights |
+| Infinite Scroll | dash cooldown x0.25, endless air dashes | attack speed -40% | mobility | damage per second |
+
+The stat parts apply with the augment (`applyCorrupted`). The damage factors run through the
+combat world's damage modifier, which now also gets the hit's tags and target
+(`outgoingFactor`, `incomingFactor`), and the rest lives in the loadout feature
+`phaser/player/weapons/corrupted.ts` (dash hits, the Data Lake heal, the chain and its cost, thorns,
+the cookie banner, the EULA), in the player (mirrored controls, stuns), the motor (`noJump`,
+`infiniteAirDash`) and the run director (fragments, cookies). Cards an augment makes useless are not
+offered (`canApply`): no extra jumps or glide without a jump, no Quality Control under Rogue Admin.
+
+No curse traps the mage. The slowest the augments make the mage is 0.7 times the run speed, which
+still clears the widest gap with the plain jump (a test checks it). Deprecated jump() takes every
+jump, so a kraken intern in a hard hat follows the mage through the stretches
+(`phaser/scenes/intern.ts`). It only helps where the walk to the door needs it
+(`phaser/scenes/internPlan.ts`): over every hole between grounds (gaps and pits) it builds a plank
+bridge in 0.9 s, with a barrier at both ends until it stands, so a slow mage waits instead of
+falling, and at a wall where the ground goes up it reaches out a tentacle and hoists the mage over.
+Platforms are never needed to reach the door, and boss arenas and waystations are flat, so they get
+nothing: a mage without a jump cannot use them and has to take the hits it cannot dodge there. That
+is what the 2.5 times the HP pays for. `walkWithoutJumping` walks hundreds of generated stretches
+with bridges and lifts only.
+
+| What | Where |
+|---|---|
+| Datenkrake chance | `model/run/encounters.ts` (`CHANCE_ENCOUNTERS`) |
+| Grab reach and animation timing | `phaser/scenes/encounters.ts` |
+| Corrupted augment numbers | `model/progression/corrupted.ts` (`CORRUPTION`) |
+| Kraken lines | `model/progression/datenkrake.ts` (`DATENKRAKE_LINES`) |
+| Intern build distance and times | `phaser/scenes/intern.ts` |
 
 ## Phantoms
 
