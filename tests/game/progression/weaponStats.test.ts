@@ -2,11 +2,12 @@ import { describe, expect, it, vi } from 'vitest'
 import type { AttackContext, AttackMove, WeaponMoveset } from '../../../src/game/contracts/player'
 import type { PlayerWeaponId, WeaponSlot } from '../../../src/game/contracts/progression'
 import { createBuild } from '../../../src/game/model/progression/build'
-import { CARDS } from '../../../src/game/model/progression/catalog'
+import { CARDS, LEGENDARY_WEAPON_IDS } from '../../../src/game/model/progression/catalog'
 import { weaponRelation, weaponStats } from '../../../src/game/model/progression/weaponStats'
 import { staffMoveset } from '../../../src/game/phaser/player/staffMoveset'
 import { beakerMoveset, bunsenMoveset, discMoveset, petriMoveset } from '../../../src/game/phaser/player/weapons/heavy'
 import { bindScheduler, heavyOf } from '../../../src/game/phaser/player/weapons/kit'
+import { arcitectMoveset, commanderMoveset, lfsMoveset, pressMoveset } from '../../../src/game/phaser/player/weapons/legendaryMoves'
 import { pipetteMoveset, scalpelMoveset, wandMoveset, whipMoveset } from '../../../src/game/phaser/player/weapons/light'
 import { createScheduler } from '../../../src/game/phaser/player/weapons/scheduler'
 
@@ -23,6 +24,10 @@ const MOVESETS: Record<PlayerWeaponId, WeaponMoveset> = {
   beakerHammer: beakerMoveset,
   bunsenStaff: bunsenMoveset,
   petriShield: petriMoveset,
+  arcitect: arcitectMoveset,
+  arcCommander: commanderMoveset,
+  gitLfs: lfsMoveset,
+  publicationPress: pressMoveset,
 }
 
 interface Captured {
@@ -33,6 +38,7 @@ interface Captured {
 
 interface Box {
   damage: number
+  tags?: string[]
   shape: { kind: string; x: number; w?: number; r?: number }
 }
 
@@ -58,8 +64,12 @@ function fire(move: AttackMove, tier: 1 | 2): Captured[] {
     combat: {
       spawnHitbox(box: Box) {
         const { shape } = box
-        hits.push({ damage: box.damage, reach: shape.x + (shape.kind === 'rect' ? (shape.w ?? 0) : (shape.r ?? 0)) })
+        // The rolling ticks of Git LFS and the drops of ARCitect land away from the mage, so they count as shots.
+        const thrown = (box.tags?.includes('lfs') || box.tags?.includes('isa')) ?? false
+        hits.push({ damage: box.damage, reach: thrown ? null : shape.x + (shape.kind === 'rect' ? (shape.w ?? 0) : (shape.r ?? 0)) })
       },
+      cancelShots: () => 0,
+      livingCombatants: () => [],
       spawnProjectile(shot: { damage: number }) {
         hits.push({ damage: shot.damage, reach: null })
       },
@@ -90,7 +100,7 @@ const SPLIT_TARGETS: PlayerWeaponId[] = ['centrifugeDisc', 'beakerHammer']
 
 describe('weaponStats table against the real movesets', () => {
   it('covers every weapon card at both tiers', () => {
-    expect(COMBOS.length).toBe(2 + 8 * 2)
+    expect(COMBOS.length).toBe(2 + 12 * 2)
   })
 
   it.each(COMBOS)('$id $slot tier $tier', ({ id, slot, tier }) => {
@@ -134,6 +144,24 @@ describe('weaponStats table against the real movesets', () => {
     expect(weaponStats('scalpel', 'light', 2).name).toBe('Dual Scalpels')
     expect(weaponStats('bunsenStaff', 'heavy', 2).name).toBe('Overclocked Bunsen Staff')
     expect(weaponStats('staff', 'heavy', 1).name).toBe('Staff')
+  })
+
+  it('gives a legendary weapon one name and the same moves at both tiers', () => {
+    for (const id of LEGENDARY_WEAPON_IDS) {
+      const slot = CARDS.find((card) => card.id === `weapon.${id}`)?.slot ?? 'light'
+      const card = CARDS.find((entry) => entry.id === `weapon.${id}`)
+      expect(weaponStats(id, slot, 2).name).toBe(card?.name)
+      expect(weaponStats(id, slot, 1).moves).toEqual(weaponStats(id, slot, 2).moves)
+    }
+  })
+
+  it('makes every legendary weapon hit one target harder than any common weapon of its slot does as a first pick', () => {
+    for (const slot of ['light', 'heavy'] as const) {
+      const ids = (legendary: boolean) =>
+        CARDS.filter((card) => card.kind === 'weapon' && card.slot === slot && (card.rarity === 'legendary') === legendary).map((card) => card.id.slice('weapon.'.length) as PlayerWeaponId)
+      const best = Math.max(...ids(false).map((id) => weaponStats(id, slot, 1).damagePerSecond))
+      for (const id of ids(true)) expect(weaponStats(id, slot, 2).damagePerSecond, id).toBeGreaterThan(best)
+    }
   })
 
   it('rejects a weapon in the wrong slot', () => {

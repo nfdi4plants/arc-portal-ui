@@ -89,6 +89,26 @@ export function bindFx(scene: Phaser.Scene, fx: FxPool): () => void {
   }
 }
 
+// ARCitect's ISA blocks need the physics world and the loadout, which the movesets know nothing
+// of. legendaryFeature.ts binds a builder per wielder. It puts a block of `kind` at the x and
+// returns the floor it stands on, or null when the block could not stand there.
+export type BlockBuilder = (kind: 'assay' | 'study' | 'investigation', x: number, fromY: number) => number | null
+
+const builders = new WeakMap<object, BlockBuilder>()
+
+export function bindBuilder(wielder: object, builder: BlockBuilder): () => void {
+  builders.set(wielder, builder)
+  return () => {
+    if (builders.get(wielder) === builder) builders.delete(wielder)
+  }
+}
+
+// Without a builder (the tests) the block only hits, on the floor under the mage.
+export function placeBlock(ctx: AttackContext, kind: 'assay' | 'study' | 'investigation', x: number): number {
+  const feet = ctx.player.position()
+  return builders.get(ctx.player)?.(kind, x, feet.y) ?? feet.y
+}
+
 export function burst(ctx: AttackContext, x: number, y: number, kind: FxArt, size = 1): void {
   fxPools.get(ctx.scene)?.burst(x, y, kind, size)
 }

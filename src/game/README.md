@@ -376,6 +376,34 @@ stays spent from one scene to the next. `defeatBoss` recharges it, and so does e
 boss. The HUD greys a spent slot and writes "after boss" over it. Every slot shows its key, its name
 and, while it cools down, the seconds left.
 
+## Legendary weapons
+
+Four weapon cards are legendary: two for the light slot and two for the heavy slot. Each one comes
+from a tool or an idea of the ARC world and plays differently from every other weapon. They take the
+normal card rules: they roll only when a card rolls legendary (the level-up chance with its
+first-legendary pity, the 3% of the store), and holding one ends the pity like a legendary augment
+does (`ownsLegendary` in `model/progression/offer.ts`). The Datenkrake never takes a weapon.
+
+A legendary weapon has one form, at full power. A pick puts it in its slot at tier 2, there is no
+upgrade, and the card is not offered again while it is held (`legendaryWeapon` in `build.ts`). A
+common weapon picked later replaces it at tier 1. The cards show the legendary look, the build panel
+reads "(legendary)" and the run recap "light, legendary".
+
+| Weapon | Slot | Based on | How it plays |
+|---|---|---|---|
+| ARCitect | light, build tool | ARCitect, the desktop editor that builds the Investigation, Study and Assay structure of an ARC | Each light press drops an ISA block a little ahead: an Assay, a Study, then an Investigation, each bigger. The drop hits what is under it for 18, 22 and 30 and launches it. A block stands for 4 s, at most 3 at a time (the oldest makes way), as a one-way platform for the wielder, and enemy shots that can be reflected stop at it. A block dropped on a block stacks. No up light |
+| ARC Commander | light, shots at the cursor | the ARC Commander command line (`arc sync`) | `arc add` and `arc commit` fly as terminal chips for 20. `arc sync` first pulls in every enemy shot within 5 tiles, then fires one blast of 28 plus 10 per shot pulled, up to 70, through two enemies |
+| Git LFS | heavy, throw | git LFS, which keeps large files outside the repository | One enormous file, thrown after a long wind-up, hits for 30 and rolls on at 150 units/s for 2.4 s. Everything inside it takes 12 every 0.2 s. The rolling ticks carry no `heavy` tag and a stagger of 0.3, so mobs are not staggered five times a second |
+| Publication Press | heavy, melee stamp | a DOI that makes an ARC snapshot citable and immutable | The slam (48) publishes every enemy within 7 tiles: frozen as a statue for 1.8 s, with a gold DOI seal over it. A boss turns the freeze into a slow, like every freeze. The wielder's next hit on a statue shatters it for 60% of that hit plus 25 |
+
+The moves live in `phaser/player/weapons/legendaryMoves.ts`, and the parts that need the loadout
+(the ISA blocks, the shatter and the seals over the statues, all from fixed pools) in
+`legendaryFeature.ts`, which finds the hits by their tags. The air, dash and up versions are the
+fallbacks of `variants.ts` (ARC Commander aims at the cursor and has no up light, ARCitect drops its
+blocks ahead and has none either). The shots look for
+the wielder's opposing team (`opposingTeam`), so the FAIR trader can wield them against the mage. A
+statue of the mage, published by the trader, is a stun of at most 0.6 s.
+
 ## Ontology Fragments and the FAIR trade store
 
 The currency of the run is the Ontology Fragment, a gold shard of a term graph. The ontologies broke
@@ -474,6 +502,7 @@ Click the canvas to give it keyboard focus.
 | Waystation width and encounter slot positions | `phaser/scenes/WaystationScene.ts` (`ROOM_VIEWS`, `SLOT_AT`) |
 | Staff timing and damage | `phaser/player/staffMoveset.ts` |
 | Other weapons | `phaser/player/weapons/light.ts`, `phaser/player/weapons/heavy.ts` |
+| Legendary weapons (ISA blocks, sync blast, LFS roll, publish reach and shatter) | `phaser/player/weapons/legendaryMoves.ts`, `legendaryFeature.ts` |
 | Weapon numbers on the level-up screen (follow the movesets, a test compares them) | `model/progression/weaponStats.ts` |
 | Attack buffer and combo grace | `phaser/player/attacks.ts` |
 | Ability cooldowns, reach and damage | `phaser/player/weapons/abilities.ts` |

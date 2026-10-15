@@ -26,7 +26,9 @@ export interface PartRef extends SpriteRef {
 // study = greenhouse, assay = wet lab, run = server room.
 export type Theme = DatasetKind
 
-export type ProjectileArt = 'bolt' | 'droplet' | 'disc' | 'arrow' | 'bomb' | 'flame' | 'orb'
+// 'command' and 'file' are the shots of two legendary weapons, 'seal' the mark a third one leaves
+// over enemies.
+export type ProjectileArt = 'bolt' | 'droplet' | 'disc' | 'arrow' | 'bomb' | 'flame' | 'orb' | 'command' | 'file' | 'seal'
 // 'safe' is the teal spot where an area attack does not hit.
 export type TelegraphArt = 'rect' | 'circle' | 'cone' | 'line' | 'safe'
 // A badge over a boss for one of its mechanics or its theme.

@@ -1,7 +1,7 @@
 import type Phaser from 'phaser'
 import { PALETTE } from '../../contracts/constants'
 import type { PlayerBuild, WeaponSlot } from '../../contracts/progression'
-import { buildSummary, type BuildSummary, type StatRow, type WeaponSummary } from '../../model/progression'
+import { buildSummary, isLegendaryWeapon, type BuildSummary, type StatRow, type WeaponSummary } from '../../model/progression'
 import { cssColor } from '../color'
 import { addText } from './ui'
 
@@ -254,7 +254,8 @@ export class BuildPanel {
 }
 
 function weaponTitle(weapon: WeaponSummary): string {
-  return weapon.id === 'staff' ? weapon.name : `${weapon.name} (tier ${weapon.tier})`
+  if (weapon.id === 'staff') return weapon.name
+  return isLegendaryWeapon(weapon.id) ? `${weapon.name} (legendary)` : `${weapon.name} (tier ${weapon.tier})`
 }
 
 function weaponLines(weapon: WeaponSummary): string {

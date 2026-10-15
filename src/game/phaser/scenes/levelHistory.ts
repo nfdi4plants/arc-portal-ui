@@ -1,6 +1,6 @@
 import type { PlayerBuild, PlayerWeaponId, Rarity } from '../../contracts/progression'
 import type { RunPlan } from '../../contracts/run'
-import { CARDS, corruptedAugment, createBuild, weaponName } from '../../model/progression'
+import { CARDS, corruptedAugment, createBuild, isLegendaryWeapon, weaponName } from '../../model/progression'
 
 // The record of the cards a run has chosen, one entry per level gained. Free of Phaser.
 
@@ -136,10 +136,13 @@ export function runRecap(records: readonly LevelUpRecord[]): RecapEntry[] {
     if (card?.slot) {
       const id = record.cardId.slice('weapon.'.length) as PlayerWeaponId
       const held = weapons[card.slot]
-      const tier = held.id === id ? 2 : 1
+      // A legendary weapon comes at full power, so it never reads as an upgrade.
+      const legendary = isLegendaryWeapon(id)
+      const tier = held.id === id || legendary ? 2 : 1
       weapons[card.slot] = { id, tier }
       if (tier === 2) name = weaponName(id, 2)
-      note = [tier === 2 ? `${card.slot}, tier 2` : `${card.slot} weapon`, price].filter(Boolean).join(' · ')
+      const kind = legendary ? `${card.slot}, legendary` : tier === 2 ? `${card.slot}, tier 2` : `${card.slot} weapon`
+      note = [kind, price].filter(Boolean).join(' · ')
     }
     return { tag, name, note, rarity: record.rarity, cardId: record.cardId, skipped: false }
   })

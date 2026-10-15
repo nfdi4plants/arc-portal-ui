@@ -75,6 +75,38 @@ const DEFS: Record<ProjectileArt, ProjectileDef> = {
       pen.poly([[4.6, 5.6], [6, 8.8], [4.5, 10.2], [3.1, 8.8]], { tint: '#fff6cf', line: 'none' })
     },
   },
+  // ARC Commander: a typed command flying as a little terminal chip.
+  command: {
+    width: 18,
+    height: 9,
+    draw(pen) {
+      pen.rect(0.6, 0.6, 16.8, 7.8, { tint: '#253447', weight: 0.8, rough: 0.3 })
+      pen.text(['$ arc'], 9, 4.6, 4.6, 16, 0, '#7ee8d0')
+    },
+  },
+  // Git LFS: one enormous file, a sheet with a folded corner and the label.
+  file: {
+    width: 34,
+    height: 34,
+    draw(pen) {
+      pen.glow(17, 17, 17, 'rgba(245, 190, 0, 0.35)')
+      pen.poly([[4, 1.5], [23, 1.5], [31, 9.5], [31, 32.5], [4, 32.5]], { tint: '#fffdf6', hatch: '#9aa0a6', gap: 3.2, weight: 1.3, rough: 0.6 })
+      pen.poly([[23, 1.5], [23, 9.5], [31, 9.5]], { tint: '#dfe3e6', weight: 1, rough: 0.3 })
+      pen.rect(7, 13, 21, 10, { tint: '#f5be00', weight: 0.9, rough: 0.3 })
+      pen.text(['LFS'], 17.5, 18.4, 7.2, 20, 0, '#253447')
+      for (const y of [26.5, 29.5]) pen.line(8, y, 27, y, { weight: 0.6, rough: 0.2 })
+    },
+  },
+  // Publication Press: the seal over a published enemy, a gold DOI stamp.
+  seal: {
+    width: 16,
+    height: 16,
+    draw(pen) {
+      pen.poly(starPts(8, 8, 7.6, 6.2, 12), { ...gold, weight: 0.8, rough: 0.3 })
+      pen.ellipse(8, 8, 9.4, 9.4, { tint: '#fff3c4', weight: 0.6, rough: 0.2 })
+      pen.text(['DOI'], 8, 8.4, 3.8, 9, 0, '#253447')
+    },
+  },
   orb: {
     width: 10,
     height: 10,

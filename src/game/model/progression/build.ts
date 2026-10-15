@@ -123,6 +123,15 @@ function weapon(slot: WeaponSlot, id: PlayerWeaponId): Effect {
   }
 }
 
+// A legendary weapon comes at full power, so it lands at tier 2 and is never offered again while
+// it is held.
+function legendaryWeapon(slot: WeaponSlot, id: PlayerWeaponId): Effect {
+  return {
+    applies: (build) => build.weapons[slot].id !== id,
+    apply: (build) => ({ ...build, weapons: { ...build.weapons, [slot]: { id, tier: 2 } } }),
+  }
+}
+
 function placeAbility(
   slots: PlayerBuild['abilitySlots'],
   id: MechanicId | LegendaryId,
@@ -173,6 +182,10 @@ const EFFECTS = new Map<string, Effect>([
   ['weapon.beakerHammer', weapon('heavy', 'beakerHammer')],
   ['weapon.bunsenStaff', weapon('heavy', 'bunsenStaff')],
   ['weapon.petriShield', weapon('heavy', 'petriShield')],
+  ['weapon.arcitect', legendaryWeapon('light', 'arcitect')],
+  ['weapon.arcCommander', legendaryWeapon('light', 'arcCommander')],
+  ['weapon.gitLfs', legendaryWeapon('heavy', 'gitLfs')],
+  ['weapon.publicationPress', legendaryWeapon('heavy', 'publicationPress')],
   ['mechanic.doubleJump', mechanic('doubleJump')],
   ['mechanic.airDash', mechanic('airDash')],
   ['mechanic.wallJump', mechanic('wallJump')],

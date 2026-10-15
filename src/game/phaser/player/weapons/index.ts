@@ -22,6 +22,8 @@ import type { Feature } from './core'
 import { beakerMoveset, bunsenMoveset, discMoveset, petriMoveset } from './heavy'
 import { createDamageModifier, damageMultiplier } from './helpers'
 import { createFairPrinciples, createGitRevert, createOntology, createPeerReview } from './legendaries'
+import { createLegendaryWeapons } from './legendaryFeature'
+import { LEGENDARY_MOVESETS } from './legendaryMoves'
 import { pipetteMoveset, scalpelMoveset, wandMoveset, whipMoveset } from './light'
 import { createEcho, createFamiliar, createParry, createReflectDash } from './mechanics'
 import { createMoveLayer } from './moves'
@@ -60,7 +62,8 @@ export type LoadoutWithStatus = Loadout & {
   readEula(): void
 }
 
-// The eight new weapons. The staff stays with the player and is wrapped inside the loadout.
+// The weapons of the cards, the legendary ones included. The staff stays with the player and is
+// wrapped inside the loadout.
 export const WEAPON_MOVESETS: readonly WeaponMoveset[] = [
   wandMoveset,
   pipetteMoveset,
@@ -70,6 +73,7 @@ export const WEAPON_MOVESETS: readonly WeaponMoveset[] = [
   beakerMoveset,
   bunsenMoveset,
   petriMoveset,
+  ...LEGENDARY_MOVESETS,
 ]
 
 export function attachLoadout(deps: LoadoutDeps): LoadoutWithStatus {
@@ -102,6 +106,7 @@ export function attachLoadout(deps: LoadoutDeps): LoadoutWithStatus {
     gitRevert,
     createFairPrinciples(core),
     createPeerReview(core),
+    createLegendaryWeapons(core),
     ...Object.values(abilities),
   ]
   const handlers: Record<string, AbilityHandler> = {

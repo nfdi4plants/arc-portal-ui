@@ -1,7 +1,8 @@
-import type { PlayerBuild, PlayerStats, WeaponSlot } from '../../contracts/progression'
+import type { PlayerBuild, PlayerStats, PlayerWeaponId, WeaponSlot } from '../../contracts/progression'
 import { bindingLabel, DEFAULT_BINDINGS } from '../input'
 import { applyCard, STAT_CAPS } from './build'
-import { ABILITY_IDS, CARDS } from './catalog'
+import { ABILITY_IDS, CARDS, isLegendaryWeapon } from './catalog'
+import { weaponName } from './weaponStats'
 import { FLAVOR } from './flavor'
 
 const ABILITY_ACTIONS = ['ability1', 'ability2', 'ability3', 'ability4'] as const
@@ -48,21 +49,18 @@ function statLines(build: PlayerBuild, cardId: string): string[] {
   return [`${line.label}: ${line.format(now)} -> ${line.format(next)} (${line.limit})`]
 }
 
-// The tier 2 name is the one the card description announces ("Picking it again gives X.").
-function weaponName(id: string, tier: 1 | 2): string {
-  const card = CARDS.find((c) => c.id === `weapon.${id}`)
-  if (!card) return id === 'staff' ? 'Staff' : id
-  if (tier === 1) return card.name
-  return /gives (.+)\.$/.exec(card.description)?.[1] ?? `${card.name} (tier 2)`
-}
-
 function weaponLines(build: PlayerBuild, cardId: string): string[] {
   const card = CARDS.find((c) => c.id === cardId)
   if (!card?.slot) return []
   const slot: WeaponSlot = card.slot
-  const id = cardId.slice('weapon.'.length)
+  const id = cardId.slice('weapon.'.length) as PlayerWeaponId
   const current = build.weapons[slot]
   const head = `${slot === 'light' ? 'Light' : 'Heavy'} slot: ${card.description}`
+  if (isLegendaryWeapon(id)) {
+    if (current.id === id) return [head, `You already wield the ${card.name}.`]
+    const replaced = current.id === 'staff' ? 'your Staff' : `your ${weaponName(current.id, current.tier)}`
+    return [head, `A legendary weapon at full power, with no tier 2 to reach. It replaces ${replaced} in the ${slot} slot.`]
+  }
   if (current.id === id && current.tier === 1) return [head, `Upgrades your ${card.name} to ${weaponName(id, 2)} (tier 2).`]
   if (current.id === id) return [head, `Your ${weaponName(id, 2)} is already at tier 2.`]
   if (current.id === 'staff') return [head, `New weapon. It replaces your Staff in the ${slot} slot.`]

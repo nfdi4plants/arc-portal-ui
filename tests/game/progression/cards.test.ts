@@ -1,18 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import type { PowerUpKind } from '../../../src/game/contracts/progression'
-import { ABILITY_IDS, applyCard, canApply, CARDS, createBuild, rollOffer } from '../../../src/game/model/progression'
+import { ABILITY_IDS, applyCard, canApply, CARDS, createBuild, eligibleAugments, LEGENDARY_WEAPON_IDS, legendaryChance, rollOffer } from '../../../src/game/model/progression'
+import { drawCards } from '../../../src/game/model/progression/offer'
 import { createRng } from '../../../src/game/contracts/rng'
 
 const countOf = (kind: PowerUpKind) => CARDS.filter((card) => card.kind === kind).length
 
 describe('catalog', () => {
-  it('has seven stat cards, eight weapon cards, 20 mechanics and seven legendaries', () => {
+  it('has seven stat cards, twelve weapon cards (four legendary), 20 mechanics and seven legendaries', () => {
     expect({
       stat: countOf('stat'),
       weapon: countOf('weapon'),
       mechanic: countOf('mechanic'),
       legendary: countOf('legendary'),
-    }).toEqual({ stat: 7, weapon: 8, mechanic: 20, legendary: 7 })
+    }).toEqual({ stat: 7, weapon: 12, mechanic: 20, legendary: 7 })
   })
 
   it('gives every catalog card an effect that applyCard accepts', () => {
@@ -142,5 +143,53 @@ describe('legendary cards', () => {
     const build = applyCard(applyCard(createBuild(), 'mechanic.parry'), 'legendary.gitRevert')
     expect(build.abilitySlots).toEqual(['parry', 'gitRevert', null, null])
     expect(build.legendaries).toEqual(['gitRevert'])
+  })
+})
+
+describe('legendary weapon cards', () => {
+  const cards = CARDS.filter((card) => card.kind === 'weapon' && card.rarity === 'legendary')
+
+  it('are two light and two heavy weapons, all of legendary rarity', () => {
+    expect(cards.map((card) => card.id.slice('weapon.'.length)).sort()).toEqual([...LEGENDARY_WEAPON_IDS].sort())
+    expect(cards.filter((card) => card.slot === 'light')).toHaveLength(2)
+    expect(cards.filter((card) => card.slot === 'heavy')).toHaveLength(2)
+  })
+
+  it('come at full power, replace the weapon of their slot and are never offered twice', () => {
+    for (const card of cards) {
+      const slot = card.slot ?? 'light'
+      const id = card.id.slice('weapon.'.length)
+      const upgraded = applyCard(applyCard(createBuild(), slot === 'light' ? 'weapon.wand' : 'weapon.beakerHammer'), slot === 'light' ? 'weapon.wand' : 'weapon.beakerHammer')
+      const build = applyCard(upgraded, card.id)
+      expect(build.weapons[slot]).toEqual({ id, tier: 2 })
+      expect(canApply(build, card.id)).toBe(false)
+      expect(applyCard(build, card.id)).toBe(build)
+    }
+  })
+
+  it('give way to a common weapon picked later, which starts at tier 1', () => {
+    const build = applyCard(applyCard(createBuild(), 'weapon.arcitect'), 'weapon.scalpel')
+    expect(build.weapons.light).toEqual({ id: 'scalpel', tier: 1 })
+  })
+
+  it('show up only when a card rolls legendary', () => {
+    const rng = createRng('legendary-weapons')
+    for (let i = 0; i < 300; i++) {
+      for (const card of drawCards(createBuild(), rng, 4, 0)) expect(cards).not.toContain(card)
+    }
+    const seen = new Set<string>()
+    for (let i = 0; i < 300; i++) for (const card of drawCards(createBuild(), rng, 4, 1)) seen.add(card.id)
+    for (const card of cards) expect(seen).toContain(card.id)
+  })
+
+  it('end the first-legendary pity like a legendary augment does', () => {
+    const late = { ...createBuild(), level: 8 }
+    expect(legendaryChance(late)).toBeGreaterThan(0.1)
+    expect(legendaryChance(applyCard(late, 'weapon.gitLfs'))).toBe(0.005)
+  })
+
+  it('are never taken by the Datenkrake', () => {
+    const build = applyCard(applyCard(createBuild(), 'weapon.arcCommander'), 'weapon.publicationPress')
+    expect(eligibleAugments(build, {}).some((id) => id.startsWith('weapon.'))).toBe(false)
   })
 })

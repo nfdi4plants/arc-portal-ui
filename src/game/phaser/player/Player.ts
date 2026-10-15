@@ -22,6 +22,8 @@ import { airHeavyOf, dashHeavyOf, dashLightOf, upHeavyOf, upLightOf } from './we
 export const PLAYER_HURTBOX = { width: 18, height: 42 }
 const DAMAGE_IFRAMES_MS = 700
 const FLINCH_MS = 180
+// The longest a freeze holds the mage, as a stun.
+const PLAYER_FREEZE_MS = 600
 const DROP_THROUGH_MS = 150
 const ABILITY_ACTIONS: readonly Action[] = ['ability1', 'ability2', 'ability3', 'ability4']
 const GHOST_COUNT = 6
@@ -37,7 +39,7 @@ const SMEAR_ALPHA = [0.25, 0.17, 0.1, 0.05]
 const SMEAR_LIGHT_COUNT = 3
 const SMEAR_FADE_MS = 90
 // Weapons that shoot. Their moves get no smear, only their projectile art.
-const RANGED_WEAPONS: ReadonlySet<PlayerWeaponId> = new Set(['wand', 'pipettePistol', 'centrifugeDisc'])
+const RANGED_WEAPONS: ReadonlySet<PlayerWeaponId> = new Set(['wand', 'pipettePistol', 'centrifugeDisc', 'arcCommander', 'gitLfs'])
 const WEAPON_SLOTS: readonly WeaponSlot[] = ['light', 'heavy']
 
 export interface PlayerDeps {
@@ -625,6 +627,11 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
       attacks.cancel()
     },
     isStunned: () => stunMs > 0,
+    // Only an enemy that wields the mage's own weapons freezes the mage (the FAIR trader's
+    // Publication Press), and only as a short stun. Slows do nothing.
+    applyStatus(status) {
+      if (status.kind === 'freeze') handle.stun(Math.min(status.ms, PLAYER_FREEZE_MS))
+    },
     collideWith(target) {
       const collider = scene.physics.add.collider(body, target, undefined, processCollision)
       colliders.push(collider)

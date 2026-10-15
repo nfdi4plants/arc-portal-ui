@@ -1,6 +1,6 @@
-export { ABILITY_IDS, CARDS } from './catalog'
+export { ABILITY_IDS, CARDS, LEGENDARY_WEAPON_IDS, isLegendaryWeapon } from './catalog'
 export { STAT_CAPS, addXp, applyCard, canApply, createBuild, xpForNextLevel } from './build'
-export { legendaryChance, rollOffer } from './offer'
+export { legendaryChance, ownsLegendary, rollOffer } from './offer'
 export { levelUpSummary } from './levelUpSummary'
 export type { LevelUpRow, LevelUpSummary } from './levelUpSummary'
 export { createBossCharge } from './charge'

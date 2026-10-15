@@ -218,6 +218,33 @@ export function traderArt(scene: Phaser.Scene): SpriteRef {
   })
 }
 
+// The ISA blocks of the ARCitect weapon: an Assay, a Study and an Investigation, each larger. A
+// wooden crate with a coloured label and the letter on it. The sprite stands on the bottom centre.
+export type IsaKind = 'assay' | 'study' | 'investigation'
+export const ISA_BLOCKS: Record<IsaKind, { w: number; h: number; letter: string; tint: string; hatch: string }> = {
+  assay: { w: 24, h: 14, letter: 'A', tint: '#cdf3ea', hatch: '#22c3a6' },
+  study: { w: 30, h: 22, letter: 'S', tint: '#d3ecf7', hatch: '#4baed6' },
+  investigation: { w: 36, h: 30, letter: 'I', tint: '#fff3c4', hatch: '#e5b92e' },
+}
+
+export function isaBlockArt(scene: Phaser.Scene, kind: IsaKind): SpriteRef {
+  const { w, h, letter, tint, hatch } = ISA_BLOCKS[kind]
+  return spriteFrom(scene, {
+    key: `scribble:isa:${kind}`,
+    width: w,
+    height: h,
+    anchors: { weapon: { x: 0, y: -h / 2 }, head: { x: 0, y: -h } },
+    draw(pen) {
+      pen.rect(0.8, 0.8, w - 1.6, h - 1.6, { ...wood, weight: 1.2, rough: 0.5 })
+      pen.line(0.8, 0.8, w - 0.8, h - 0.8, { line: '#8a6238', weight: 0.7, rough: 0.3 })
+      const lw = Math.min(w - 8, 16)
+      const lh = Math.min(h - 6, 11)
+      pen.rect(w / 2 - lw / 2, h / 2 - lh / 2, lw, lh, { tint, hatch, gap: 2, weight: 0.9, rough: 0.3 })
+      pen.text([letter], w / 2, h / 2 + 0.4, Math.min(9, lh - 1), lw - 2, 0, NAVY)
+    },
+  })
+}
+
 export const CARD_WIDTH = 100
 export const CARD_HEIGHT = 136
 

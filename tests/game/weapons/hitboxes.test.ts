@@ -9,6 +9,7 @@ import { staffMoveset } from '../../../src/game/phaser/player/staffMoveset'
 import { beakerMoveset, bunsenMoveset, petriMoveset } from '../../../src/game/phaser/player/weapons/heavy'
 import { MELEE_BODY_HALF_WIDTH, MELEE_MARGIN, forgivingShape } from '../../../src/game/phaser/player/weapons/helpers'
 import { bindScheduler } from '../../../src/game/phaser/player/weapons/kit'
+import { pressMoveset } from '../../../src/game/phaser/player/weapons/legendaryMoves'
 import { scalpelMoveset, whipMoveset } from '../../../src/game/phaser/player/weapons/light'
 import { createScheduler } from '../../../src/game/phaser/player/weapons/scheduler'
 import { holdOf, weaponPose } from '../../../src/game/phaser/player/weaponPose'
@@ -40,6 +41,8 @@ function boxesOf(move: AttackMove, tier: 1 | 2, hook: 'onActive' | 'onLand' = 'o
         return { cancel() {} }
       },
       spawnProjectile: () => ({ cancel() {} }),
+      livingCombatants: () => [],
+      cancelShots: () => 0,
     },
     player,
     aim: { x: 100, y: -20 },
@@ -176,6 +179,7 @@ describe('melee hitboxes cover the drawn weapon', () => {
     ['beakerHammer', beakerMoveset],
     ['bunsenStaff', bunsenMoveset],
     ['petriShield', petriMoveset],
+    ['publicationPress', pressMoveset],
   ]
   for (const [id, set] of MELEE_HEAVIES) {
     for (const tier of TIERS) {

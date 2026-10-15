@@ -205,6 +205,77 @@ const petriShield: WeaponDef = {
   },
 }
 
+// The legendary weapons have one form, drawn the same at both tiers, with a gold legendary halo.
+const LEGEND_HALO = 'rgba(245, 190, 0, 0.5)'
+
+// ARCitect: a builder's rod topped with the ISA tree, an Investigation block over a Study and an
+// Assay.
+const arcitect: WeaponDef = {
+  size: [[24, 44], [24, 44]],
+  tip: [[12, 8], [12, 8]],
+  draw(pen, _tier, w, h) {
+    const x = w / 2
+    pen.glow(x, 12, 13, LEGEND_HALO)
+    stick(pen, x, h, x, 24, 2.4)
+    pen.rect(x - 3, 22, 6, 3, gold)
+    pen.line(x, 10, x - 6, 15, { weight: 0.7, rough: 0.2 })
+    pen.line(x, 10, x + 6, 15, { weight: 0.7, rough: 0.2 })
+    pen.rect(x - 7, 1, 14, 9, { tint: '#fff3c4', hatch: '#e5b92e', gap: 2, weight: 1, rough: 0.3 })
+    pen.text(['I'], x, 5.8, 6.4, 10, 0, cssColor(PALETTE.navy))
+    pen.rect(x - 11, 14, 9, 8, { ...blue, gap: 2, weight: 0.9, rough: 0.3 })
+    pen.text(['S'], x - 6.5, 18.2, 5.4, 8, 0, cssColor(PALETTE.navy))
+    pen.rect(x + 2, 14, 9, 8, { ...teal, gap: 2, weight: 0.9, rough: 0.3 })
+    pen.text(['A'], x + 6.5, 18.2, 5.4, 8, 0, cssColor(PALETTE.navy))
+  },
+}
+
+// ARC Commander: a terminal on a grip, its screen shows the prompt.
+const arcCommander: WeaponDef = {
+  size: [[24, 34], [24, 34]],
+  tip: [[12, 8], [12, 8]],
+  draw(pen, _tier, w, h) {
+    const x = w / 2
+    pen.glow(x, 9, 12, LEGEND_HALO)
+    stick(pen, x, h, x, 18, 2.4)
+    pen.rect(x - 11, 1, 22, 16, { ...metal, weight: 1.1, rough: 0.3 })
+    pen.rect(x - 9, 3, 18, 12, { tint: cssColor(PALETTE.navy), weight: 0.8, rough: 0.2 })
+    pen.text(['$_'], x, 9.4, 7, 16, 0, '#7ee8d0')
+    pen.rect(x - 4, 17, 8, 3, gold)
+  },
+}
+
+// Git LFS: one enormous file carried by its strap. It leaves the hand when thrown.
+const gitLfs: WeaponDef = {
+  size: [[30, 40], [30, 40]],
+  tip: [[15, 14], [15, 14]],
+  draw(pen, _tier, w, h) {
+    const x = w / 2
+    pen.glow(x, 14, 15, LEGEND_HALO)
+    pen.line(x, h, x - 6, 27, { line: MATERIAL.wood.dark, weight: 1.6, rough: 0.3 })
+    pen.line(x, h, x + 6, 27, { line: MATERIAL.wood.dark, weight: 1.6, rough: 0.3 })
+    pen.poly([[3, 1], [21, 1], [27, 7], [27, 28], [3, 28]], { tint: '#fffdf6', hatch: '#9aa0a6', gap: 3, weight: 1.2, rough: 0.5 })
+    pen.poly([[21, 1], [21, 7], [27, 7]], { tint: '#dfe3e6', weight: 0.9, rough: 0.3 })
+    pen.rect(6, 11, 18, 8, { tint: '#f5be00', weight: 0.8, rough: 0.3 })
+    pen.text(['LFS'], 15, 15.4, 6, 16, 0, cssColor(PALETTE.navy))
+  },
+}
+
+// Publication Press: a heavy rubber stamp, its face reads DOI.
+const publicationPress: WeaponDef = {
+  size: [[32, 46], [32, 46]],
+  tip: [[16, 9], [16, 9]],
+  draw(pen, _tier, w, h) {
+    const x = w / 2
+    pen.glow(x, 10, 16, LEGEND_HALO)
+    stick(pen, x, h, x, 20, 2.8)
+    pen.ellipse(x, h - 4, 8, 7, { ...wood, weight: 0.9, rough: 0.3 })
+    pen.rect(2, 4, w - 4, 13, { tint: '#e5484d', hatch: '#a8282d', gap: 2.4, weight: 1.2, rough: 0.4 })
+    pen.rect(4, 1, w - 8, 4, gold)
+    pen.rect(x - 4, 17, 8, 4, metal)
+    pen.text(['DOI'], x, 11, 8, w - 8, 0, '#fffdf6')
+  },
+}
+
 export const WEAPON_DEFS: Record<PlayerWeaponId, WeaponDef> = {
   staff,
   wand,
@@ -215,6 +286,10 @@ export const WEAPON_DEFS: Record<PlayerWeaponId, WeaponDef> = {
   beakerHammer,
   bunsenStaff,
   petriShield,
+  arcitect,
+  arcCommander,
+  gitLfs,
+  publicationPress,
 }
 
 export function playerWeapon(scene: Phaser.Scene, id: PlayerWeaponId, tier: 1 | 2): SpriteRef {

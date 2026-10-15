@@ -1,4 +1,4 @@
-import type { Combatant, HitShape } from '../../../contracts/combat'
+import type { Combatant, HitShape, Team } from '../../../contracts/combat'
 
 // Pure helpers of the loadout. Nothing here imports Phaser, so they run in jsdom tests.
 
@@ -53,6 +53,12 @@ export function createRingBuffer(capacity: number): RingBuffer {
       count = 0
     },
   }
+}
+
+// The team a combatant fights: the mage's hits look for enemies, the hits of an enemy that
+// wields the mage's weapons (the FAIR trader) look for the mage.
+export function opposingTeam(team: Team): Team {
+  return team === 'enemy' ? 'player' : 'enemy'
 }
 
 // The closest item to `from` within `maxDistance` that `accept` allows. The first one wins a tie.

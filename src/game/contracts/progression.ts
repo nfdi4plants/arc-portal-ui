@@ -14,6 +14,11 @@ export type PlayerWeaponId =
   | 'beakerHammer'
   | 'bunsenStaff'
   | 'petriShield'
+  // Legendary weapons, at full power from the start (LEGENDARY_WEAPON_IDS in the catalog).
+  | 'arcitect'
+  | 'arcCommander'
+  | 'gitLfs'
+  | 'publicationPress'
 
 export type MechanicId =
   | 'doubleJump'

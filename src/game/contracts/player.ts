@@ -143,4 +143,7 @@ export interface PlayerHandle extends Combatant {
   // augments (the EULA, the cookie banner). Cancels the attack in progress.
   stun(ms: number): void
   isStunned(): boolean
+  // Lets the body collide with a body added after it, such as a bridge of the kraken intern or an
+  // ISA block of ARCitect. Returns the function that removes the collider.
+  collideWith(target: Phaser.Types.Physics.Arcade.ArcadeColliderType): () => void
 }
