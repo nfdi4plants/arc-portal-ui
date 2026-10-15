@@ -9,6 +9,7 @@ import { cssColor } from '../color'
 import type { View } from '../view'
 import { BuildPanel } from './BuildPanel'
 import { CardNote, createCardFace, showCardOn, sizeCardFace, type CardFace } from './cardFace'
+import { cardHitRect } from './cardHit'
 import type { RunContext } from './context'
 import { drawScribbleBox } from './panelFrame'
 import { addButton, addText, type Button, onCanvasKey, onClick, overlayView } from './ui'
@@ -20,6 +21,10 @@ const KEYS: Record<string, number> = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 
 const INTRO_MS = 350
 const HOVER_DETAILS_MS = 600
 const TILT = (3 * Math.PI) / 180
+// A hovered card lifts by this share of its height and grows by HOVER_GROW. Every card bobs by BOB.
+const HOVER_LIFT = 0.04
+const HOVER_GROW = 0.06
+const BOB = 0.012
 const SIDE_PANEL_MIN_WIDTH = 600
 const BUILD_KEY = 'KeyB'
 const NAVY = cssColor(PALETTE.navy)
@@ -228,14 +233,14 @@ export class StoreScene extends Phaser.Scene {
 
   private poseCard(view: StockView, intro: number) {
     const face = view.face
-    const bob = Math.sin(this.clock / 650 + view.phase) * view.h * 0.012
+    const bob = Math.sin(this.clock / 650 + view.phase) * view.h * BOB
     const rotation = view.tilt * (1 - view.hover)
     for (const text of face.texts) text.setRotation(-rotation)
     face.box
       .setVisible(true)
-      .setPosition(view.x, view.y + (1 - intro) * view.h * 0.15 + bob - view.hover * view.h * 0.04)
+      .setPosition(view.x, view.y + (1 - intro) * view.h * 0.15 + bob - view.hover * view.h * HOVER_LIFT)
       .setRotation(rotation)
-      .setScale(1 + 0.06 * view.hover)
+      .setScale(1 + HOVER_GROW * view.hover)
       .setAlpha(intro * DIM_ALPHA[view.state])
     if (face.glow.visible) face.glow.setAlpha(0.55 + 0.3 * Math.sin(this.clock / 260))
   }
@@ -300,7 +305,9 @@ export class StoreScene extends Phaser.Scene {
       view.y = cardsTop + room / 2
       view.w = cardW
       view.h = cardH
-      view.zone.setPosition(view.x, view.y).setSize(cardW, cardH)
+      // The hit area covers the card in every pose, hovered or not (cardHitRect).
+      const hit = cardHitRect({ w: cardW, h: cardH, tilt: TILT, lift: HOVER_LIFT, bob: BOB, hoverScale: 1 + HOVER_GROW, gap })
+      view.zone.setPosition(view.x, view.y + (hit.top + hit.bottom) / 2).setSize(hit.right - hit.left, hit.bottom - hit.top)
       sizeCardFace(view.face, this.stock[i], cardW)
       const priceY = view.y + cardH * 0.55 + priceRow / 2 + 2
       const size = Math.max(6.5, Math.min(9, cardW * 0.09))
@@ -318,8 +325,10 @@ export class StoreScene extends Phaser.Scene {
   private enableInput() {
     for (let i = 0; i < STOCK_SIZE; i++) {
       const zone = this.cards[i].zone
-      zone.removeInteractive()
+      // Switched on and off, never removed: Phaser clears an input that is removed and added again
+      // in the same frame, which left every card dead after a purchase. The hit area follows setSize.
       if (i < this.stock.length) zone.setInteractive({ useHandCursor: true })
+      else zone.disableInteractive()
     }
   }
 
