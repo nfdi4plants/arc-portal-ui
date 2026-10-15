@@ -5,10 +5,18 @@ import type { PlayerBuild, PowerUpCard } from '../../contracts/progression'
 import { createRng, type Rng } from '../../contracts/rng'
 import type { RunPlan, Segment } from '../../contracts/run'
 import { bossFromNode, finalBossFromPlan } from '../../model/content'
-import { appendLevelUp, datenkrakeSourceText, sourceText, statStacks, storeSourceText, type LevelUpRecord } from './levelHistory'
+import { appendLevelUp, datenkrakeSourceText, lootSourceText, sourceText, statStacks, storeSourceText, type LevelUpRecord } from './levelHistory'
 import {
   addXp,
   applyCard,
+  applyLoot,
+  createStrikeState,
+  HOSTILE_STRIKE,
+  strikeAt,
+  TRADER_FIGHT_LINES,
+  TRADER_WARNINGS,
+  traderBonus,
+  traderBuild,
   buyCard,
   canSubmit,
   CARDS,
@@ -26,7 +34,7 @@ import {
   submitToDatenkrake,
   TRADER_LINES,
 } from '../../model/progression'
-import type { BossCharge, DatenkrakeDeal, DatenkrakeMood, LevelUpSummary, TraderMood } from '../../model/progression'
+import type { BossCharge, DatenkrakeDeal, DatenkrakeMood, LevelUpSummary, StrikeState, TraderFightMood, TraderMood } from '../../model/progression'
 
 export type RunStage =
   | { kind: 'stretch'; index: number }
@@ -90,6 +98,15 @@ export class RunDirector {
   private readonly datenkrakeLines: Record<DatenkrakeMood, () => string>
   // The waystations whose Datenkrake was dealt with, so leaving and coming back does not repeat it.
   private readonly datenkrakeDone = new Map<number, 'fought' | 'submitted'>()
+  // The FAIR trader can be attacked (model/progression/traderFight.ts): the strikes per waystation,
+  // the waystations where he turned hostile, and the whole stock of each visit for the loot. Once
+  // beaten he is gone for the rest of the run, and every later waystation shows his closed stall.
+  traderGone = false
+  private readonly strikes = new Map<number, StrikeState>()
+  private readonly hostile = new Set<number>()
+  private readonly stockIds = new Map<number, string[]>()
+  private readonly warningLines: Record<1 | 2 | 3, () => string>
+  private readonly fightLines: Record<TraderFightMood, () => string>
   private history: LevelUpRecord[] = []
   // The build just before the first of the pending levels, for the level-up summary.
   private levelUpBase: PlayerBuild | null = null
@@ -113,6 +130,15 @@ export class RunDirector {
     const pickers = {} as Record<DatenkrakeMood, () => string>
     for (const mood of Object.keys(DATENKRAKE_LINES) as DatenkrakeMood[]) pickers[mood] = createLinePicker(DATENKRAKE_LINES[mood], kraken.fork(mood))
     this.datenkrakeLines = pickers
+    const unfair = this.rng.fork('trader-fight-lines')
+    this.warningLines = {
+      1: createLinePicker(TRADER_WARNINGS[1], unfair.fork('1')),
+      2: createLinePicker(TRADER_WARNINGS[2], unfair.fork('2')),
+      3: createLinePicker(TRADER_WARNINGS[3], unfair.fork('3')),
+    }
+    const fight = {} as Record<TraderFightMood, () => string>
+    for (const mood of Object.keys(TRADER_FIGHT_LINES) as TraderFightMood[]) fight[mood] = createLinePicker(TRADER_FIGHT_LINES[mood], unfair.fork(mood))
+    this.fightLines = fight
   }
 
   start(): void {
@@ -292,6 +318,7 @@ export class RunDirector {
     if (!stock) {
       stock = rollStock(this.build, this.rng.fork(`store/${index}`))
       this.stocks.set(index, stock)
+      this.stockIds.set(index, stock.map((card) => card.id))
     }
     return stock
   }
@@ -321,6 +348,63 @@ export class RunDirector {
       price: priceOf(card),
     })
     return true
+  }
+
+  // The store of the waystation after node boss `index` opens while the trader is calm.
+  traderOpen(index: number): boolean {
+    return !this.traderGone && !this.hostile.has(index)
+  }
+
+  traderHostile(index: number): boolean {
+    return this.hostile.has(index)
+  }
+
+  // A hit of the mage on the trader at `nowMs` of the waystation clock. Returns the strike it
+  // starts (1 to 3 are warnings, HOSTILE_STRIKE starts the fight), or 0 when it is part of the strike
+  // before or the trader no longer listens.
+  strikeTrader(index: number, nowMs: number): number {
+    if (!this.traderOpen(index)) return 0
+    let state = this.strikes.get(index)
+    if (!state) {
+      state = createStrikeState()
+      this.strikes.set(index, state)
+    }
+    const strike = strikeAt(state, nowMs)
+    if (strike >= HOSTILE_STRIKE) this.hostile.add(index)
+    return strike
+  }
+
+  traderWarning(strike: 1 | 2 | 3): string {
+    return this.warningLines[strike]()
+  }
+
+  traderFightLine(mood: TraderFightMood): string {
+    return this.fightLines[mood]()
+  }
+
+  // The trader as a fighter at the mage's level, seeded per waystation.
+  traderFighter(index: number): PlayerBuild {
+    return traderBuild(this.build.level, this.rng.fork(`trader/${index}`))
+  }
+
+  // The beaten trader's stall: every card left in his stock, then one legendary augment or weapon
+  // the mage does not have and his stock did not hold. They apply like purchases, without a level,
+  // and the trader is gone for the rest of the run. Returns what applied, the bonus apart.
+  lootTrader(index: number): { cards: PowerUpCard[]; bonus: PowerUpCard | null } {
+    if (this.traderGone) return { cards: [], bonus: null }
+    this.traderGone = true
+    const stock = this.stock(index) as PowerUpCard[]
+    const loot = applyLoot(this.build, stock)
+    stock.length = 0
+    const pick = traderBonus(loot.build, this.stockIds.get(index) ?? [], this.rng.fork(`traderLoot/${index}`))
+    const withBonus = pick ? applyLoot(loot.build, [pick]) : { build: loot.build, applied: [] }
+    this.build = withBonus.build
+    const bonus = withBonus.applied[0] ?? null
+    const source = lootSourceText(this.plan, index, this.bossSpec(index).label)
+    for (const card of [...loot.applied, ...withBonus.applied]) {
+      this.history = appendLevelUp(this.history, { level: this.build.level, cardId: card.id, cardName: card.name, rarity: card.rarity, offered: [], source, looted: true })
+    }
+    return { cards: loot.applied, bonus }
   }
 
   completeStretch(): void {

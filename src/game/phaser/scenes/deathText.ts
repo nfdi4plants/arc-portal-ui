@@ -45,5 +45,7 @@ export function deathText(killer: KillerInfo, plan: RunPlan | null): { headline:
     }
     case 'hazard':
       return { headline: killer.label, detail: '' }
+    case 'trader':
+      return { headline: 'Out-traded by the FAIR trader', detail: `"${killer.line}" He fought with every legendary augment. Leave his stall in peace next time, or come back stronger.` }
   }
 }

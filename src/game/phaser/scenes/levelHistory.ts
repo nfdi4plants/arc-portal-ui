@@ -25,6 +25,8 @@ export interface LevelUpRecord {
   // Set for what happened at the Datenkrake: an augment it took, the corrupted augment it gave
   // (cardId 'corrupted.<id>') or a fight it lost. Such an entry gained no level either.
   datenkrake?: DatenkrakeEvent
+  // Set for a card looted from the stall of the beaten FAIR trader. Such an entry gained no level.
+  looted?: boolean
 }
 
 export type DatenkrakeEvent = 'taken' | 'corrupted' | 'fought'
@@ -59,6 +61,13 @@ export function datenkrakeSourceText(plan: RunPlan, index: number, bossLabel: st
   return `at the Datenkrake in the waystation after boss ${bossLabel}${step}`
 }
 
+// Where the loot came from: the stall of the trader the mage beat.
+export function lootSourceText(plan: RunPlan, index: number, bossLabel: string): string {
+  const segment = plan.segments[index]
+  const step = segment ? ` (${segment.processName})` : ''
+  return `looted from the FAIR trader in the waystation after boss ${bossLabel}${step}`
+}
+
 // How many stacks of each stat card the run still holds: every level-up pick and purchase, less
 // the ones the Datenkrake took. The build itself only knows their sum.
 export function statStacks(records: readonly LevelUpRecord[]): Record<string, number> {
@@ -87,6 +96,10 @@ export interface HistoryRow {
 
 export function historyRow(record: LevelUpRecord): HistoryRow {
   if (record.datenkrake) return { title: datenkrakeTitle(record), source: record.source, also: null }
+  if (record.looted) {
+    const rarity = record.rarity ? ` (${record.rarity})` : ''
+    return { title: `Looted from the FAIR trader: ${record.cardName ?? record.cardId}${rarity}`, source: record.source, also: null }
+  }
   if (record.price !== undefined) {
     const rarity = record.rarity ? ` (${record.rarity})` : ''
     return { title: `Bought · ${record.cardName ?? record.cardId}${rarity} · ${record.price} fragments`, source: record.source, also: null }
@@ -119,6 +132,8 @@ export interface RecapEntry {
   // A level that passed without a card.
   skipped: boolean
   datenkrake?: DatenkrakeEvent
+  // Set for a card looted from the stall of the beaten FAIR trader. Such an entry gained no level.
+  looted?: boolean
 }
 
 // Every augment of the run in the order it was taken, level-ups and purchases alike. The weapons
@@ -127,8 +142,8 @@ export function runRecap(records: readonly LevelUpRecord[]): RecapEntry[] {
   const weapons: PlayerBuild['weapons'] = { ...createBuild().weapons }
   return records.map((record) => {
     if (record.datenkrake) return datenkrakeEntry(record)
-    const tag = record.price !== undefined ? 'Bought' : `Lv ${record.level}`
-    const price = record.price !== undefined ? `${record.price} fragments` : ''
+    const tag = record.looted ? 'Looted' : record.price !== undefined ? 'Bought' : `Lv ${record.level}`
+    const price = record.looted ? 'from the FAIR trader' : record.price !== undefined ? `${record.price} fragments` : ''
     if (!record.cardId) return { tag, name: 'no card taken', note: '', rarity: null, cardId: null, skipped: true }
     const card = CARDS.find((entry) => entry.id === record.cardId)
     let name = record.cardName ?? record.cardId

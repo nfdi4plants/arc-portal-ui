@@ -32,3 +32,16 @@ export {
 export type { CorruptedAugment, CorruptionFlags, HitMemory } from './corrupted'
 export { DATENKRAKE_LINES, canSubmit, eligibleAugments, fillDealLine, removeAugment, submitToDatenkrake } from './datenkrake'
 export type { DatenkrakeDeal, DatenkrakeMood } from './datenkrake'
+export {
+  HOSTILE_STRIKE,
+  STRIKE_WINDOW_MS,
+  TRADER_FIGHT_LINES,
+  TRADER_HP_FACTOR,
+  TRADER_WARNINGS,
+  applyLoot,
+  createStrikeState,
+  strikeAt,
+  traderBonus,
+  traderBuild,
+} from './traderFight'
+export type { StrikeState, TraderFightMood } from './traderFight'

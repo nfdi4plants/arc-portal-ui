@@ -13,6 +13,8 @@ export type KillerInfo =
   | { kind: 'boss'; spec: BossSpec; segment: Segment }
   | { kind: 'finalBoss'; title: string; phase: number }
   | { kind: 'hazard'; label: string }
+  // The FAIR trader, with the line he had for the mage.
+  | { kind: 'trader'; line: string }
 
 // Crowd control from the mage's abilities, applied straight to a combatant without a hit. Bosses
 // turn a freeze into a slow and take slows at half strength (combat/status.ts).
