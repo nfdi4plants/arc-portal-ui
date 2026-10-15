@@ -125,9 +125,14 @@ export function arenaPlatforms(left: number, right: number, floorY: number): Are
   return platforms
 }
 
+// Half the width of the mage's hurtbox (PLAYER_HURTBOX in player/Player.ts). A mage whose middle
+// is this far past the end of a platform still stands on it.
+export const FEET_MARGIN = 9
+
 // The platform a body with its feet at (x, feetY) stands on, or null on the floor or in the air.
-export function platformUnder(platforms: readonly ArenaPlatform[], x: number, feetY: number): ArenaPlatform | null {
-  for (const p of platforms) if (x >= p.x && x <= p.x + p.w && Math.abs(feetY - p.top) <= 2) return p
+// `margin` is half the width of the body's feet.
+export function platformUnder(platforms: readonly ArenaPlatform[], x: number, feetY: number, margin = 0): ArenaPlatform | null {
+  for (const p of platforms) if (x >= p.x - margin && x <= p.x + p.w + margin && Math.abs(feetY - p.top) <= 2) return p
   return null
 }
 
