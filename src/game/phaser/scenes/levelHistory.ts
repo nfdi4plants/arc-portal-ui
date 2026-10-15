@@ -62,7 +62,7 @@ export interface HistoryRow {
 export function historyRow(record: LevelUpRecord): HistoryRow {
   if (record.price !== undefined) {
     const rarity = record.rarity ? ` (${record.rarity})` : ''
-    return { title: `Bought · ${record.cardName ?? record.cardId}${rarity} · ${record.price} coins`, source: record.source, also: null }
+    return { title: `Bought · ${record.cardName ?? record.cardId}${rarity} · ${record.price} fragments`, source: record.source, also: null }
   }
   const title = record.cardName ? `Lv ${record.level} · ${record.cardName}${record.rarity ? ` (${record.rarity})` : ''}` : `Lv ${record.level} · no card on offer`
   const also = record.offered.length > 0 ? `also offered: ${record.offered.map((card) => card.name).join(', ')}` : null

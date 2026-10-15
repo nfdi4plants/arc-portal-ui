@@ -4,7 +4,7 @@ import type { PowerUpCard } from '../../contracts/progression'
 import { hashString } from '../../contracts/rng'
 import { bindingLabel } from '../../model/input'
 import { priceOf, STOCK_SIZE, stockState, weaponRelation, type StockState } from '../../model/progression'
-import { applySpriteRef, CARD_HEIGHT, CARD_WIDTH, coinArt, glowTexture, traderArt } from '../art'
+import { applySpriteRef, CARD_HEIGHT, CARD_WIDTH, fragmentArt, glowTexture, traderArt } from '../art'
 import { cssColor } from '../color'
 import type { View } from '../view'
 import { BuildPanel } from './BuildPanel'
@@ -29,7 +29,7 @@ const PRICE_COLOR: Record<StockState, string> = { buy: cssColor(PALETTE.yellow),
 interface StockView {
   face: CardFace
   zone: Phaser.GameObjects.Zone
-  coin: Phaser.GameObjects.Sprite
+  fragment: Phaser.GameObjects.Sprite
   price: Phaser.GameObjects.Text
   state: StockState
   x: number
@@ -55,7 +55,7 @@ export class StoreScene extends Phaser.Scene {
   private bubble!: Phaser.GameObjects.Graphics
   private line!: Phaser.GameObjects.Text
   private purse!: Phaser.GameObjects.Text
-  private purseCoin!: Phaser.GameObjects.Sprite
+  private purseIcon!: Phaser.GameObjects.Sprite
   private hint!: Phaser.GameObjects.Text
   private empty!: Phaser.GameObjects.Text
   private cards: StockView[] = []
@@ -95,10 +95,10 @@ export class StoreScene extends Phaser.Scene {
     applySpriteRef(this.trader, traderRef)
     this.bubble = this.add.graphics()
     this.line = addText(this, '', 7.5, { color: PALETTE.navy })
-    const coinRef = coinArt(this)
-    this.purseCoin = this.add.sprite(0, 0, coinRef.textureKey)
-    applySpriteRef(this.purseCoin, coinRef)
-    this.purseCoin.setOrigin(0.5)
+    const fragmentRef = fragmentArt(this)
+    this.purseIcon = this.add.sprite(0, 0, fragmentRef.textureKey)
+    applySpriteRef(this.purseIcon, fragmentRef)
+    this.purseIcon.setOrigin(0.5)
     this.purse = addText(this, '', 10, { color: PALETTE.yellow, bold: true }).setOrigin(1, 0.5).setStroke(NAVY, 3)
     this.hint = addText(this, '', 7, { align: 'center' }).setOrigin(0.5, 0).setStroke(NAVY, 2)
     this.empty = addText(this, 'Sold out! The table is bare, the trader is happy.', 9, { align: 'center', bold: true }).setOrigin(0.5).setStroke(NAVY, 3)
@@ -152,10 +152,10 @@ export class StoreScene extends Phaser.Scene {
 
   private createCard(index: number, glowKey: string): StockView {
     const face = createCardFace(this, glowKey, String(index + 1))
-    const coinRef = coinArt(this)
-    const coin = this.add.sprite(0, 0, coinRef.textureKey)
-    applySpriteRef(coin, coinRef)
-    coin.setOrigin(0.5)
+    const fragmentRef = fragmentArt(this)
+    const fragment = this.add.sprite(0, 0, fragmentRef.textureKey)
+    applySpriteRef(fragment, fragmentRef)
+    fragment.setOrigin(0.5)
     const price = addText(this, '', 8, { bold: true }).setOrigin(0, 0.5).setStroke(NAVY, 3)
     const zone = this.add.zone(0, 0, 1, 1)
     zone.on('pointerover', () => {
@@ -170,10 +170,10 @@ export class StoreScene extends Phaser.Scene {
       if (this.detailIndex === index && !this.pinned) this.hideDetails()
     })
     onClick(this, zone, () => this.buy(index), BUY_BUTTON)
-    return { face, zone, coin, price, state: 'buy', x: 0, y: 0, w: 1, h: 1, tilt: 0, phase: 0, hover: 0 }
+    return { face, zone, fragment, price, state: 'buy', x: 0, y: 0, w: 1, h: 1, tilt: 0, phase: 0, hover: 0 }
   }
 
-  // Reads the stock, the coins and the build again. Runs on open and after every purchase.
+  // Reads the stock, the Ontology Fragments and the build again. Runs on open and after every purchase.
   private refreshStock() {
     const director = this.ctx.director
     if (!director) return
@@ -182,27 +182,27 @@ export class StoreScene extends Phaser.Scene {
     this.hovered = -1
     this.syncHighlight()
     this.buildPanel.setBuild(director.build)
-    this.purse.setText(String(director.coins))
+    this.purse.setText(String(director.fragments))
     this.stock.forEach((card, i) => {
       const view = this.cards[i]
       showCardOn(this, view.face, card, i / STOCK_SIZE)
       view.tilt = ((hashString(card.id) % 1001) / 500 - 1) * TILT
       view.phase = (hashString(card.id) % 628) / 100
-      view.state = stockState(director.build, director.coins, card)
+      view.state = stockState(director.build, director.fragments, card)
       view.price.setText(view.state === 'unusable' ? 'no use now' : String(priceOf(card))).setColor(PRICE_COLOR[view.state])
-      view.coin.setAlpha(view.state === 'unusable' ? 0 : DIM_ALPHA[view.state])
+      view.fragment.setAlpha(view.state === 'unusable' ? 0 : DIM_ALPHA[view.state])
     })
     for (let i = 0; i < this.cards.length; i++) {
       const shown = i < this.stock.length
       const view = this.cards[i]
       if (!shown) view.face.box.setVisible(false)
-      view.coin.setVisible(shown)
+      view.fragment.setVisible(shown)
       view.price.setVisible(shown)
     }
     this.empty.setVisible(this.stock.length === 0)
     const pause = this.ctx.bindings.pause[0]
     const leave = pause ? `${bindingLabel(pause)}, walk away or Leave to go` : 'Walk away or Leave to go'
-    this.hint.setText(this.stock.length > 0 ? `Click a card to buy it · hover for details · ${leave}` : leave)
+    this.hint.setText(this.stock.length > 0 ? `Click a card to trade Ontology Fragments for it · hover for details · ${leave}` : leave)
     this.layout()
   }
 
@@ -211,7 +211,7 @@ export class StoreScene extends Phaser.Scene {
     const director = this.ctx.director
     const card = this.stock[index]
     if (!director || !card) return
-    const state = stockState(director.build, director.coins, card)
+    const state = stockState(director.build, director.fragments, card)
     if (state !== 'buy') {
       this.say(director.traderLine(state === 'poor' ? 'poor' : 'unusable'))
       this.layout()
@@ -250,13 +250,13 @@ export class StoreScene extends Phaser.Scene {
     const areaW = this.areaW
     const centre = this.areaX + areaW / 2
     const top = margin
-    // Title row: build button, title, coins and the Leave button.
+    // Title row: build button, title, the Ontology Fragments and the Leave button.
     this.title.setPosition(centre, top + 11)
     if (!this.sideLayout) this.buildButton.setPosition(8 + 38, top + 11)
     const right = this.areaX + areaW - 8
     this.leaveButton.setPosition(right - 22, top + 11)
     this.purse.setPosition(right - 50, top + 11)
-    this.purseCoin.setPosition(right - 50 - this.purse.width - 7, top + 11)
+    this.purseIcon.setPosition(right - 50 - this.purse.width - 7, top + 11)
     // The trader and the speech bubble under the title.
     const traderH = Math.min(46, h * 0.13)
     const traderW = traderH
@@ -308,7 +308,7 @@ export class StoreScene extends Phaser.Scene {
       const unusable = view.state === 'unusable'
       const iconW = unusable ? 0 : 10
       const startX = view.x - (iconW + view.price.width) / 2
-      view.coin.setPosition(startX + 4.5, priceY)
+      view.fragment.setPosition(startX + 4.5, priceY)
       view.price.setPosition(startX + iconW, priceY)
     }
     this.enableInput()

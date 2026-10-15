@@ -15,6 +15,7 @@ const NAVY = cssColor(PALETTE.navy)
 const BLUE = cssColor(PALETTE.blue)
 const YELLOW = cssColor(PALETTE.yellow)
 const CREAM = cssColor(PALETTE.cream)
+const TEAL = cssColor(PALETTE.teal)
 
 // A closed door outline for pen.curve: straight sides up to the spring line, then a half ellipse
 // over the top. The sides and the base get extra points so the spline keeps them straight.
@@ -95,21 +96,28 @@ export function shieldFragmentArt(scene: Phaser.Scene): SpriteRef {
   })
 }
 
-export const COIN_SIZE = 10
+export const FRAGMENT_SIZE = 11
 
-// A gold coin with a small letter A of ARC stamped in. Mobs and bosses drop it for the FAIR trade store.
-export function coinArt(scene: Phaser.Scene): SpriteRef {
-  const r = COIN_SIZE / 2
+// The shard of a broken ontology, glassy gold with three linked terms on it, one edge cut off at
+// the break. Mobs and bosses drop Ontology Fragments, the FAIR trader collects them.
+export function fragmentArt(scene: Phaser.Scene): SpriteRef {
+  const s = FRAGMENT_SIZE
+  const edge = { line: NAVY, weight: 0.6, rough: 0.15 }
+  const term = { tint: TEAL, weight: 0.5, rough: 0.1 }
   return spriteFrom(scene, {
-    key: 'scribble:pickup:coin',
-    width: COIN_SIZE,
-    height: COIN_SIZE,
-    anchors: { weapon: { x: 0, y: -r }, head: { x: 0, y: -COIN_SIZE } },
+    key: 'scribble:pickup:ontologyFragment',
+    width: s,
+    height: s,
+    anchors: { weapon: { x: 0, y: -s / 2 }, head: { x: 0, y: -s } },
     draw(pen) {
-      pen.glow(r, r, r + 1, 'rgba(245, 190, 0, 0.35)')
-      pen.ellipse(r, r, COIN_SIZE - 1.4, COIN_SIZE - 1.4, { ...gold, gap: 1.6, weight: 0.8, rough: 0.3 })
-      pen.trace([[r - 1.8, r + 2], [r, r - 2.2], [r + 1.8, r + 2]], { line: '#a8820e', weight: 0.7, rough: 0.1 })
-      pen.line(r - 1, r + 0.8, r + 1, r + 0.8, { line: '#a8820e', weight: 0.6, rough: 0.1 })
+      pen.glow(s / 2, s / 2, s / 2 + 1, 'rgba(245, 190, 0, 0.35)')
+      pen.poly([[1, 3.4], [4.4, 0.8], [6.4, 2.2], [10.2, 1], [9.4, 5], [10.4, 8.8], [6.8, 10.3], [5.6, 8.9], [2.6, 10], [0.7, 6.8]], { tint: '#fff3c4', hatch: YELLOW, gap: 1.7, weight: 0.8, rough: 0.4 })
+      pen.line(3.3, 4.2, 7.6, 3.6, edge)
+      pen.line(3.3, 4.2, 4.8, 7.6, edge)
+      pen.line(4.8, 7.6, 9.6, 7.2, edge)
+      pen.ellipse(3.3, 4.2, 2.6, 2.6, term)
+      pen.ellipse(7.6, 3.6, 2.2, 2.2, term)
+      pen.ellipse(4.8, 7.6, 2.2, 2.2, term)
     },
   })
 }
@@ -118,7 +126,8 @@ export const TRADER_WIDTH = 72
 export const TRADER_HEIGHT = 72
 
 // The FAIR trader behind a market stall: a striped awning, a counter with a "FAIR trade" sign,
-// a coin pile, a card and a flask on top. The sprite stands on the bottom centre of the stall.
+// a heap of Ontology Fragments, a card and a flask on top. The sprite stands on the bottom centre of
+// the stall.
 export function traderArt(scene: Phaser.Scene): SpriteRef {
   const w = TRADER_WIDTH
   const h = TRADER_HEIGHT
@@ -155,8 +164,11 @@ export function traderArt(scene: Phaser.Scene): SpriteRef {
       pen.rect(7, 47, w - 14, h - 48, { ...wood, weight: 1.1, rough: 0.5 })
       pen.rect(13, 53, w - 26, 13, { tint: '#fffdf6', weight: 0.9, rough: 0.4 })
       pen.text(['FAIR trade'], mid, 59.6, 7.4, w - 30, -0.03, NAVY)
-      // Goods on top: a coin pile, a card and a flask.
-      for (let i = 0; i < 3; i++) pen.ellipse(15 + i * 1.2, 45.4 - i * 1.6, 6, 2.6, { ...gold, weight: 0.6, rough: 0.2 })
+      // Goods on top: a heap of fragments, a card and a flask.
+      pen.poly([[11, 46.6], [13, 41.6], [16, 43], [17.6, 40.4], [21, 46.6]], { tint: '#fff3c4', hatch: YELLOW, gap: 1.5, weight: 0.6, rough: 0.3 })
+      pen.line(13.6, 44.6, 17.4, 43.4, { line: NAVY, weight: 0.5, rough: 0.1 })
+      pen.dot(13.6, 44.6, 0.9, TEAL)
+      pen.dot(17.4, 43.4, 0.9, TEAL)
       pen.poly([[w - 22, 46], [w - 21, 38], [w - 15, 38.6], [w - 16, 46.6]], { tint: '#dbe8fd', hatch: BLUE, gap: 1.6, weight: 0.7, rough: 0.3 })
       pen.poly([[w - 12, 46], [w - 13.5, 42], [w - 11.6, 38.5], [w - 11.6, 36.5], [w - 9.4, 36.5], [w - 9.4, 38.5], [w - 7.5, 42], [w - 9, 46]], { tint: '#dcf1e2', hatch: '#2da44e', gap: 1.4, weight: 0.7, rough: 0.3 })
     },

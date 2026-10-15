@@ -3,7 +3,7 @@ import { PALETTE, SCENE } from '../../contracts/constants'
 import type { Action } from '../../contracts/input'
 import { bindingLabel } from '../../model/input'
 import { CARDS, xpForNextLevel } from '../../model/progression'
-import { applySpriteRef, coinArt } from '../art'
+import { applySpriteRef, fragmentArt } from '../art'
 import type { View } from '../view'
 import type { Segment } from '../../contracts/run'
 import type { StaggerState } from '../bosses'
@@ -47,8 +47,8 @@ export class HudScene extends Phaser.Scene implements HudControl {
   private bars!: Phaser.GameObjects.Graphics
   private hpText!: Phaser.GameObjects.Text
   private levelText!: Phaser.GameObjects.Text
-  private coinIcon!: Phaser.GameObjects.Sprite
-  private coinText!: Phaser.GameObjects.Text
+  private fragmentIcon!: Phaser.GameObjects.Sprite
+  private fragmentText!: Phaser.GameObjects.Text
   private slotsGraphics!: Phaser.GameObjects.Graphics
   private keyTexts: Phaser.GameObjects.Text[] = []
   private nameTexts: Phaser.GameObjects.Text[] = []
@@ -77,7 +77,7 @@ export class HudScene extends Phaser.Scene implements HudControl {
   private shields = NaN
   private xp = NaN
   private level = NaN
-  private coins = NaN
+  private fragments = NaN
   private nodeIndex = NaN
   private bossFill = NaN
   private bossName: string | null = null
@@ -100,7 +100,7 @@ export class HudScene extends Phaser.Scene implements HudControl {
 
   create() {
     // The scene object outlives a restart, so the cached values start over here.
-    this.hp = this.maxHp = this.shields = this.xp = this.level = this.coins = this.nodeIndex = this.bossFill = this.bindingsVersion = NaN
+    this.hp = this.maxHp = this.shields = this.xp = this.level = this.fragments = this.nodeIndex = this.bossFill = this.bindingsVersion = NaN
     this.bossName = this.attackName = null
     this.staggerFill = NaN
     this.staggerState = null
@@ -113,11 +113,11 @@ export class HudScene extends Phaser.Scene implements HudControl {
     this.bars = this.add.graphics()
     this.hpText = addText(this, '', 6, { bold: true }).setOrigin(0.5)
     this.levelText = addText(this, '', 7, { color: PALETTE.navy, bold: true })
-    const coinRef = coinArt(this)
-    this.coinIcon = this.add.sprite(0, 0, coinRef.textureKey)
-    applySpriteRef(this.coinIcon, coinRef)
-    this.coinIcon.setOrigin(0.5, 0.5)
-    this.coinText = addText(this, '', 7, { color: PALETTE.navy, bold: true }).setOrigin(1, 0)
+    const fragmentRef = fragmentArt(this)
+    this.fragmentIcon = this.add.sprite(0, 0, fragmentRef.textureKey)
+    applySpriteRef(this.fragmentIcon, fragmentRef)
+    this.fragmentIcon.setOrigin(0.5, 0.5)
+    this.fragmentText = addText(this, '', 7, { color: PALETTE.navy, bold: true }).setOrigin(1, 0)
     this.slotsGraphics = this.add.graphics()
     this.keyTexts = ABILITIES.map(() => addText(this, '', 6, { bold: true }))
     this.nameTexts = ABILITIES.map(() => addText(this, '', 5, { align: 'center', wrap: SLOT_W - 4 }).setOrigin(0.5, 1))
@@ -204,7 +204,7 @@ export class HudScene extends Phaser.Scene implements HudControl {
       this.hintTexts[i].setPosition(x + SLOT_W / 2, y - 1)
     }
     if (this.bannerMs > 0) this.drawBannerBox()
-    this.hp = this.maxHp = this.xp = this.coins = this.nodeIndex = this.bossFill = this.staggerFill = NaN
+    this.hp = this.maxHp = this.xp = this.fragments = this.nodeIndex = this.bossFill = this.staggerFill = NaN
     this.bossName = null
     this.slotFill.fill(NaN)
   }
@@ -296,9 +296,9 @@ export class HudScene extends Phaser.Scene implements HudControl {
       this.drawBars()
     }
 
-    if (director.coins !== this.coins) {
-      this.coins = director.coins
-      this.drawCoins()
+    if (director.fragments !== this.fragments) {
+      this.fragments = director.fragments
+      this.drawFragments()
     }
 
     let slotsChanged = this.bindingsVersion !== this.ctx.bindingsVersion
@@ -373,11 +373,11 @@ export class HudScene extends Phaser.Scene implements HudControl {
     this.levelText.setText(`Level ${this.level}`)
   }
 
-  // Under the right end of the hp bar, level with the level text.
-  private drawCoins() {
+  // The Ontology Fragments under the right end of the hp bar, level with the level text.
+  private drawFragments() {
     const right = M + this.barWidth()
-    this.coinText.setText(String(this.coins)).setPosition(right, M + 19)
-    this.coinIcon.setPosition(right - this.coinText.width - 6, M + 19 + this.coinText.height / 2)
+    this.fragmentText.setText(String(this.fragments)).setPosition(right, M + 19)
+    this.fragmentIcon.setPosition(right - this.fragmentText.width - 7, M + 19 + this.fragmentText.height / 2)
   }
 
   private drawSlots() {

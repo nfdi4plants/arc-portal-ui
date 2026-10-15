@@ -251,8 +251,8 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
     }
   }
 
-  protected gainCoins(amount: number) {
-    this.director.addCoins(amount)
+  protected gainFragments(amount: number) {
+    this.director.addFragments(amount)
   }
 
   // Holds the world while the store overlay of node boss `index` is open, like the level-up screen.

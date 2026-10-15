@@ -4,13 +4,13 @@ import type { Combatant } from '../../contracts/combat'
 import type { BossSpec } from '../../contracts/content'
 import type { Segment } from '../../contracts/run'
 import { bindingLabel } from '../../model/input'
-import { bossCoinDrop } from '../../model/progression'
+import { bossFragmentDrop } from '../../model/progression'
 import { applySpriteRef, doorArt, prewarmTelegraphs, releaseTelegraphs, TRADER_HEIGHT, TRADER_WIDTH, traderArt } from '../art'
 import { freeFloorX } from '../bosses/zones'
 import { spawnBoss, type Arena, type Boss } from '../bosses'
 import type { InspectTarget } from '../mobs'
 import { acquireBubble } from '../mobs/bubbles'
-import { dropCoins, updatePickups } from '../mobs/pickups'
+import { dropOntologyFragments, updatePickups } from '../mobs/pickups'
 import type { View } from '../view'
 import { buildArena } from './arena'
 import type { RunContext } from './context'
@@ -118,14 +118,14 @@ export class BossScene extends GameplayScene {
         this.spareAfterBoss(boss)
         const x = boss.position().x
         this.openPortal(x)
-        this.dropBossCoins(x)
+        this.dropBossFragments(x)
         this.gainXp(this.spec.xp)
       }
       return
     }
     this.portalMs += dtMs
-    const coins = updatePickups(this, this.player, dtMs)
-    if (coins > 0) this.gainCoins(coins)
+    const fragments = updatePickups(this, this.player, dtMs)
+    if (fragments > 0) this.gainFragments(fragments)
     this.stepBubble(dtMs)
     if (this.portalMs < PORTAL_APPEAR_MS) return
     const box = this.player.hurtbox()
@@ -141,11 +141,11 @@ export class BossScene extends GameplayScene {
   }
 
   // A guaranteed handful, spread over the floor where the boss fell.
-  private dropBossCoins(bossX: number) {
+  private dropBossFragments(bossX: number) {
     const index = this.segment.index
-    const count = bossCoinDrop(index, this.director.rng.fork(`bossCoins/${index}`))
+    const count = bossFragmentDrop(index, this.director.rng.fork(`bossFragments/${index}`))
     const x = Phaser.Math.Clamp(bossX, this.arena.left + 2 * T, this.arena.right - 2 * T)
-    dropCoins(this, x, this.arena.floorY - 10, count)
+    dropOntologyFragments(this, x, this.arena.floorY - 10, count)
   }
 
   // The stall goes on the side of the portal that faces the middle of the arena, on free floor,

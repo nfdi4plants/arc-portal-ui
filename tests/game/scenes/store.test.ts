@@ -17,23 +17,23 @@ beforeAll(() => {
 })
 
 // A run standing in the arena of the first node boss, which has just fallen.
-function atFirstTrader(coins: number): RunDirector {
+function atFirstTrader(fragments: number): RunDirector {
   const director = new RunDirector(plan, { emit: () => {}, enter: () => {} })
   director.start()
   director.completeStretch()
-  director.addCoins(coins)
+  director.addFragments(fragments)
   return director
 }
 
-describe('coins in a run', () => {
+describe('Ontology Fragments in a run', () => {
   it('carry over from the stretch to the boss and on to the next stretch', () => {
     const director = new RunDirector(plan, { emit: () => {}, enter: () => {} })
     director.start()
-    director.addCoins(4)
+    director.addFragments(4)
     director.completeStretch()
-    director.addCoins(7)
+    director.addFragments(7)
     director.defeatBoss()
-    expect(director.coins).toBe(11)
+    expect(director.fragments).toBe(11)
   })
 })
 
@@ -41,7 +41,7 @@ describe('the FAIR trade store in a run', () => {
   it('shows the same stock when the player leaves and comes back', () => {
     const director = atFirstTrader(0)
     const first = director.stock(0).map((card) => card.id)
-    director.addCoins(3)
+    director.addFragments(3)
     expect(director.stock(0).map((card) => card.id)).toEqual(first)
   })
 
@@ -51,7 +51,7 @@ describe('the FAIR trade store in a run', () => {
     const before = director.build
     const card = director.stock(0)[0]
     expect(director.buy(0, card.id)).toBe(true)
-    expect(director.coins).toBe(100 - priceOf(card))
+    expect(director.fragments).toBe(100 - priceOf(card))
     expect(director.stock(0).map((entry) => entry.id)).not.toContain(card.id)
     expect(director.build.level).toBe(before.level)
     expect(director.build.xp).toBe(before.xp)
@@ -62,7 +62,7 @@ describe('the FAIR trade store in a run', () => {
     }
   })
 
-  it('refuses a card the coins do not cover', () => {
+  it('refuses a card the fragments do not cover', () => {
     const director = atFirstTrader(0)
     const card = director.stock(0)[0]
     expect(director.buy(0, card.id)).toBe(false)

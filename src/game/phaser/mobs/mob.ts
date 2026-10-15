@@ -4,7 +4,7 @@ import type { Combatant, CombatWorld, HitEvent, StatusEffect } from '../../contr
 import { DEPTH, PALETTE } from '../../contracts/constants'
 import type { EnemyWeaponKind, MonsterSpec } from '../../contracts/content'
 import { SUMMONED_SUFFIX } from '../../model/content'
-import { mobCoinDrop } from '../../model/progression'
+import { mobFragmentDrop } from '../../model/progression'
 import { MINION_ID_SUFFIX, applySpriteRef, monsterWeapon } from '../art'
 import { addStatus, clearStatus, createStatus, statusTimeScale, tickStatus } from '../combat/status'
 import { bodyOf, isOneWay } from '../player/oneWay'
@@ -20,7 +20,7 @@ import type { Box } from './ledge'
 import { approach, blinkDestination } from './motion'
 import { createFlimmer } from './phantom'
 import type { Flimmer } from './phantom'
-import { dropCoins, dropShieldFragment } from './pickups'
+import { dropOntologyFragments, dropShieldFragment } from './pickups'
 import { hitReaction, shrugsOff } from './reaction'
 import { createStance, stanceMods, stepStance } from './stance'
 import type { StanceMods } from './stance'
@@ -189,7 +189,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
   const phantom = spec.phantom && !minion
   const awake = holdOnHitStop(combat)
   // Rolled up front from a fork, so the drop does not depend on how the fight went.
-  const coins = minion ? 0 : mobCoinDrop(spec, rng.fork('coins'))
+  const fragments = minion ? 0 : mobFragmentDrop(spec, rng.fork('fragments'))
 
   const ref = art.monster(scene, spec)
   const W = Math.max(8, Math.round(ref.width * HURTBOX_WIDTH))
@@ -1217,7 +1217,7 @@ function createMob(scene: Phaser.Scene, spec: MonsterSpec, deps: MobDeps, x: num
     }
     playFx(scene, art, 'death', cx(), feetY() - H / 2, Math.max(ref.width, ref.height) * 1.1)
     if (passive === 'shieldDrop') dropShieldFragment(scene, cx(), feetY() - 10)
-    if (coins > 0) dropCoins(scene, cx(), feetY() - 8, coins)
+    if (fragments > 0) dropOntologyFragments(scene, cx(), feetY() - 8, fragments)
   }
 
   // A mob that fell out of the level leaves quietly: no effect, no drop.

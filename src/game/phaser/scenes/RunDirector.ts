@@ -57,8 +57,9 @@ export class RunDirector {
   // Second Wind heals once, then waits for the next boss to fall. It lives here, so leaving a
   // stretch or a boss arena keeps it spent.
   readonly secondWind: BossCharge = createBossCharge()
-  // Coins for the FAIR trade store. They carry over from one stage to the next and a pit costs none.
-  coins = 0
+  // Ontology Fragments for the FAIR trade store. They carry over from one stage to the next and a pit
+  // costs none.
+  fragments = 0
   private readonly hooks: RunDirectorHooks
   // The stock of the trader after each node boss, rolled on the first visit and fixed from then on.
   private readonly stocks = new Map<number, PowerUpCard[]>()
@@ -169,8 +170,8 @@ export class RunDirector {
     this.lastOffer = []
   }
 
-  addCoins(amount: number): void {
-    if (amount > 0 && !this.isOver()) this.coins += amount
+  addFragments(amount: number): void {
+    if (amount > 0 && !this.isOver()) this.fragments += amount
   }
 
   // The cards the trader of node boss `index` still has. Rolled against the build of the first
@@ -194,10 +195,10 @@ export class RunDirector {
     const stock = this.stocks.get(index)
     const card = stock?.find((entry) => entry.id === cardId)
     if (!stock || !card) return false
-    const result = buyCard(this.build, this.coins, card)
+    const result = buyCard(this.build, this.fragments, card)
     if (!result) return false
     this.build = result.build
-    this.coins = result.coins
+    this.fragments = result.fragments
     stock.splice(stock.indexOf(card), 1)
     this.history = appendLevelUp(this.history, {
       level: this.build.level,

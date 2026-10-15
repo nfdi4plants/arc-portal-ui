@@ -8,8 +8,9 @@ import { drawCards } from './offer'
 
 export const STOCK_SIZE = 4
 
-// A first trader sees about 11 to 13 coins (about 5 from the mobs of a stretch and 6 to 8 from the
-// boss), enough for one or two commons or one uncommon. A rare takes saving over two traders.
+// A first trader sees about 11 to 13 Ontology Fragments (about 4 to 5 from the mobs of a stretch and 6
+// to 8 from the boss), enough for one or two commons or one uncommon. A rare takes saving over two
+// traders.
 export const PRICES: Record<Rarity, number> = { common: 5, uncommon: 10, rare: 20, legendary: 45 }
 
 // A fixed legendary chance per card. The store never touches the level-up pity, which only grows
@@ -30,13 +31,13 @@ export type StockState = 'buy' | 'poor' | 'unusable'
 
 // Whether a card in stock can be bought now. An earlier purchase can make a card unusable, for
 // example the last free ability slot.
-export function stockState(build: PlayerBuild, coins: number, card: PowerUpCard): StockState {
+export function stockState(build: PlayerBuild, fragments: number, card: PowerUpCard): StockState {
   if (!canApply(build, card.id)) return 'unusable'
-  return coins >= priceOf(card) ? 'buy' : 'poor'
+  return fragments >= priceOf(card) ? 'buy' : 'poor'
 }
 
-// The build and the coins after a purchase, or null when the card cannot be bought.
-export function buyCard(build: PlayerBuild, coins: number, card: PowerUpCard): { build: PlayerBuild; coins: number } | null {
-  if (stockState(build, coins, card) !== 'buy') return null
-  return { build: applyCard(build, card.id), coins: coins - priceOf(card) }
+// The build and the fragments after a purchase, or null when the card cannot be bought.
+export function buyCard(build: PlayerBuild, fragments: number, card: PowerUpCard): { build: PlayerBuild; fragments: number } | null {
+  if (stockState(build, fragments, card) !== 'buy') return null
+  return { build: applyCard(build, card.id), fragments: fragments - priceOf(card) }
 }
