@@ -21,7 +21,7 @@ export interface WeaponPose {
 // the petri dish is held up in front of the body. Throw: the disc winds up and leaves the hand.
 export type WeaponHold = 'swing' | 'aim' | 'shield' | 'throw'
 
-const HOLDS: Partial<Record<PlayerWeaponId, WeaponHold>> = { bunsenStaff: 'aim', petriShield: 'shield', centrifugeDisc: 'throw' }
+const HOLDS: Partial<Record<PlayerWeaponId, WeaponHold>> = { bunsenStaff: 'aim', petriShield: 'shield', centrifugeDisc: 'throw', gitLfs: 'throw' }
 
 export function holdOf(id: PlayerWeaponId): WeaponHold {
   return HOLDS[id] ?? 'swing'

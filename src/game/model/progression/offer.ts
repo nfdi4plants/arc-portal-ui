@@ -1,7 +1,7 @@
 import type { PlayerBuild, PowerUpCard, Rarity, RollOffer } from '../../contracts/progression'
 import type { Rng } from '../../contracts/rng'
 import { canApply } from './build'
-import { CARDS } from './catalog'
+import { CARDS, isLegendaryWeapon } from './catalog'
 
 // When nothing at the rolled rarity can be offered, the roll steps down this list.
 const STEP_DOWN: readonly Rarity[] = ['legendary', 'rare', 'uncommon', 'common']
@@ -23,8 +23,13 @@ const LEGENDARY_BASE = 0.005
 const LEGENDARY_PITY_STEP = 0.04
 const LEGENDARY_PITY_MAX = 0.3
 
+// A legendary weapon in hand counts as a legendary taken.
+export function ownsLegendary(build: PlayerBuild): boolean {
+  return build.legendaries.length > 0 || isLegendaryWeapon(build.weapons.light.id) || isLegendaryWeapon(build.weapons.heavy.id)
+}
+
 export function legendaryChance(build: PlayerBuild): number {
-  if (build.legendaries.length > 0) return LEGENDARY_BASE
+  if (ownsLegendary(build)) return LEGENDARY_BASE
   return Math.min(LEGENDARY_PITY_MAX, LEGENDARY_BASE + LEGENDARY_PITY_STEP * Math.max(0, build.level - 2))
 }
 

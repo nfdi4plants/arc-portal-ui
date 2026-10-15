@@ -1,6 +1,7 @@
 import type Phaser from 'phaser'
 import { PALETTE } from '../../contracts/constants'
 import type { Rarity } from '../../contracts/progression'
+import { CORRUPTED_COLOR } from '../art'
 import type { View } from '../view'
 import { fitLine, historyRow, type LevelUpRecord } from './levelHistory'
 import { drawScribbleBox } from './panelFrame'
@@ -167,7 +168,9 @@ export class LevelHistoryPanel {
       }
       const text = historyRow(record)
       const top = y + HEADER_H + i * ROW_H
-      row.marker.setPosition(x + PAD, top + 3).setFillStyle(record.rarity ? RARITY_COLOR[record.rarity] : GREY)
+      // The Datenkrake's corrupted augments and lost fights glitch purple.
+      const kraken = record.datenkrake === 'corrupted' || record.datenkrake === 'fought'
+      row.marker.setPosition(x + PAD, top + 3).setFillStyle(kraken ? CORRUPTED_COLOR : record.rarity ? RARITY_COLOR[record.rarity] : GREY)
       row.title.setText(fitLine(text.title, Math.floor(room / CHAR_W_TITLE))).setPosition(textLeft, top + 2)
       row.source.setText(fitLine(text.source, Math.floor(room / CHAR_W_SMALL))).setPosition(textLeft, top + 14)
       row.also

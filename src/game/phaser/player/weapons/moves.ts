@@ -57,7 +57,9 @@ export function createMoveLayer(core: Core): MoveLayer {
       note(hit, null)
       return real.spawnHitbox(hit)
     },
-    spawnProjectile(shot, origin) {
+    spawnProjectile(spec, origin) {
+      // In Silico: the mage's shots pierce every enemy.
+      const shot = spec.owner === player && core.build.corrupted.includes('inSilico') ? { ...spec, pierce: Infinity, maxTargets: Infinity } : spec
       note(shot, origin)
       return real.spawnProjectile(shot, origin)
     },
@@ -66,7 +68,7 @@ export function createMoveLayer(core: Core): MoveLayer {
     cancelShots: (team, area) => real.cancelShots(team, area),
     livingCombatants: (team) => real.livingCombatants(team),
     on: (event, listener) => real.on(event, listener),
-    setDamageModifier: (modifier) => real.setDamageModifier(modifier),
+    addDamageModifier: (modifier) => real.addDamageModifier(modifier),
     update: (deltaMs) => real.update(deltaMs),
     hitStopRemainingMs: () => real.hitStopRemainingMs(),
     destroy: () => real.destroy(),
@@ -201,8 +203,8 @@ export function createMoveLayer(core: Core): MoveLayer {
     return moves
   }
 
-  core.own(bindScheduler(deps.scene, core.scheduler))
-  core.own(bindFx(deps.scene, core.fx))
+  core.own(bindScheduler(deps.player, core.scheduler))
+  core.own(bindFx(deps.player, core.fx))
   // A hit or a dash cancels the attack, so its sub-hits stop with it.
   const interrupt = () => core.scheduler.cancel(SUB_HITS)
   core.own(player.on('damaged', interrupt))

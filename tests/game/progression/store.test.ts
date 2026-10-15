@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { PlayerBuild } from '../../../src/game/contracts/progression'
 import { createRng } from '../../../src/game/contracts/rng'
-import { addXp, applyCard, bossCoinDrop, buyCard, canApply, CARDS, createBuild, mobCoinDrop, PRICES, priceOf, rollStock, STOCK_SIZE, stockState } from '../../../src/game/model/progression'
-import type { CoinSource } from '../../../src/game/model/progression/coins'
+import { addXp, applyCard, bossFragmentDrop, buyCard, canApply, CARDS, createBuild, mobFragmentDrop, PRICES, priceOf, rollStock, STOCK_SIZE, stockState } from '../../../src/game/model/progression'
+import type { FragmentSource } from '../../../src/game/model/progression'
 
 const card = (id: string) => {
   const found = CARDS.find((entry) => entry.id === id)
@@ -24,16 +24,24 @@ describe('store prices', () => {
   })
 
   it('makes a first trader visit buy a common or an uncommon, but not a rare', () => {
-    // A typical first stretch has about eight mobs of mixed sizes.
-    const sizes: CoinSource['size'][] = ['small', 'medium', 'large', 'medium', 'small', 'large', 'medium', 'small']
-    const totals = Array.from({ length: 500 }, (_, run) => {
+    // A typical first stretch has about eight mobs of mixed sizes, most of them with an ontology
+    // term (the first step of the Talinum ARC has 10 of 13).
+    const sizes: FragmentSource['size'][] = ['small', 'medium', 'large', 'medium', 'small', 'large', 'medium', 'small']
+    const accessions = ['OBI:1', 'PO:2', 'OBI:3', null, 'UO:4', 'PO:5', null, 'NCIT:6']
+    const totals = Array.from({ length: 2000 }, (_, run) => {
       const rng = createRng(`run-${run}`)
-      const mobs = sizes.reduce((sum, size, i) => sum + mobCoinDrop({ size, segmentIndex: 0, phantom: false }, rng.fork(`mob-${i}`)), 0)
-      return mobs + bossCoinDrop(0, rng.fork('boss'))
+      const mobs = sizes.reduce(
+        (sum, size, i) => sum + mobFragmentDrop({ size, segmentIndex: 0, phantom: false, source: { accession: accessions[i] } }, rng.fork(`mob-${i}`)),
+        0,
+      )
+      return mobs + bossFragmentDrop(0, rng.fork('boss'))
     })
     const mean = totals.reduce((sum, total) => sum + total, 0) / totals.length
     expect(mean).toBeGreaterThanOrEqual(PRICES.uncommon)
     expect(mean).toBeLessThan(PRICES.rare)
+    // The same income as the flat 40% drop chance gave: 10 drop chances at 0.4 plus 7 from the boss.
+    expect(mean).toBeGreaterThan(10.4)
+    expect(mean).toBeLessThan(11.6)
   })
 })
 
@@ -91,10 +99,10 @@ describe('buying a card', () => {
     expect(result?.build.xp).toBe(build.xp)
     expect(result?.build.hp).toBe(40)
     expect(result?.build.stats.maxHp).toBe(build.stats.maxHp)
-    expect(result?.coins).toBe(30 - PRICES.common)
+    expect(result?.fragments).toBe(30 - PRICES.common)
   })
 
-  it('refuses a card the coins do not cover', () => {
+  it('refuses a card the fragments do not cover', () => {
     const rare = card('mechanic.wallJump')
     expect(stockState(createBuild(), PRICES.rare - 1, rare)).toBe('poor')
     expect(buyCard(createBuild(), PRICES.rare - 1, rare)).toBeNull()

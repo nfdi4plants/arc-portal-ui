@@ -11,11 +11,24 @@ const T = TILE
 const ARENA_VIEWS = 1.6
 const WALL_TILES = 16
 
+export interface ArenaOptions {
+  // The width in view widths, rounded to whole tiles.
+  views?: number
+  // A row of one-way platforms (arenaPlatforms) for the boss fights.
+  platforms?: boolean
+}
+
 // A flat floor between two walls, about 1.6 view widths wide, with a row of one-way platforms
-// (arenaPlatforms) for the boss fights.
-export function buildArena(scene: Phaser.Scene, art: ScribbleArt, theme: Theme, view: View): { arena: Arena; setup: LevelSetup; parallax: Parallax } {
-  const width = Math.round((ARENA_VIEWS * view.width) / T) * T
-  const arena: Arena = { left: 0, right: width, floorY: 0, platforms: arenaPlatforms(0, width, 0) }
+// (arenaPlatforms) for the boss fights. The waystation asks for a smaller room without platforms.
+export function buildArena(
+  scene: Phaser.Scene,
+  art: ScribbleArt,
+  theme: Theme,
+  view: View,
+  { views = ARENA_VIEWS, platforms = true }: ArenaOptions = {},
+): { arena: Arena; setup: LevelSetup; parallax: Parallax } {
+  const width = Math.round((views * view.width) / T) * T
+  const arena: Arena = { left: 0, right: width, floorY: 0, platforms: platforms ? arenaPlatforms(0, width, 0) : [] }
   const tiles = art.tiles(scene, theme)
   const parallax = addParallax(scene, art, tiles.background, -T, width + T)
   parallax.layout(view)

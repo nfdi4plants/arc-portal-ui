@@ -1,6 +1,7 @@
 import type { PlayerBuild, WeaponSlot } from '../../contracts/progression'
 import { createBuild, STAT_CAPS } from './build'
 import { CARDS } from './catalog'
+import { corruptedAugment } from './corrupted'
 import { type WeaponStats, weaponStats } from './weaponStats'
 
 export interface WeaponSummary extends WeaponStats {
@@ -30,6 +31,8 @@ export interface BuildSummary {
   stats: StatRow[]
   mechanics: string[]
   legendaries: string[]
+  // Corrupted augments of the Datenkrake.
+  corrupted: string[]
 }
 
 export const fmt = (value: number): string => String(Math.round(value * 10) / 10)
@@ -126,12 +129,14 @@ function statRows(build: PlayerBuild): StatRow[] {
 const nameOf = (prefix: string, id: string) => CARDS.find((card) => card.id === `${prefix}.${id}`)?.name ?? id
 
 // What the level-up screen shows of the build: both weapons with their effective numbers, the
-// stats against their base with the limits, and the owned mechanics and legendaries.
+// stats against their base with the limits, and the owned mechanics, legendaries and corrupted
+// augments.
 export function buildSummary(build: PlayerBuild): BuildSummary {
   return {
     weapons: [weaponSummary(build, 'light'), weaponSummary(build, 'heavy')],
     stats: statRows(build),
     mechanics: build.mechanics.map((id) => nameOf('mechanic', id)),
     legendaries: build.legendaries.map((id) => nameOf('legendary', id)),
+    corrupted: build.corrupted.map((id) => corruptedAugment(id)?.name ?? id),
   }
 }

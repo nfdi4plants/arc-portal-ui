@@ -13,7 +13,8 @@ import { clamp, knockback, toOwnerShape } from './zones'
 // The mechanic slots of a boss genome at runtime, see BossMechanicKind. Passive ones change the
 // numbers (armour, enrage, mirror), timed ones (minion, spill, teleport, shield) start only while
 // the boss stands idle, at most one at a time and MECHANIC_GAP_MS apart, so they never pile onto
-// an attack. Every object is created once per boss and reused.
+// an attack. The spill lands on the platform the player stands on, and the teleport puts the boss
+// right beside it. Every object is created once per boss and reused.
 
 export interface MechanicsDeps extends AttackEnv {
   // Moves the boss to x with the blink flash.
@@ -60,6 +61,11 @@ const SHIFT_AT = 0.5
 const SHIFT_DELAY_MS = 700
 const SHIELD_MS = 1400
 const SPILL = { w: 64, h: 16, warnMs: 900, burnMs: 1000 }
+// How far the middle of a spill on a platform may sit from the middle of the platform.
+const SPILL_LEDGE_REACH = 8
+// How far from the player a teleport lands, on the floor and next to a platform.
+const TELEPORT_FLOOR = [150, 230] as const
+const TELEPORT_LEDGE = [60, 110] as const
 const REFLECT_GAP_MS = 350
 const REFLECT_SPEED = 220
 const MARKER_GAP = 3
@@ -69,7 +75,7 @@ const SHIELD_TINT = 0x9fd6ff
 const BOSS_MARKER_SIZE = 14
 
 export function createMechanics(deps: MechanicsDeps): Mechanics {
-  const { scene, combat, art, player, rng, arena, telegraphs, body, self, adds } = deps
+  const { scene, combat, art, player, rng, arena, telegraphs, body, self, adds, perch } = deps
   let kinds: BossMechanicSpec[] = []
   // One timer per timed mechanic, rebuilt on a phase change only.
   const timers: { kind: BossMechanicKind; leftMs: number }[] = []
@@ -81,6 +87,8 @@ export function createMechanics(deps: MechanicsDeps): Mechanics {
   let spillZone: Zone | null = null
   let spillMs = 0
   let spillX = 0
+  // The top of the surface the spill lies on, the floor or a platform.
+  let spillY = 0
   let raised = false
 
   const markers: Phaser.GameObjects.Sprite[] = []
@@ -110,14 +118,19 @@ export function createMechanics(deps: MechanicsDeps): Mechanics {
   }
 
   function startSpill() {
-    spillX = clamp(player.position().x, arena.left + SPILL.w / 2, arena.right - SPILL.w / 2)
-    spillZone = telegraphs.show({ shape: 'rect', x: spillX, y: arena.floorY - SPILL.h / 2, w: SPILL.w, h: SPILL.h, fill: 'wide' })
+    // On a platform the patch covers most of it, so the player has to get off.
+    const ledge = perch.ledge
+    const from = ledge ? ledge.x + ledge.w / 2 - SPILL_LEDGE_REACH : arena.left + SPILL.w / 2
+    const to = ledge ? ledge.x + ledge.w / 2 + SPILL_LEDGE_REACH : arena.right - SPILL.w / 2
+    spillX = clamp(player.position().x, from, to)
+    spillY = ledge ? ledge.top : arena.floorY
+    spillZone = telegraphs.show({ shape: 'rect', x: spillX, y: spillY - SPILL.h / 2, w: SPILL.w, h: SPILL.h, fill: 'wide' })
     spillMs = SPILL.warnMs + SPILL.burnMs
   }
 
   function burnSpill(damage: number) {
     spillZone?.activate()
-    const shape = { kind: 'rect' as const, x: spillX - SPILL.w / 2, y: arena.floorY - SPILL.h, w: SPILL.w, h: SPILL.h }
+    const shape = { kind: 'rect' as const, x: spillX - SPILL.w / 2, y: spillY - SPILL.h, w: SPILL.w, h: SPILL.h }
     combat.spawnHitbox({
       owner: self,
       shape: toOwnerShape(shape, self.position(), self.facing()),
@@ -131,11 +144,14 @@ export function createMechanics(deps: MechanicsDeps): Mechanics {
     })
   }
 
+  // Beside the player, or right next to the platform the player stands on, close enough for a
+  // sweep or a leap to reach up.
   function teleport() {
     const playerX = player.position().x
     const side = body.x >= playerX ? -1 : 1
-    let target = playerX + side * rng.int(150, 230)
-    if (target < deps.minX || target > deps.maxX) target = playerX - side * rng.int(150, 230)
+    const [near, far] = perch.ledge ? TELEPORT_LEDGE : TELEPORT_FLOOR
+    let target = playerX + side * rng.int(near, far)
+    if (target < deps.minX || target > deps.maxX) target = playerX - side * rng.int(near, far)
     deps.blink(clamp(target, deps.minX, deps.maxX))
   }
 

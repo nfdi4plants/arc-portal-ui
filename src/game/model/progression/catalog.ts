@@ -1,4 +1,4 @@
-import type { LegendaryId, MechanicId, PowerUpCard } from '../../contracts/progression'
+import type { LegendaryId, MechanicId, PlayerWeaponId, PowerUpCard } from '../../contracts/progression'
 
 export const CARDS: readonly PowerUpCard[] = [
   {
@@ -111,6 +111,44 @@ export const CARDS: readonly PowerUpCard[] = [
     name: 'Petri Shield',
     description: 'Heavy attack that reflects projectiles, then bashes. It does not block melee. Picking it again gives Overclocked Petri Shield.',
     rarity: 'uncommon',
+    kind: 'weapon',
+    slot: 'heavy',
+  },
+  // Legendary weapons come at full power. There is no tier 2 to reach, so a second copy is never
+  // offered.
+  {
+    id: 'weapon.arcitect',
+    name: 'ARCitect',
+    description:
+      'Legendary light build tool. Each light press drops an ISA block a little ahead: an Assay, a Study, then an Investigation, each one bigger. The drop hits what is under it for 18, 22 and 30 and launches it. A block stands for 4 s, 3 at most: you can stand on it, and enemy shots stop at it.',
+    rarity: 'legendary',
+    kind: 'weapon',
+    slot: 'light',
+  },
+  {
+    id: 'weapon.arcCommander',
+    name: 'ARC Commander',
+    description:
+      'Legendary light terminal. Types arc add and arc commit at the cursor. The third command, arc sync, pulls in every enemy shot within 5 tiles and fires them back as one blast: 28 damage plus 10 per shot, up to 70.',
+    rarity: 'legendary',
+    kind: 'weapon',
+    slot: 'light',
+  },
+  {
+    id: 'weapon.gitLfs',
+    name: 'Git LFS',
+    description:
+      'Legendary heavy throw. Hurls one enormous file that hits for 30, then rolls slowly on for 2.4 s and hits everything in it for 12 every 0.2 s.',
+    rarity: 'legendary',
+    kind: 'weapon',
+    slot: 'heavy',
+  },
+  {
+    id: 'weapon.publicationPress',
+    name: 'Publication Press',
+    description:
+      'Legendary heavy stamp. The slam publishes every enemy within 7 tiles: immutable statues for 1.8 s (bosses only slow down). Your next hit on a statue shatters it for 60% more plus 25.',
+    rarity: 'legendary',
     kind: 'weapon',
     slot: 'heavy',
   },
@@ -328,3 +366,10 @@ export const ABILITY_IDS: readonly (MechanicId | LegendaryId)[] = [
   'peerPressure',
   'labCoat',
 ]
+
+// The legendary weapons, which come at full power (tier 2) and have no upgrade.
+export const LEGENDARY_WEAPON_IDS: readonly PlayerWeaponId[] = ['arcitect', 'arcCommander', 'gitLfs', 'publicationPress']
+
+export function isLegendaryWeapon(id: PlayerWeaponId): boolean {
+  return LEGENDARY_WEAPON_IDS.includes(id)
+}

@@ -3,6 +3,7 @@ import { PLAYER_HEIGHT, TILE, WORLD_MAX_ASPECT, WORLD_MIN_VIEW_WIDTH, WORLD_VIEW
 import {
   arenaPlatforms,
   fallMs,
+  FEET_MARGIN,
   freeFloorX,
   JUMP_APEX,
   PLATFORM_THICKNESS,
@@ -57,6 +58,12 @@ describe('platformUnder', () => {
     expect(platformUnder(platforms, p.x + p.w / 2, 0)).toBeNull()
     expect(platformUnder(platforms, p.x + p.w / 2, p.top - 20)).toBeNull()
     expect(platformUnder(platforms, p.x - 10, p.top)).toBeNull()
+  })
+
+  it('counts a mage on the very edge, its middle just past the end', () => {
+    expect(platformUnder(platforms, p.x - FEET_MARGIN, p.top, FEET_MARGIN)).toBe(p)
+    expect(platformUnder(platforms, p.x + p.w + FEET_MARGIN, p.top, FEET_MARGIN)).toBe(p)
+    expect(platformUnder(platforms, p.x - FEET_MARGIN - 1, p.top, FEET_MARGIN)).toBeNull()
   })
 
   it('puts a body on a platform at its middle', () => {

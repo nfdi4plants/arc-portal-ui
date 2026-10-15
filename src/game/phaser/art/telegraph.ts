@@ -1,6 +1,7 @@
 import type Phaser from 'phaser'
 import type { TelegraphArt } from '../../contracts/art'
 import { animKeyOf, spriteFrom } from './atlas'
+import { artContext } from './canvas'
 import { conePts, telegraphSize } from './geometry'
 import { TEXTURE_SCALE, telegraphKey } from './layout'
 import type { Look, Pen } from './pen'
@@ -45,7 +46,7 @@ function hatchTile({ gap, crossed, color, width, flip }: HatchLook): HTMLCanvasE
   const tile = document.createElement('canvas')
   tile.width = side
   tile.height = side
-  const ctx = tile.getContext('2d')
+  const ctx = artContext(tile)
   if (!ctx) throw new Error('Canvas 2D is not available')
   ctx.strokeStyle = color
   ctx.lineWidth = width * TEXTURE_SCALE
@@ -129,6 +130,7 @@ const COMMON: readonly (readonly [TelegraphArt, number, number])[] = [
   ['rect', 128, 16],
   ['rect', 64, 16],
   ['rect', 32, 64],
+  ['rect', 32, 128],
   ['circle', 128, 128],
   ['cone', 256, 128],
   ['line', 512, 16],

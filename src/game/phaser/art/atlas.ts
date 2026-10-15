@@ -69,7 +69,7 @@ export function spriteFrom(scene: Phaser.Scene, def: SpriteDef): SpriteRef {
     const count = def.variants ?? VARIANTS
     const canvas = drawCanvas(def, count)
     // textures.create skips the CanvasTexture wrapper that addCanvas builds. That wrapper reads
-    // every pixel back on creation and stalls on a GPU-backed canvas.
+    // every pixel back on creation.
     const texture = scene.textures.create(def.key, canvas)
     if (!texture) throw new Error(`Texture ${def.key} already exists`)
     texture.add('__BASE', 0, 0, 0, canvas.width, canvas.height)

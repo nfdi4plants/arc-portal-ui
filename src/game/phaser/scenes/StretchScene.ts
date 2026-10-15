@@ -12,7 +12,9 @@ import { GameplayScene, type LevelSetup } from './GameplayScene'
 import { addParallax, addTiles, type Parallax } from './levelArt'
 import { generateStretch, type StretchLayout } from './levelGen'
 import { PIT_KILLER } from './RunDirector'
-import { createRescueFrame, rescueAt } from './rescue'
+import { createKrakenIntern, type KrakenIntern } from './intern'
+import { createRescueFrame, rescueAt, rescueSpot } from './rescue'
+import { ENTER_ACTION, portalOffer } from './interaction'
 import { addText, plural } from './ui'
 
 const T = TILE
@@ -52,6 +54,8 @@ export class StretchScene extends GameplayScene {
   private rescueStage: 'carry' | 'released' | 'vulnerable' = 'carry'
   private readonly rescueSpot = { x: 0, y: 0 }
   private cloud: Phaser.GameObjects.Sprite | null = null
+  // Deprecated jump(): the kraken intern bridges the holes and lifts the mage up the steps.
+  private intern: KrakenIntern | null = null
 
   constructor(ctx: RunContext) {
     super(SCENE.stretch, ctx)
@@ -123,6 +127,7 @@ export class StretchScene extends GameplayScene {
       colliders: [this.statics],
       rng: this.director.rng.fork(`mobs/${this.segment.index}`),
     }
+    this.intern = this.director.build.corrupted.includes('deprecatedJump') ? createKrakenIntern(this, this.player, this.layout, this.director) : null
     const { segment } = this
     const dataset = segment.datasetId.replace(/\/+$/, '')
     this.showIntro(
@@ -157,7 +162,8 @@ export class StretchScene extends GameplayScene {
     this.prewarmed = this.specs.length
   }
 
-  protected onFrame() {
+  protected onFrame(deltaMs: number) {
+    this.intern?.frame(deltaMs)
     // Spawning waits for the art drawn behind the banner.
     if (this.prewarmed < this.specs.length) return
     const centre = this.cameras.main.midPoint.x
@@ -186,8 +192,8 @@ export class StretchScene extends GameplayScene {
         slot.gone = true
       }
     }
-    const coins = updatePickups(this, this.player, dtMs)
-    if (coins > 0) this.gainCoins(coins)
+    const fragments = updatePickups(this, this.player, dtMs)
+    if (fragments > 0) this.gainFragments(fragments)
     if (this.rescueMs >= 0) {
       this.stepRescue(dtMs)
       return
@@ -198,12 +204,19 @@ export class StretchScene extends GameplayScene {
       this.fallIntoPit()
       return
     }
+    if (this.intern?.step(dtMs, this.heldDirection())) {
+      this.showPrompt(null)
+      return
+    }
     if (this.player.isGrounded()) {
       this.safeX = feet.x
       this.safeY = feet.y
     }
-    const box = this.player.hurtbox()
-    if (Phaser.Geom.Intersects.RectangleToRectangle(box, this.door)) this.leave((director) => director.completeStretch())
+    // The door leads on only on the interact key, so a mage chasing a mob past it stays.
+    const offer = portalOffer(Phaser.Geom.Intersects.RectangleToRectangle(this.player.hurtbox(), this.door), true)
+    const door = this.door
+    this.showPrompt(offer === 'enter' ? ENTER_ACTION : null, door.centerX, door.y - 16)
+    if (offer === 'enter' && this.interactPressed()) this.leave((director) => director.completeStretch())
   }
 
   // The pit costs hp first. If the mage lives, the cloud carries it back down onto the last safe
@@ -255,16 +268,10 @@ export class StretchScene extends GameplayScene {
     }
   }
 
-  // The last ground the player stood on, moved a tile in from its edges so the player does not
-  // land on the lip of the same pit again.
+  // The last ground the player stood on: the middle of a stepping stone, or well away from the
+  // edges of wider ground, so the player does not land on the lip of the same pit again.
   private safeSpot(): { x: number; y: number } {
-    const surfaces = [...this.layout.grounds, ...this.layout.platforms]
-    for (const s of surfaces) {
-      if (Math.abs(s.top - this.safeY) > 1 || this.safeX < s.x - 2 || this.safeX > s.x + s.w + 2) continue
-      const margin = Math.min(T, s.w / 2)
-      return { x: Math.min(s.x + s.w - margin, Math.max(s.x + margin, this.safeX)), y: s.top }
-    }
-    return { x: this.safeX, y: this.safeY }
+    return rescueSpot([...this.layout.grounds, ...this.layout.platforms], this.safeX, this.safeY)
   }
 
   protected inspectableMobs(): Mob[] {
@@ -280,5 +287,6 @@ export class StretchScene extends GameplayScene {
   protected onShutdown() {
     for (const slot of this.slots) if (!slot.gone) slot.mob?.destroy()
     this.slots = []
+    this.intern = null
   }
 }

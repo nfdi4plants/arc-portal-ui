@@ -1,7 +1,7 @@
 import type Phaser from 'phaser'
 import { PALETTE } from '../../contracts/constants'
 import type { PlayerBuild, WeaponSlot } from '../../contracts/progression'
-import { buildSummary, type BuildSummary, type StatRow, type WeaponSummary } from '../../model/progression'
+import { buildSummary, isLegendaryWeapon, type BuildSummary, type StatRow, type WeaponSummary } from '../../model/progression'
 import { cssColor } from '../color'
 import { addText } from './ui'
 
@@ -14,6 +14,10 @@ const LABEL_EM = 7.8
 const VALUE_EM = 8.4
 
 export type HighlightKind = 'upgrade' | 'replace'
+
+type ChipKind = 'mechanic' | 'legendary' | 'corrupted'
+const CHIP_KINDS: readonly ChipKind[] = ['mechanic', 'legendary', 'corrupted']
+const CHIP_BACKGROUND: Record<ChipKind, number> = { mechanic: PALETTE.cream, legendary: PALETTE.yellow, corrupted: 0x3a1557 }
 
 const HIGHLIGHT_COLOR: Record<HighlightKind, number> = { upgrade: PALETTE.teal, replace: PALETTE.blue }
 
@@ -68,7 +72,7 @@ export class BuildPanel {
     // Same style and size in all three columns, or their lines drift apart.
     this.values = addText(scene, '', 7, { color: PALETTE.navy })
     this.bonuses = addText(scene, '', 7, { color: PALETTE.outline })
-    this.heads = ['Mechanics', 'Legendaries'].map((label) => addText(scene, label, 7, { color: PALETTE.navy, bold: true }))
+    this.heads = ['Mechanics', 'Legendaries', 'Corrupted'].map((label) => addText(scene, label, 7, { color: PALETTE.navy, bold: true }))
     this.empty = addText(scene, 'No mechanics or legendaries yet.', 7, { color: PALETTE.outline }).setFontStyle('italic')
     const parts: Phaser.GameObjects.GameObject[] = [this.paper, this.marker, this.icons, this.header, this.labels, this.values, this.bonuses, this.empty, ...this.heads]
     for (const block of this.blocks) parts.push(block.title, block.body, block.note)
@@ -160,8 +164,8 @@ export class BuildPanel {
 
   // Mechanics and legendaries as small tags that wrap at the panel's edge.
   private arrangeChips(summary: BuildSummary, size: number, inner: number, top: number): number {
-    const groups = [summary.mechanics, summary.legendaries]
-    const total = groups[0].length + groups[1].length
+    const groups = [summary.mechanics, summary.legendaries, summary.corrupted]
+    const total = groups[0].length + groups[1].length + groups[2].length
     this.empty.setFontSize(size - 0.5).setVisible(total === 0).setPosition(PAD, top)
     let y = top
     if (total === 0) {
@@ -179,7 +183,7 @@ export class BuildPanel {
       let x = PAD
       let rowH = 0
       for (const name of names) {
-        const chip = this.chipAt(used++, g === 1)
+        const chip = this.chipAt(used++, CHIP_KINDS[g])
         chip.setFontSize(size - 0.5).setText(name).setVisible(true)
         if (x > PAD && x + chip.width > PAD + inner) {
           x = PAD
@@ -196,14 +200,15 @@ export class BuildPanel {
     return y
   }
 
-  private chipAt(index: number, legendary: boolean): Phaser.GameObjects.Text {
+  private chipAt(index: number, kind: ChipKind): Phaser.GameObjects.Text {
     let chip = this.chips[index]
     if (!chip) {
       chip = addText(this.scene, '', 6.5, { color: PALETTE.navy }).setPadding(3, 1, 3, 1)
       this.box.add(chip)
       this.chips.push(chip)
     }
-    chip.setBackgroundColor(cssColor(legendary ? PALETTE.yellow : PALETTE.cream))
+    // A corrupted augment glitches: dark purple with light text.
+    chip.setBackgroundColor(cssColor(CHIP_BACKGROUND[kind])).setColor(cssColor(kind === 'corrupted' ? PALETTE.cream : PALETTE.navy))
     return chip
   }
 
@@ -249,7 +254,8 @@ export class BuildPanel {
 }
 
 function weaponTitle(weapon: WeaponSummary): string {
-  return weapon.id === 'staff' ? weapon.name : `${weapon.name} (tier ${weapon.tier})`
+  if (weapon.id === 'staff') return weapon.name
+  return isLegendaryWeapon(weapon.id) ? `${weapon.name} (legendary)` : `${weapon.name} (tier ${weapon.tier})`
 }
 
 function weaponLines(weapon: WeaponSummary): string {

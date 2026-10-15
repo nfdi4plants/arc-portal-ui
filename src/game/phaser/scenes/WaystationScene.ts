@@ -1,0 +1,234 @@
+import Phaser from 'phaser'
+import { DEPTH, PALETTE, SCENE, TILE } from '../../contracts/constants'
+import { ENCOUNTER_SLOTS, rollEncounters } from '../../model/run'
+import type { Combatant } from '../../contracts/combat'
+import { applySpriteRef, datenkrakeArmArt, datenkrakeArt, doorArt, stallArt, traderArt, traderFighterArt } from '../art'
+import type { Arena } from '../bosses'
+import type { View } from '../view'
+import { buildArena } from './arena'
+import type { RunContext } from './context'
+import { ENCOUNTER_SPAWNERS, type Encounter, type EncounterHost } from './encounters'
+import { GameplayScene, type LevelSetup } from './GameplayScene'
+import type { Parallax } from './levelArt'
+import { ENTER_ACTION, portalOffer } from './interaction'
+import { portalLabel } from './RunDirector'
+import { startTraderFight, TRADER_BOSS_NAME, type TraderFight } from './traderFight'
+import { addText } from './ui'
+
+const T = TILE
+const BANNER_MS = 1400
+// One room a little wider than the view, without platforms.
+const ROOM_VIEWS = 1.15
+const PORTAL = { w: 2 * T, h: 3 * T }
+// The portal the mage came through closes behind it once the banner is gone.
+const ENTRANCE_CLOSE_MS = 700
+// Where each slot stands on the floor between the entrance and the exit, as a share of that span.
+const SLOT_AT = { left: 0.18, centre: 0.5, right: 0.82 } as const
+const MID_FIGHT = "Can't leave mid-fight"
+
+// The waystation after a node boss: one quiet room of the boss's theme. The mage comes in on the
+// left, meets the encounters of `rollEncounters` (the FAIR trader, sometimes the Datenkrake) and leaves through the
+// portal on the right, which leads to the next step or to the ARC itself.
+export class WaystationScene extends GameplayScene {
+  private index = 0
+  private arena!: Arena
+  private parallax!: Parallax
+  private spawnX = 0
+  private readonly exit = new Phaser.Geom.Rectangle()
+  private encounters: Encounter[] = []
+  // The encounter in reach, -1 when none is.
+  private nearIndex = -1
+  // The encounter whose overlay is open.
+  private engaged: Encounter | null = null
+  private colliders: Phaser.Types.Physics.Arcade.ArcadeColliderType[] = []
+  // The FAIR trader after the fourth strike, until he is beaten and looted.
+  private fight: TraderFight | null = null
+
+  constructor(ctx: RunContext) {
+    super(SCENE.waystation, ctx)
+  }
+
+  protected buildLevel(data: { index?: number }): LevelSetup {
+    this.index = data.index ?? 0
+    this.encounters = []
+    this.nearIndex = -1
+    this.engaged = null
+    const theme = this.director.segment(this.index).datasetKind
+    const built = buildArena(this, this.ctx.art, theme, this.view, { views: ROOM_VIEWS, platforms: false })
+    this.arena = built.arena
+    this.parallax = built.parallax
+    this.spawnX = built.setup.spawn.x
+    this.colliders = built.setup.colliders
+    this.fight = null
+    return built.setup
+  }
+
+  protected setup() {
+    const { arena, director, index } = this
+    const floor = arena.floorY
+    const exitX = arena.right - 2.5 * T
+    this.exit.setTo(exitX - PORTAL.w / 2, floor - PORTAL.h, PORTAL.w, PORTAL.h)
+    const ref = doorArt(this, PORTAL.w, PORTAL.h)
+    applySpriteRef(this.add.sprite(exitX, floor, ref.textureKey).setDepth(DEPTH.tiles + 1), ref)
+    const label = portalLabel(director.plan, index)
+    addText(this, label.title, 8, { color: PALETTE.navy, bold: true, align: 'center' })
+      .setOrigin(0.5, 1)
+      .setPosition(exitX, floor - PORTAL.h - 12)
+      .setDepth(DEPTH.tiles + 1)
+    addText(this, label.detail, 6, { color: PALETTE.navy, align: 'center' })
+      .setOrigin(0.5, 1)
+      .setPosition(exitX, floor - PORTAL.h - 4)
+      .setDepth(DEPTH.tiles + 1)
+
+    const entrance = this.add.sprite(1.5 * T, floor, ref.textureKey).setDepth(DEPTH.tiles + 1)
+    applySpriteRef(entrance, ref)
+    // Tweens are held with the world, so this waits for the banner.
+    this.tweens.add({ targets: entrance, scaleX: 0, alpha: 0, delay: 150, duration: ENTRANCE_CLOSE_MS, ease: 'Back.easeIn', onComplete: () => entrance.destroy() })
+
+    // Drawn up front, so the first encounter does not stall the frame. The stall without him and
+    // his fighting body as well, for the moment he vaults over the counter.
+    traderArt(this)
+    stallArt(this, director.traderGone ? 'closed' : 'empty')
+    if (!director.traderGone) traderFighterArt(this)
+    const kinds = rollEncounters(director.plan.seed, index)
+    if (kinds.includes('datenkrake')) {
+      datenkrakeArt(this)
+      datenkrakeArmArt(this)
+    }
+    const host: EncounterHost = {
+      scene: this,
+      director,
+      index,
+      floorY: floor,
+      player: this.player,
+      openStore: () => this.openStore(index),
+      hold: (on) => this.holdForEncounter(on),
+      openDatenkrake: () => this.openDatenkrake(index),
+      combat: this.combat,
+      startTraderFight: (x, counterY) => this.startFight(x, counterY),
+    }
+    const from = this.spawnX + 2 * T
+    const to = this.exit.x - 2 * T
+    kinds.forEach((kind, i) => {
+      const x = Math.round(from + (to - from) * SLOT_AT[ENCOUNTER_SLOTS[i]])
+      this.encounters.push(ENCOUNTER_SPAWNERS[kind](host, x))
+    })
+
+    this.showIntro('Waystation', `${director.bossSpec(index).label} is behind you · ${label.title}`, BANNER_MS)
+  }
+
+  protected onBannerDone() {
+    for (const encounter of this.encounters) encounter.arrived()
+  }
+
+  protected onView(view: View) {
+    this.parallax?.layout(view)
+  }
+
+  protected onFrame(deltaMs: number) {
+    for (const encounter of this.encounters) encounter.frame?.(deltaMs)
+    this.fight?.frame(deltaMs)
+  }
+
+  // The trader leaves the counter and fights at the mage's level. The exit stays shut until he is
+  // beaten, and the HUD shows his hp like a boss's.
+  private startFight(x: number, counterY: number) {
+    if (this.fight) return
+    const { arena } = this
+    this.fight = startTraderFight(
+      { scene: this, combat: this.combat, art: this.ctx.art, director: this.director, index: this.index, player: this.player, colliders: this.colliders, room: { left: arena.left, right: arena.right } },
+      x,
+      counterY,
+    )
+    if (this.ctx.active) {
+      this.ctx.active.boss = this.fight.hud
+      this.ctx.active.bossName = TRADER_BOSS_NAME
+    }
+  }
+
+  // He has fallen and faded: his stall is looted, the cards apply like purchases, and the overlay
+  // shows them.
+  private finishFight(fight: TraderFight) {
+    const line = fight.defeatLine()
+    fight.destroy()
+    this.fight = null
+    if (this.ctx.active) this.ctx.active.boss = null
+    this.director.setHp(this.player.hp())
+    const loot = this.director.lootTrader(this.index)
+    this.player.setBuild(this.director.build)
+    this.loadout.sync(this.director.build)
+    this.openTraderLoot({ ...loot, line })
+  }
+
+  protected freezeActors(frozen: boolean) {
+    this.fight?.setFrozen(frozen)
+  }
+
+  protected xpFor(target: Combatant): number {
+    return target === this.fight?.fighter ? 0 : super.xpFor(target)
+  }
+
+  protected stepWorld(dtMs: number) {
+    const fight = this.fight
+    if (fight) {
+      fight.step(dtMs)
+      if (fight.done()) {
+        this.finishFight(fight)
+        return
+      }
+    }
+    const box = this.player.hurtbox()
+    let near = -1
+    for (let i = 0; i < this.encounters.length; i++) {
+      const encounter = this.encounters[i]
+      encounter.update(dtMs)
+      if (near < 0 && !encounter.zone.isEmpty() && Phaser.Geom.Intersects.RectangleToRectangle(box, encounter.zone)) near = i
+    }
+    const encounter = this.encounters[near]
+    if (near !== this.nearIndex) {
+      this.encounters[this.nearIndex]?.near(false)
+      encounter?.near(true)
+      this.nearIndex = near
+      // The Datenkrake does not wait for a key.
+      if (encounter?.auto) {
+        this.showPrompt(null)
+        this.engaged = encounter
+        encounter.interact()
+        return
+      }
+    }
+    if (encounter && !encounter.auto) {
+      if (encounter.talking()) this.showPrompt(null)
+      else this.showPrompt(encounter.action, encounter.promptX, encounter.promptY)
+      if (this.interactPressed()) {
+        this.showPrompt(null)
+        this.engaged = encounter
+        encounter.interact()
+      }
+      return
+    }
+    // The exit portal leads on only on the interact key, like every portal, and not while the
+    // trader fights.
+    const offer = portalOffer(Phaser.Geom.Intersects.RectangleToRectangle(box, this.exit), true, this.fight !== null)
+    if (offer === 'blocked') this.showPrompt(MID_FIGHT, this.exit.centerX, this.exit.y - 24, false)
+    else this.showPrompt(offer === 'enter' ? ENTER_ACTION : null, this.exit.centerX, this.exit.y - 24)
+    if (offer === 'enter' && this.interactPressed()) this.leave((director) => director.leaveWaystation())
+  }
+
+  protected onStoreClosed() {
+    this.engaged?.closed()
+    this.engaged = null
+  }
+
+  protected onDatenkrakeClosed() {
+    this.engaged?.closed()
+    this.engaged = null
+  }
+
+  protected onShutdown() {
+    this.fight?.destroy()
+    this.fight = null
+    this.encounters = []
+    this.engaged = null
+  }
+}

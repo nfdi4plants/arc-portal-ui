@@ -79,7 +79,7 @@ function overhead(real: CombatWorld): CombatWorld {
     cancelShots: (team, area) => real.cancelShots(team, area),
     livingCombatants: (team) => real.livingCombatants(team),
     on: (event, listener) => real.on(event, listener),
-    setDamageModifier: (modifier) => real.setDamageModifier(modifier),
+    addDamageModifier: (modifier) => real.addDamageModifier(modifier),
     update: (deltaMs) => real.update(deltaMs),
     hitStopRemainingMs: () => real.hitStopRemainingMs(),
     destroy: () => real.destroy(),

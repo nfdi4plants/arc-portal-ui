@@ -19,7 +19,26 @@ export { monsterWeapon } from './monster'
 export { carrier } from './carrier'
 export type { MonsterWeaponRef } from './monster'
 export { prewarmTelegraphs, releaseTelegraphs } from './telegraph'
-export { CARD_HEIGHT, CARD_WIDTH, COIN_SIZE, RARITY_COLOR, TRADER_HEIGHT, TRADER_WIDTH, cardArt, coinArt, doorArt, glowTexture, shieldFragmentArt, traderArt } from './props'
+export type { IsaKind } from './props'
+export { CARD_HEIGHT, CARD_WIDTH, FRAGMENT_SIZE, RARITY_COLOR, TRADER_HEIGHT, TRADER_WIDTH, cardArt, doorArt, fragmentArt, glowTexture, ISA_BLOCKS, isaBlockArt, portalSparkArt, portalSwirlArt, shieldFragmentArt, stallArt, TRADER_FIGHTER, traderArt, traderFighterArt } from './props'
+export {
+  ARM_LENGTH,
+  CORRUPTED_CARD_HEIGHT,
+  CORRUPTED_CARD_WIDTH,
+  CORRUPTED_COLOR,
+  DATENKRAKE_ARMS,
+  DATENKRAKE_HEIGHT,
+  DATENKRAKE_WIDTH,
+  INTERN_HEIGHT,
+  INTERN_WIDTH,
+  PLANK_HEIGHT,
+  PLANK_WIDTH,
+  bridgePlankArt,
+  corruptedCardArt,
+  datenkrakeArmArt,
+  datenkrakeArt,
+  krakenInternArt,
+} from './datenkrake'
 export type { BossArt, PartRef } from './parts'
 
 // Puts a sprite on the texture of `ref`, standing on its origin (bottom centre), sized in world

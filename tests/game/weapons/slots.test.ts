@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { CARDS } from '../../../src/game/model/progression/catalog'
 import { beakerMoveset, bunsenMoveset, discMoveset, petriMoveset } from '../../../src/game/phaser/player/weapons/heavy'
+import { LEGENDARY_MOVESETS } from '../../../src/game/phaser/player/weapons/legendaryMoves'
 import { pipetteMoveset, scalpelMoveset, wandMoveset, whipMoveset } from '../../../src/game/phaser/player/weapons/light'
 import { staffMoveset } from '../../../src/game/phaser/player/staffMoveset'
 
 // Imported from the weapon files because the index pulls in the Phaser runtime, which jsdom lacks.
-const WEAPON_MOVESETS = [wandMoveset, pipetteMoveset, scalpelMoveset, whipMoveset, discMoveset, beakerMoveset, bunsenMoveset, petriMoveset]
+const WEAPON_MOVESETS = [wandMoveset, pipetteMoveset, scalpelMoveset, whipMoveset, discMoveset, beakerMoveset, bunsenMoveset, petriMoveset, ...LEGENDARY_MOVESETS]
 
 const weaponCards = CARDS.flatMap((card) => (card.kind === 'weapon' && card.slot ? [{ id: card.id, slot: card.slot }] : []))
 
@@ -32,6 +33,13 @@ describe('weapon movesets', () => {
       const set = WEAPON_MOVESETS.find((candidate) => candidate.id === card.id.replace('weapon.', ''))
       const foreign = card.slot === 'light' ? ['airHeavy', 'dashHeavy', 'upHeavy'] : ['dashLight', 'upLight']
       for (const key of foreign) expect(set, `${card.id} ${key}`).not.toHaveProperty(key)
+    }
+  })
+
+  it('gives a legendary weapon the same moves at both tiers, so it has one form', () => {
+    for (const set of LEGENDARY_MOVESETS) {
+      const timing = (tier: 1 | 2, slot: 'light' | 'heavy') => set.moves(slot, tier).map(({ name, startupMs, activeMs, recoveryMs, cancelAfterMs, lunge }) => ({ name, startupMs, activeMs, recoveryMs, cancelAfterMs, lunge }))
+      for (const slot of ['light', 'heavy'] as const) expect(timing(1, slot), set.id).toEqual(timing(2, slot))
     }
   })
 

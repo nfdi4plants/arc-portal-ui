@@ -16,10 +16,14 @@ import {
   createSecondWind,
 } from './abilities'
 import { PASSIVE_IDS, createCore } from './core'
+import { createCorruption } from './corrupted'
+import { CORRUPTION } from '../../../model/progression'
 import type { Feature } from './core'
 import { beakerMoveset, bunsenMoveset, discMoveset, petriMoveset } from './heavy'
 import { createDamageModifier, damageMultiplier } from './helpers'
 import { createFairPrinciples, createGitRevert, createOntology, createPeerReview } from './legendaries'
+import { createLegendaryWeapons } from './legendaryFeature'
+import { LEGENDARY_MOVESETS } from './legendaryMoves'
 import { pipetteMoveset, scalpelMoveset, wandMoveset, whipMoveset } from './light'
 import { createEcho, createFamiliar, createParry, createReflectDash } from './mechanics'
 import { createMoveLayer } from './moves'
@@ -54,9 +58,12 @@ export type LoadoutWithStatus = Loadout & {
   gitRevertCharged(): boolean
   // True while Second Wind is owned and its heal is still available until the next boss falls.
   secondWindCharged(): boolean
+  // Terms of Service: after a level-up card the mage reads the EULA. Nothing without the augment.
+  readEula(): void
 }
 
-// The eight new weapons. The staff stays with the player and is wrapped inside the loadout.
+// The weapons of the cards, the legendary ones included. The staff stays with the player and is
+// wrapped inside the loadout.
 export const WEAPON_MOVESETS: readonly WeaponMoveset[] = [
   wandMoveset,
   pipetteMoveset,
@@ -66,6 +73,7 @@ export const WEAPON_MOVESETS: readonly WeaponMoveset[] = [
   beakerMoveset,
   bunsenMoveset,
   petriMoveset,
+  ...LEGENDARY_MOVESETS,
 ]
 
 export function attachLoadout(deps: LoadoutDeps): LoadoutWithStatus {
@@ -86,8 +94,10 @@ export function attachLoadout(deps: LoadoutDeps): LoadoutWithStatus {
     peerPressure: createPeerPressure(core),
     labCoat: createLabCoat(core),
   }
+  const corruption = createCorruption(core)
   const features: Feature[] = [
     moves,
+    corruption,
     createEcho(core),
     createReflectDash(core),
     parry,
@@ -96,6 +106,7 @@ export function attachLoadout(deps: LoadoutDeps): LoadoutWithStatus {
     gitRevert,
     createFairPrinciples(core),
     createPeerReview(core),
+    createLegendaryWeapons(core),
     ...Object.values(abilities),
   ]
   const handlers: Record<string, AbilityHandler> = {
@@ -104,9 +115,21 @@ export function attachLoadout(deps: LoadoutDeps): LoadoutWithStatus {
     gitRevert: gitRevert.handler,
   }
   for (const [id, ability] of Object.entries(abilities)) handlers[id] = ability.handler
+  // Rogue Admin: every ability waits three times as long. The same handler with a longer cooldown.
+  const slowHandlers: Record<string, AbilityHandler> = {}
+  for (const [id, handler] of Object.entries(handlers)) {
+    slowHandlers[id] = {
+      get cooldownMs() {
+        return handler.cooldownMs * CORRUPTION.rogueAdmin.abilityCooldown
+      },
+      activate: (ctx) => handler.activate(ctx),
+    }
+  }
+  let slowAbilities = false
   const movesets = [...WEAPON_MOVESETS, staffMoveset].map((moveset) => moves.wrap(moveset))
   const critRoll = deps.rng.fork('loadout-crit')
-  const modifier = createDamageModifier(player, core.damage, () => critRoll.next())
+  const modifier = createDamageModifier(player, core.damage, () => critRoll.next(), corruption.damage)
+  const removeModifier = combat.addDamageModifier(modifier)
   // Ids last given to each ability slot, so a sync keeps the cooldown of a slot that did not change.
   const applied: (string | null | undefined)[] = [undefined, undefined, undefined, undefined]
   let destroyed = false
@@ -135,7 +158,7 @@ export function attachLoadout(deps: LoadoutDeps): LoadoutWithStatus {
     destroyed = true
     scene.events.off('postupdate', render)
     scene.events.off('shutdown', destroy)
-    combat.setDamageModifier(null)
+    removeModifier()
     player.setLethalHitInterceptor(null)
     for (let slot = 0; slot < applied.length; slot++) if (applied[slot]) player.setAbilityHandler(slot, null)
     core.destroy()
@@ -148,17 +171,21 @@ export function attachLoadout(deps: LoadoutDeps): LoadoutWithStatus {
       const owned = new Set<string>([...build.mechanics, ...build.legendaries])
       for (const id of PASSIVE_IDS) core.flags[id] = owned.has(id)
       core.damage.multiplier = damageMultiplier(build.stats.damage, core.flags.fairPrinciples)
-      core.damage.critChance = build.stats.critChance
+      // Rogue Admin: every hit crits.
+      core.damage.critChance = build.corrupted.includes('rogueAdmin') ? 1 : build.stats.critChance
       core.damage.critMultiplier = build.stats.critMultiplier
-      combat.setDamageModifier(modifier)
       core.version++
 
       for (const moveset of movesets) player.registerMoveset(moveset)
+      const slow = build.corrupted.includes('rogueAdmin')
+      if (slow !== slowAbilities) applied.fill(undefined)
+      slowAbilities = slow
+      const table = slow ? slowHandlers : handlers
       for (let slot = 0; slot < applied.length; slot++) {
         const id = build.abilitySlots[slot] ?? null
         if (applied[slot] === id) continue
         applied[slot] = id
-        player.setAbilityHandler(slot, id ? (handlers[id] ?? null) : null)
+        player.setAbilityHandler(slot, id ? (table[id] ?? null) : null)
       }
       for (const feature of features) feature.sync(build)
     },
@@ -172,6 +199,7 @@ export function attachLoadout(deps: LoadoutDeps): LoadoutWithStatus {
     },
     destroy,
     gitRevertCharged: gitRevert.charged,
+    readEula: () => corruption.readEula(),
     secondWindCharged: abilities.secondWind.charged,
   }
 }

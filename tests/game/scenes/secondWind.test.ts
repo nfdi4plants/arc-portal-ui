@@ -47,6 +47,8 @@ describe('Second Wind charge in a run', () => {
       director.completeStretch()
       director.secondWind.spend()
       director.defeatBoss()
+      director.secondWind.spend()
+      director.leaveWaystation()
     }
     expect(director.stage.kind).toBe('finalBoss')
     expect(director.secondWind.ready()).toBe(true)

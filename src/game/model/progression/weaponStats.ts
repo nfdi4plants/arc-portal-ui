@@ -1,5 +1,5 @@
 import type { PlayerBuild, PlayerWeaponId, WeaponSlot } from '../../contracts/progression'
-import { CARDS } from './catalog'
+import { CARDS, isLegendaryWeapon } from './catalog'
 
 // Damage and reach live inside the onActive closures of the movesets, which need Phaser. This
 // table repeats them for the level-up screen, and tests/game/weapons/weaponStats.test.ts runs
@@ -56,6 +56,10 @@ const dual = (damage: number) => [damage * 0.75, damage * 0.75]
 const STAFF_LIGHT = [row('Staff jab', [12], 350, 72), row('Staff jab', [12], 350, 72), row('Staff thrust', [20], 440, 76)]
 // The staff is the only weapon in both slots, so its heavy half has an entry of its own.
 const STAFF_HEAVY: Entry = { slot: 'heavy', rows: [[row('Staff slam', [36], 760, 70)], [row('Staff slam', [36], 760, 70)]], notes: ['Slow overhead slam', 'Slow overhead slam'] }
+
+// A legendary weapon has one form, so both tiers read the same rows.
+const legendary = (slot: WeaponSlot, rows: Row[], note: string): Entry => ({ slot, rows: [rows, rows], notes: [note, note] })
+const LFS_ROLL = Array.from({ length: 12 }, () => 12)
 
 const TABLE: Record<PlayerWeaponId, Entry> = {
   staff: {
@@ -120,13 +124,26 @@ const TABLE: Record<PlayerWeaponId, Entry> = {
     rows: [[row('Shield stance', [28], 850, 46)], [row('Shield stance', [40], 1050, 60)]],
     notes: ['Block then bash, reflects shots', 'Longer block, harder bash'],
   },
+  arcitect: legendary(
+    'light',
+    [row('Place Assay', [18], 370), row('Place Study', [22], 380), row('Place Investigation', [30], 460)],
+    'Drops ISA blocks to stand on, shots stop at them',
+  ),
+  arcCommander: legendary(
+    'light',
+    [row('arc add', [20], 370), row('arc commit', [20], 370), row('arc sync', [28], 470)],
+    'arc sync fires the enemy shots back, up to 70',
+  ),
+  gitLfs: legendary('heavy', [row('git lfs push', [30, ...LFS_ROLL], 760)], 'A huge file that keeps hitting as it rolls'),
+  publicationPress: legendary('heavy', [row('Publish', [48], 680, 64)], 'Freezes enemies near you, the next hit shatters'),
 }
 
 // The tier 2 name is the one the card description announces ("Picking it again gives X.").
 export function weaponName(id: PlayerWeaponId, tier: 1 | 2): string {
   const card = CARDS.find((c) => c.id === `weapon.${id}`)
   if (!card) return 'Staff'
-  if (tier === 1) return card.name
+  // A legendary weapon has one form and one name.
+  if (tier === 1 || isLegendaryWeapon(id)) return card.name
   return /gives (.+)\.$/.exec(card.description)?.[1] ?? `${card.name} (tier 2)`
 }
 
@@ -169,5 +186,5 @@ export function weaponRelation(build: PlayerBuild, card: { id: string; slot?: We
   const current = build.weapons[slot]
   const currentName = weaponName(current.id, current.tier)
   if (card.id !== `weapon.${current.id}`) return { kind: 'replace', slot, currentName }
-  return current.tier === 1 ? { kind: 'upgrade', slot, currentName } : { kind: 'none' }
+  return current.tier === 1 && !isLegendaryWeapon(current.id) ? { kind: 'upgrade', slot, currentName } : { kind: 'none' }
 }

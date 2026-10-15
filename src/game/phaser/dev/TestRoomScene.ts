@@ -39,6 +39,7 @@ const TEST_BUILD: PlayerBuild = {
   legendaries: [],
   abilitySlots: [null, null, null, null],
   offerSize: 3,
+  corrupted: [],
 }
 
 const TOGGLES: Record<string, MechanicId> = {

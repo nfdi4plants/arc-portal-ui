@@ -1,7 +1,9 @@
 import Phaser from 'phaser'
 import type { Combatant, CombatWorld, HitEvent, KillerInfo } from '../../contracts/combat'
-import { PALETTE } from '../../contracts/constants'
+import { DEPTH, PALETTE } from '../../contracts/constants'
 import type { Action, Bindings, InputFrame } from '../../contracts/input'
+import { bindingLabel } from '../../model/input'
+import { cssColor } from '../color'
 import { preloadCoreAssets } from '../assets'
 import { createCombatWorld } from '../combat'
 import { createInputLayer, type InputLayer } from '../input/InputLayer'
@@ -12,10 +14,15 @@ import { attachLoadout, type LoadoutWithStatus } from '../player/weapons'
 import { createPlayer, type Player } from '../player/Player'
 import { followView, viewForBox, type View } from '../view'
 import { MOB_INFO_EVENT } from './mobInfoEvent'
-import type { GameplayControl, RunContext } from './context'
+import type { GameplayControl, RunContext, TraderLoot } from './context'
+import { interactPressed } from './interaction'
+import { addText } from './ui'
 import { PIT_KILLER, type RunDirector } from './RunDirector'
+import type { DatenkrakeDeal } from '../../model/progression'
 
-type Hold = 'banner' | 'levelUp' | 'store' | 'pause' | 'external' | 'over'
+// 'encounter' holds the world while a waystation encounter plays out on its own (the Datenkrake's
+// grab), 'datenkrake' while its overlay is open, 'loot' while the beaten FAIR trader's loot shows.
+type Hold = 'banner' | 'levelUp' | 'store' | 'datenkrake' | 'encounter' | 'loot' | 'pause' | 'external' | 'over'
 
 export interface LevelSetup {
   colliders: Phaser.Types.Physics.Arcade.ArcadeColliderType[]
@@ -45,6 +52,11 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
   private lookAhead = 0
   private inspector: Inspector | null = null
   private pauseDim: Phaser.GameObjects.Rectangle | null = null
+  // The interaction prompt ("[W] Enter", "[W] Trade"), one per scene, shown by showPrompt.
+  private prompt: Phaser.GameObjects.Text | null = null
+  private promptText: string | null = null
+  private promptKeyed = false
+  private promptBindings = -1
 
   constructor(key: string, ctx: RunContext) {
     super(key)
@@ -64,6 +76,11 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
   protected onShutdown(): void {}
   // After the FAIR trade store closed, whichever way the player left it.
   protected onStoreClosed(): void {}
+  // After the Datenkrake overlay closed with a choice.
+  protected onDatenkrakeClosed(): void {}
+  // Freezes or thaws what else acts like the player (the fighting FAIR trader), with the player:
+  // for every hold and every hit-stop.
+  protected freezeActors(_frozen: boolean): void {}
   // The mobs and bosses the pause menu lets the player inspect, and the step the mobs come from.
   protected inspectableMobs(): InspectTarget[] {
     return []
@@ -129,10 +146,20 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
     })
     this.loadout.sync(director.build)
     this.combat.on('kill', (event) => this.onKill(event))
+    // Data Leak: a hit spills fragments.
+    this.player.on('damaged', () => this.director.leakFragments())
     this.combat.on('hit', (event) => this.onHit(event))
     this.inspector = createInspector(this, (mob) => this.pickMob(mob))
     // Drawn here, not in the HUD, so the mob under the pointer can sit above it at full brightness.
     this.pauseDim = this.add.rectangle(0, 0, 1, 1, PALETTE.navy, PAUSE_DIM_ALPHA).setDepth(INSPECT_DIM_DEPTH).setVisible(false)
+    this.prompt = addText(this, '', 7, { color: PALETTE.navy, bold: true, align: 'center' })
+      .setOrigin(0.5, 1)
+      .setBackgroundColor(cssColor(PALETTE.yellow))
+      .setPadding(3, 1, 3, 1)
+      .setDepth(DEPTH.fx)
+      .setVisible(false)
+    this.promptText = null
+    this.promptBindings = -1
 
     const camera = this.cameras.main
     const { x, y, width, height } = level.bounds
@@ -177,6 +204,7 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
     const stopped = this.combat.hitStopRemainingMs() > 0
     // A kill in this step may have opened the level-up and held the world.
     this.player.setFrozen(stopped || this.frozen)
+    this.freezeActors(stopped || this.frozen)
     if (!stopped && !this.frozen) {
       this.loadout.update(dt)
       this.stepWorld(dt)
@@ -193,7 +221,15 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
       if (pressed.has('pause') || pressed.has('left') || pressed.has('right')) this.closeStore()
       return
     }
+    // In the Datenkrake's grip there is nothing to do but choose, and the loot is read to the end.
+    if (this.holds.has('datenkrake') || this.holds.has('encounter') || this.holds.has('loot')) return
     if (pressed.has('pause')) this.togglePause()
+  }
+
+  // The direction left or right holds, 0 for neither or both. Valid inside stepWorld.
+  protected heldDirection(): -1 | 0 | 1 {
+    const held = this.frame.held
+    return held.has('left') === held.has('right') ? 0 : held.has('right') ? 1 : -1
   }
 
   // Went down since the previous step. Valid inside stepWorld.
@@ -201,8 +237,37 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
     return this.frame.pressed.has(action)
   }
 
+  // An up press that interacts (a portal, the trader), not one that starts an up attack. Valid
+  // inside stepWorld.
+  protected interactPressed(): boolean {
+    return interactPressed(this.frame.pressed)
+  }
+
+  // Shows the interaction prompt with its bottom centre at (x, y), null hides it. With `keyed` the
+  // key of up comes first, "[W] Enter", and follows a binding change. Cheap to call every step:
+  // the text is only set again when it changes.
+  protected showPrompt(text: string | null, x = 0, y = 0, keyed = true) {
+    const prompt = this.prompt
+    if (!prompt) return
+    if (text === null) {
+      if (this.promptText !== null) prompt.setVisible(false)
+      this.promptText = null
+      return
+    }
+    if (text !== this.promptText || keyed !== this.promptKeyed || this.promptBindings !== this.ctx.bindingsVersion) {
+      this.promptText = text
+      this.promptKeyed = keyed
+      this.promptBindings = this.ctx.bindingsVersion
+      const binding = this.ctx.bindings.up[0]
+      prompt.setText(keyed && binding ? `[${bindingLabel(binding)}] ${text}` : text)
+    }
+    if (prompt.x !== x || prompt.y !== y) prompt.setPosition(x, y)
+    prompt.setVisible(true)
+  }
+
   private togglePause() {
-    if (this.holds.has('levelUp') || this.holds.has('store') || this.holds.has('over') || this.holds.has('external')) return
+    if (this.holds.has('levelUp') || this.holds.has('store') || this.holds.has('datenkrake') || this.holds.has('encounter') || this.holds.has('loot')) return
+    if (this.holds.has('over') || this.holds.has('external')) return
     const paused = !this.holds.has('pause')
     this.setHold('pause', paused)
     this.inspector?.setActive(paused, paused ? this.inspectableMobs() : [])
@@ -219,6 +284,7 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
     if (frozen === this.frozen) return
     this.frozen = frozen
     this.player?.setFrozen(frozen)
+    this.freezeActors(frozen)
     if (frozen) {
       this.physics.world.pause()
       this.time.paused = true
@@ -251,8 +317,8 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
     }
   }
 
-  protected gainCoins(amount: number) {
-    this.director.addCoins(amount)
+  protected gainFragments(amount: number) {
+    this.director.addFragments(amount)
   }
 
   // Holds the world while the store overlay of node boss `index` is open, like the level-up screen.
@@ -260,6 +326,26 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
     if (this.holds.size > 0) return
     this.setHold('store', true)
     this.ctx.openStore(index)
+  }
+
+  // Holds the world while an encounter plays an animation of its own.
+  protected holdForEncounter(on: boolean) {
+    this.setHold('encounter', on)
+  }
+
+  // Opens the Datenkrake overlay of the waystation after node boss `index`. It may open while the
+  // encounter hold of the grab is still on.
+  protected openDatenkrake(index: number) {
+    if (this.holds.has('over') || this.holds.has('datenkrake')) return
+    this.setHold('datenkrake', true)
+    this.ctx.openDatenkrake(index)
+  }
+
+  // Holds the world and shows what the beaten FAIR trader left. The cards are applied already.
+  protected openTraderLoot(loot: TraderLoot) {
+    if (this.holds.has('over') || this.holds.has('loot')) return
+    this.setHold('loot', true)
+    this.ctx.openTraderLoot(loot)
   }
 
   protected die(killer: KillerInfo) {
@@ -306,7 +392,11 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
       this.die(event.attacker.killer ?? PIT_KILLER)
       return
     }
-    if (event.attacker.team === 'player') this.gainXp(this.xpFor(event.target))
+    if (event.attacker.team !== 'player') return
+    // Accept All Cookies: every kill raises max HP for good.
+    this.director.setHp(this.player.hp())
+    if (this.director.eatCookie()) this.player.setBuild(this.director.build)
+    this.gainXp(this.xpFor(event.target))
   }
 
   // Shots a beaten boss fired earlier must not kill the player during the outro. An unregistered
@@ -350,6 +440,7 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
     if (this.director.pendingLevelUps === 0) {
       this.ctx.closeLevelUp()
       this.setHold('levelUp', false)
+      this.loadout.readEula()
     }
   }
 
@@ -358,6 +449,33 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
     this.ctx.closeStore()
     this.setHold('store', false)
     this.onStoreClosed()
+  }
+
+  // "Submit": the Datenkrake swaps an augment for a corrupted one. The overlay shows the deal.
+  submitToDatenkrake(index: number): DatenkrakeDeal | null {
+    this.director.setHp(this.player.hp())
+    const deal = this.director.submitToDatenkrake(index)
+    if (!deal) return null
+    this.player.setBuild(this.director.build)
+    this.loadout.sync(this.director.build)
+    return deal
+  }
+
+  fightDatenkrake(index: number) {
+    this.director.fightDatenkrake(index)
+  }
+
+  closeDatenkrake() {
+    if (!this.holds.has('datenkrake')) return
+    this.ctx.closeDatenkrake()
+    this.setHold('datenkrake', false)
+    this.onDatenkrakeClosed()
+  }
+
+  closeTraderLoot() {
+    if (!this.holds.has('loot')) return
+    this.ctx.closeTraderLoot()
+    this.setHold('loot', false)
   }
 
   // Only the card applies, like a level-up card without the level: hp, level and XP stay.
@@ -378,6 +496,8 @@ export abstract class GameplayScene extends Phaser.Scene implements GameplayCont
     this.inspector?.destroy()
     this.inspector = null
     this.pauseDim = null
+    this.prompt = null
+    this.promptText = null
     this.loadout.destroy()
     this.controls.destroy()
     this.ctx.hud?.showPause(false)

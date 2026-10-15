@@ -1,4 +1,4 @@
-import type { Combatant, HitShape } from '../../../contracts/combat'
+import type { Combatant, HitShape, Team } from '../../../contracts/combat'
 
 // Pure helpers of the loadout. Nothing here imports Phaser, so they run in jsdom tests.
 
@@ -53,6 +53,12 @@ export function createRingBuffer(capacity: number): RingBuffer {
       count = 0
     },
   }
+}
+
+// The team a combatant fights: the mage's hits look for enemies, the hits of an enemy that
+// wields the mage's weapons (the FAIR trader) look for the mage.
+export function opposingTeam(team: Team): Team {
+  return team === 'enemy' ? 'player' : 'enemy'
 }
 
 // The closest item to `from` within `maxDistance` that `accept` allows. The first one wins a tie.
@@ -182,12 +188,23 @@ export function rollHit(base: number, state: DamageState, roll: number): { damag
 // Attacks owned by `owner` use the build's multiplier and crit. Everything else, including
 // hits the loadout spawns with a final damage, passes through unchanged. The state object is
 // read on every call, so the loadout updates it in place.
+// The corrupted augments of the owner's build: a factor on its own hits and one on hits it takes.
+export interface DamageCorruption {
+  outgoing(tags: readonly string[], target: Combatant): number
+  incoming(): number
+}
+
 export function createDamageModifier(
   owner: Combatant,
   state: DamageState,
   roll: () => number,
-): (attacker: Combatant, base: number) => { damage: number; crit: boolean } {
-  return (attacker, base) => (attacker === owner ? rollHit(base, state, roll()) : { damage: base, crit: false })
+  corruption?: DamageCorruption,
+): (attacker: Combatant, base: number, tags?: readonly string[], target?: Combatant) => { damage: number; crit: boolean } {
+  return (attacker, base, tags = [], target = attacker) => {
+    if (attacker === owner) return rollHit(corruption ? base * corruption.outgoing(tags, target) : base, state, roll())
+    if (corruption && target === owner) return { damage: base * corruption.incoming(), crit: false }
+    return { damage: base, crit: false }
+  }
 }
 
 // Up attacks without moves of their own turn their hitboxes to point overhead. The box starts a

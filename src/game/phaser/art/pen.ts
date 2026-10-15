@@ -2,6 +2,7 @@ import rough from 'roughjs'
 import type { RoughCanvas } from 'roughjs/bin/canvas'
 import type { Drawable, Options } from 'roughjs/bin/core'
 import type { RoughGenerator } from 'roughjs/bin/generator'
+import { artContext } from './canvas'
 import { boundsOf } from './geometry'
 import type { Bounds, Pt } from './geometry'
 import { seedFor } from './layout'
@@ -46,7 +47,8 @@ export class Pen {
 
   constructor(canvas: HTMLCanvasElement, scale: number) {
     this.scale = scale
-    const ctx = canvas.getContext('2d')
+    // Before rough.canvas, which asks for the context again and gets this one.
+    const ctx = artContext(canvas)
     if (!ctx) throw new Error('Canvas 2D is not available')
     this.ctx = ctx
     ctx.lineCap = 'round'

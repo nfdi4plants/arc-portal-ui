@@ -1,10 +1,11 @@
 import Phaser from 'phaser'
 import type { ScribbleArt, SpriteRef } from '../../contracts/art'
-import type { CombatWorld, HitEvent } from '../../contracts/combat'
+import type { CombatWorld, HitEvent, KillerInfo, Team } from '../../contracts/combat'
 import { DEPTH, MAGE_FRAME, MAGE_TEXTURE, PALETTE, PLAYER_HEIGHT } from '../../contracts/constants'
 import type { Action, InputFrame } from '../../contracts/input'
 import type { AbilityHandler, AttackContext, PlayerEvents, PlayerHandle, WeaponMoveset } from '../../contracts/player'
 import type { PlayerBuild, PlayerWeaponId, WeaponSlot } from '../../contracts/progression'
+import { CORRUPTION } from '../../model/progression/corrupted'
 import { EMPTY_MOTOR_INPUT, JUMP_VELOCITY, MOTOR, createMotorState, plungeBounced, runSpeed } from '../../model/input/motor'
 import type { MotorEnv, MotorInput, MotorState } from '../../model/input/motor'
 import type { InputLayer } from '../input/InputLayer'
@@ -21,6 +22,8 @@ import { airHeavyOf, dashHeavyOf, dashLightOf, upHeavyOf, upLightOf } from './we
 export const PLAYER_HURTBOX = { width: 18, height: 42 }
 const DAMAGE_IFRAMES_MS = 700
 const FLINCH_MS = 180
+// The longest a freeze holds the mage, as a stun.
+const PLAYER_FREEZE_MS = 600
 const DROP_THROUGH_MS = 150
 const ABILITY_ACTIONS: readonly Action[] = ['ability1', 'ability2', 'ability3', 'ability4']
 const GHOST_COUNT = 6
@@ -36,7 +39,7 @@ const SMEAR_ALPHA = [0.25, 0.17, 0.1, 0.05]
 const SMEAR_LIGHT_COUNT = 3
 const SMEAR_FADE_MS = 90
 // Weapons that shoot. Their moves get no smear, only their projectile art.
-const RANGED_WEAPONS: ReadonlySet<PlayerWeaponId> = new Set(['wand', 'pipettePistol', 'centrifugeDisc'])
+const RANGED_WEAPONS: ReadonlySet<PlayerWeaponId> = new Set(['wand', 'pipettePistol', 'centrifugeDisc', 'arcitect', 'arcCommander', 'gitLfs'])
 const WEAPON_SLOTS: readonly WeaponSlot[] = ['light', 'heavy']
 
 export interface PlayerDeps {
@@ -45,6 +48,15 @@ export interface PlayerDeps {
   input: InputLayer
   build: PlayerBuild
   colliders: Phaser.Types.Physics.Arcade.ArcadeColliderType[]
+  // Who this player is. The mage by default. The FAIR trader runs the same body on the enemy team,
+  // driven by its own input (scenes/traderAi.ts).
+  identity?: { id: string; team: Team; killer: KillerInfo | null }
+  // The body texture and frame. The mage sprite by default.
+  look?: { texture: string; frame?: string }
+  // How the body takes hits. By default every hit flinches, cancels the attack, knocks back and
+  // leaves DAMAGE_IFRAMES_MS of invulnerability. `poise` returns true for a hit that only deals
+  // its damage, and `iframesMs` replaces the invulnerability.
+  hits?: { iframesMs: number; poise(hit: HitEvent): boolean }
 }
 
 export interface PlayerDebugState {
@@ -55,7 +67,13 @@ export interface PlayerDebugState {
   damageIframesMs: number
 }
 
-export type Player = PlayerHandle & { destroy(): void; debugState(): PlayerDebugState }
+export type Player = PlayerHandle & {
+  destroy(): void
+  debugState(): PlayerDebugState
+  // Lets the body collide with a body added after the player, such as a bridge of the kraken
+  // intern. Returns the function that removes the collider.
+  collideWith(target: Phaser.Types.Physics.Arcade.ArcadeColliderType): () => void
+}
 
 export { markOneWay } from './oneWay'
 
@@ -78,7 +96,7 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
     touchingWallLeft: false,
     touchingWallRight: false,
     stats: { moveSpeed: 1, dashCooldownMs: 0 },
-    mechanics: { doubleJump: false, airDash: false, wallJump: false, hatGlide: false },
+    mechanics: { doubleJump: false, airDash: false, wallJump: false, hatGlide: false, noJump: false, infiniteAirDash: false },
     speedScale: 1,
     actionsLocked: false,
   }
@@ -89,6 +107,8 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
     motorEnv.mechanics.airDash = build.mechanics.includes('airDash')
     motorEnv.mechanics.wallJump = build.mechanics.includes('wallJump')
     motorEnv.mechanics.hatGlide = build.mechanics.includes('hatGlide')
+    motorEnv.mechanics.noJump = build.corrupted.includes('deprecatedJump')
+    motorEnv.mechanics.infiniteAirDash = build.corrupted.includes('infiniteScroll')
   }
   readBuild()
 
@@ -98,6 +118,10 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
   let grounded = false
   let lastVy = 0
   let flinchMs = 0
+  // Corrupted augments: no control while stunned (Terms of Service, cookie banners), left and right
+  // swapped while mirrored (Mirror Site).
+  let stunMs = 0
+  let mirrorMs = 0
   let damageIframesMs = 0
   // Hits miss while this runs (blockHits).
   let blockMs = 0
@@ -125,6 +149,22 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
   const mergedPressed = new Set<Action>()
   const mergedReleased = new Set<Action>()
   const mergedFrame: InputFrame = { held: mergedPressed, pressed: mergedPressed, released: mergedReleased, aim: { x, y } }
+  // Mirror Site swaps left and right into these, so a mirrored step allocates nothing.
+  const mirrorHeld = new Set<Action>()
+  const mirrorPressed = new Set<Action>()
+  const mirrorReleased = new Set<Action>()
+  const mirroredFrame: InputFrame = { held: mirrorHeld, pressed: mirrorPressed, released: mirrorReleased, aim: { x, y } }
+  const swapSides = (from: ReadonlySet<Action>, to: Set<Action>) => {
+    to.clear()
+    for (const action of from) to.add(action === 'left' ? 'right' : action === 'right' ? 'left' : action)
+  }
+  const mirrorFrame = (frame: InputFrame): InputFrame => {
+    swapSides(frame.held, mirrorHeld)
+    swapSides(frame.pressed, mirrorPressed)
+    swapSides(frame.released, mirrorReleased)
+    mirroredFrame.aim = frame.aim
+    return mirroredFrame
+  }
   // The held set of the step an attack started in, kept past the step for attackStarted listeners.
   const attackHeld = new Set<Action>()
   // The dash speed a dash attack with keepsMomentum carries, 0 for any other attack.
@@ -149,8 +189,9 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
   const colliders = deps.colliders.map((target) => scene.physics.add.collider(body, target, undefined, processCollision))
 
   // Visuals. The container sits at the feet, the mage image hangs above it.
-  const mageFrame = scene.textures.get(MAGE_TEXTURE).has(MAGE_FRAME) ? MAGE_FRAME : undefined
-  const mage = scene.add.image(0, 0, MAGE_TEXTURE, mageFrame).setOrigin(0.5, 1)
+  const bodyTexture = deps.look?.texture ?? MAGE_TEXTURE
+  const mageFrame = deps.look ? deps.look.frame : scene.textures.get(MAGE_TEXTURE).has(MAGE_FRAME) ? MAGE_FRAME : undefined
+  const mage = scene.add.image(0, 0, bodyTexture, mageFrame).setOrigin(0.5, 1)
   const baseScale = PLAYER_HEIGHT / Math.max(1, mage.height)
   // The weapon art stands upright with the grip at its origin, so the sprite rotates around the hand.
   const weapon = scene.add.sprite(0, 0, MAGE_TEXTURE)
@@ -187,7 +228,7 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
   // A fixed pool for the dash smear, reused in turn.
   const ghosts = Array.from({ length: GHOST_COUNT }, () =>
     scene.add
-      .image(0, 0, MAGE_TEXTURE, mageFrame)
+      .image(0, 0, bodyTexture, mageFrame)
       .setOrigin(0.5, 1)
       .setTint(PALETTE.blue)
       .setTintMode(Phaser.TintModes.FILL)
@@ -344,9 +385,12 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
 
     let frame = deps.input.frame()
     if (carriedPressed.size > 0 || carriedReleased.size > 0) frame = mergeCarried(frame)
+    mirrorMs = Math.max(0, mirrorMs - dt)
+    if (mirrorMs > 0) frame = mirrorFrame(frame)
     held = frame.held
     aim = frame.aim
     flinchMs = Math.max(0, flinchMs - dt)
+    stunMs = Math.max(0, stunMs - dt)
     damageIframesMs = Math.max(0, damageIframesMs - dt)
     blockMs = Math.max(0, blockMs - dt)
     dropMs = Math.max(0, dropMs - dt)
@@ -362,9 +406,9 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
       }
     }
 
-    const controllable = flinchMs <= 0 && hp > 0
+    const controllable = flinchMs <= 0 && stunMs <= 0 && hp > 0
     let input: MotorInput = controllable ? frame : EMPTY_MOTOR_INPUT
-    if (controllable && grounded && onOneWay && frame.held.has('down') && frame.pressed.has('jump')) {
+    if (controllable && grounded && onOneWay && !motorEnv.mechanics.noJump && frame.held.has('down') && frame.pressed.has('jump')) {
       dropMs = DROP_THROUGH_MS
       dropPressed.clear()
       for (const action of frame.pressed) if (action !== 'jump') dropPressed.add(action)
@@ -535,9 +579,9 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
   scene.events.on('postupdate', onRender)
 
   const handle: Player = {
-    id: 'player',
-    team: 'player',
-    killer: null,
+    id: deps.identity?.id ?? 'player',
+    team: deps.identity?.team ?? 'player',
+    killer: deps.identity?.killer ?? null,
     gameObject: container,
     // The same rectangle every call. Read it, do not keep it.
     hurtbox: () => hurtbox.setTo(body.x, body.y, W, H),
@@ -561,13 +605,20 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
       }
       const taken = Math.min(hp, hit.damage)
       hp -= taken
+      flashMs = 70
+      if (deps.hits) damageIframesMs = Math.max(damageIframesMs, deps.hits.iframesMs)
+      // A poised body (the trader) shrugs the hit off and goes on with what it does.
+      if (deps.hits?.poise(hit) && hp > 0) {
+        emit('damaged', { hit })
+        return taken
+      }
       attacks.cancel()
       motor.dashMs = 0
       motor.jumpHeld = false
       handle.setVelocity(hit.knockback.x, hit.knockback.y)
       flinchMs = FLINCH_MS
-      damageIframesMs = DAMAGE_IFRAMES_MS
-      flashMs = 70
+      if (!deps.hits) damageIframesMs = DAMAGE_IFRAMES_MS
+      if (build.corrupted.includes('mirrorSite')) mirrorMs = CORRUPTION.mirrorSite.mirrorMs
       emit('damaged', { hit })
       return taken
     },
@@ -586,6 +637,25 @@ export function createPlayer(scene: Phaser.Scene, deps: PlayerDeps, x: number, y
     shieldCount: () => shields,
     blockHits(ms) {
       blockMs = Math.max(blockMs, ms)
+    },
+    stun(ms) {
+      stunMs = Math.max(stunMs, ms)
+      attacks.cancel()
+    },
+    isStunned: () => stunMs > 0,
+    // Only an enemy that wields the mage's own weapons freezes the mage (the FAIR trader's
+    // Publication Press), and only as a short stun. Slows do nothing.
+    applyStatus(status) {
+      if (status.kind === 'freeze') handle.stun(Math.min(status.ms, PLAYER_FREEZE_MS))
+    },
+    collideWith(target) {
+      const collider = scene.physics.add.collider(body, target, undefined, processCollision)
+      colliders.push(collider)
+      return () => {
+        const index = colliders.indexOf(collider)
+        if (index >= 0) colliders.splice(index, 1)
+        collider.destroy()
+      }
     },
     heal(amount) {
       if (hp <= 0) return

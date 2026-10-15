@@ -3,7 +3,7 @@ import type { ScribbleArt } from '../../contracts/art'
 import type { Combatant, CombatWorld, HitboxSpec, HitEvent, HitShape, ProjectileSpec, SlowZone, Team } from '../../contracts/combat'
 import { DEPTH, PALETTE } from '../../contracts/constants'
 import { placeholderArt } from '../placeholderArt'
-import { applyDamageModifier, type DamageModifier } from './damage'
+import { applyDamageModifiers, type DamageModifier } from './damage'
 import { createFeedback } from './feedback'
 import { boundsOf, facingOfVelocity, hitPoint, mirrorKnockback, overlaps, resolveShape, type Facing, type Point, type Rect } from './geometry'
 import { createProjectilePool } from './projectilePool'
@@ -67,7 +67,7 @@ export function createCombatWorld(scene: Phaser.Scene, options: CombatWorldOptio
   const scratch: Rect = { x: 0, y: 0, w: 0, h: 0 }
   // Reused by livingCombatants, so effects that look for targets every step allocate nothing.
   const living: Combatant[] = []
-  let modifier: DamageModifier | null = null
+  const modifiers: DamageModifier[] = []
   let hitStopMs = 0
   let destroyed = false
 
@@ -76,18 +76,19 @@ export function createCombatWorld(scene: Phaser.Scene, options: CombatWorldOptio
   }
 
   function land(attack: Attack, target: Combatant, point: Point) {
-    const { damage, crit } = applyDamageModifier(modifier, attack.owner, attack.spec.damage)
+    const tags = [...(attack.spec.tags ?? [])]
+    // Targets react more mildly to shots than to strikes, so every projectile hit says it is one.
+    if ('sprite' in attack && !tags.includes('projectile')) tags.push('projectile')
+    const { damage, crit } = applyDamageModifiers(modifiers, attack.owner, attack.spec.damage, tags, target)
     const event: HitEvent = {
       attacker: attack.owner,
       target,
       damage,
       crit,
       knockback: mirrorKnockback(attack.spec.knockback, attack.facing),
-      tags: [...(attack.spec.tags ?? [])],
+      tags,
       stagger: attack.spec.stagger ?? 1,
     }
-    // Targets react more mildly to shots than to strikes, so every projectile hit says it is one.
-    if ('sprite' in attack && !event.tags.includes('projectile')) event.tags.push('projectile')
     const taken = target.receiveHit(event)
     if (typeof taken === 'number') event.damage = taken
     hitStopMs = Math.max(hitStopMs, attack.spec.hitStopMs)
@@ -340,8 +341,12 @@ export function createCombatWorld(scene: Phaser.Scene, options: CombatWorldOptio
         listeners[event].delete(listener)
       }
     },
-    setDamageModifier(next) {
-      modifier = next
+    addDamageModifier(next) {
+      modifiers.push(next)
+      return () => {
+        const index = modifiers.indexOf(next)
+        if (index >= 0) modifiers.splice(index, 1)
+      }
     },
     update(deltaMs) {
       if (destroyed) return
