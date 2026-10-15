@@ -38,6 +38,14 @@ derived from a hash of the annotation. Its stats scale with the segment depth,
 On the death screen a boss (or final boss phase) whose step has 8 or more annotations (quality 1)
 gets no annotate hint, because its attacks already have the longest warnings.
 
+The death and victory screens show a "Your run" recap (`RunRecapPanel` in `phaser/scenes/`):
+every augment of the run in the order it was taken (`runRecap` in `levelHistory.ts`), with "Lv 4"
+or "Bought", a rarity mark, the card name, the slot of a weapon and its tier 2 name when it was
+picked twice, and the price of a purchase. Skipped levels show faintly. Hovering an entry shows its
+card text under the list, and the wheel or a drag scrolls a long list a row at a time. The final
+build sits beside it (`BuildPanel`). Views at least 600 units wide put the recap beside the end
+text, narrower ones open it with the "Your run (B)" button as an overlay with larger text.
+
 ## Bosses
 
 A boss is built like a monster, from slots that annotations fill (`bossGenome` in
@@ -120,7 +128,25 @@ step, slot stays empty", "no value with a unit, no theme modifier"), and a quali
 "6 of 8 annotations on illumina → telegraph 695 ms, stagger bar ×1.3, hits ×1.14"
 (`model/content/describeBoss.ts`). The final boss shows the phase it is in.
 
-The level-up screen plays a short intro with all input locked, so clicks and keys from the fight cannot pick a card. After it a card is chosen by a left click that starts and ends on the card, or by the keys 1 to 4. Hovering a card for about 600 ms (or pressing ? over it) opens its details, built by `cardDetails` in `model/progression/details.ts`. The mouse button is the `CHOOSE_BUTTON` constant in `LevelUpScene.ts`.
+The level-up screen opens with a summary (`levelUpSummary` in `model/progression/levelUpSummary.ts`):
+"Level up!" pops in with sparkles, then "Level 3 → 4", max HP and HP counting up from their old
+values with the gain and the heal, the legendary chance per card while no legendary is owned and it
+still grows, and the XP towards the next level. `RunDirector` keeps the build from just before the
+first pending level, so several levels gained at once show as one summary with the totals ("Level
+1 → 3", "2 cards to choose, one per level"), followed by one card choice per level ("1 of 2").
+The "Choose a card" button and the keys Enter, Space and 1 lead on, but only after 600 ms
+(`SUMMARY_GUARD_MS`), so a click or key still going from the fight does not skip it. The cards fly
+in after that and can be chosen at once: by a left click that starts and ends on the card, or by
+the keys 1 to 4. Hovering a card for about 600 ms (or pressing ? over it) opens its details, built
+by `cardDetails` in `model/progression/details.ts`. The mouse button is the `CHOOSE_BUTTON` constant
+in `LevelUpScene.ts`. Store purchases gain no level and show no summary.
+
+The hit area of a card on the level-up screen and in the store is the box around every pose the card
+takes, tilted at rest or lifted and grown under the pointer (`cardHitRect` in
+`phaser/scenes/cardHit.ts`), so a click anywhere on the drawn card counts. The card zones are
+switched on and off with `setInteractive` and `disableInteractive` and resized with `setSize`,
+never removed and added again: Phaser clears the input of an object that is removed and added in
+the same frame, which left the store cards dead after a purchase.
 
 ## Folder layout
 

@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import { PALETTE, SCENE } from '../../contracts/constants'
 import type { RunContext } from './context'
 import { addEndButtons } from './endScreen'
+import { RECAP_SIDE_MIN_WIDTH, RunRecapPanel } from './RunRecapPanel'
 import { addText, overlayView } from './ui'
 
 function formatTime(ms: number): string {
@@ -30,18 +31,24 @@ export class VictoryScene extends Phaser.Scene {
     const bars = this.add.graphics()
     const labels = plan.segments.map((segment) => addText(this, segment.processName, 7).setOrigin(1, 0.5))
     const placeButtons = addEndButtons(this, this.ctx)
+    const recap = new RunRecapPanel(this, director.levelHistory, build)
 
-    overlayView(this, ({ width: w, height: h }) => {
+    overlayView(this, (view) => {
+      const { width: w, height: h } = view
       dim.setSize(w, h)
-      title.setPosition(w / 2, h * 0.08)
-      subtitle.setPosition(w / 2, title.y + 24).setWordWrapWidth(w * 0.8)
-      stats.setPosition(w / 2, subtitle.y + subtitle.height + 8)
+      // Wide views put the text and bars in a left column and the run recap beside it.
+      const side = w >= RECAP_SIDE_MIN_WIDTH
+      const columnW = side ? w * 0.42 : w
+      const x = columnW / 2 + (side ? 4 : 0)
+      title.setPosition(x, h * 0.05)
+      subtitle.setPosition(x, title.y + 24).setWordWrapWidth(columnW * 0.86)
+      stats.setPosition(x, subtitle.y + subtitle.height + 8).setWordWrapWidth(columnW * 0.92).setAlign('center')
       // One bar per segment, its length the segment's annotation quality.
-      const top = stats.y + 22
-      const buttonsY = h - 28
+      const top = stats.y + stats.height + 10
+      const buttonsY = side ? h - 20 : h - 46
       const row = Math.min(12, (buttonsY - 20 - top) / Math.max(1, labels.length))
-      const labelRight = w * 0.42
-      const barW = w * 0.4
+      const labelRight = (side ? 4 : 0) + columnW * 0.48
+      const barW = columnW * 0.44
       bars.clear()
       plan.segments.forEach((segment, i) => {
         const y = top + i * row
@@ -50,6 +57,8 @@ export class VictoryScene extends Phaser.Scene {
         bars.fillStyle(PALETTE.teal, 1).fillRect(labelRight, y + row * 0.2, barW * segment.quality, row * 0.6)
       })
       placeButtons(w / 2, buttonsY)
+      if (side) recap.layout(view, { x: columnW + 8, y: 10, w: w - columnW - 16, h: h - 46 }, { x: 0, y: 0 })
+      else recap.layout(view, null, { x: w / 2, y: buttonsY + 26 })
     })
     this.ctx.emit({ type: 'victory', plan, level: build.level, timeMs: elapsedMs })
   }

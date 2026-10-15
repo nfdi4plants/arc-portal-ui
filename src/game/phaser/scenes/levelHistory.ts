@@ -1,5 +1,6 @@
-import type { Rarity } from '../../contracts/progression'
+import type { PlayerBuild, PlayerWeaponId, Rarity } from '../../contracts/progression'
 import type { RunPlan } from '../../contracts/run'
+import { CARDS, createBuild, weaponName } from '../../model/progression'
 
 // The record of the cards a run has chosen, one entry per level gained. Free of Phaser.
 
@@ -73,4 +74,40 @@ export function historyRow(record: LevelUpRecord): HistoryRow {
 // Cuts a line to `maxChars` with an ellipsis, for rows of a fixed height.
 export function fitLine(text: string, maxChars: number): string {
   return text.length <= maxChars ? text : `${text.slice(0, Math.max(1, maxChars - 1)).trimEnd()}…`
+}
+
+// One augment of the run recap on the end screens.
+export interface RecapEntry {
+  // "Lv 4" for a level-up, "Bought" for a store purchase.
+  tag: string
+  name: string
+  // What a weapon did to its slot or what a purchase cost, such as "light, tier 2" or "10 fragments".
+  note: string
+  rarity: Rarity | null
+  cardId: string | null
+  // A level that passed without a card.
+  skipped: boolean
+}
+
+// Every augment of the run in the order it was taken, level-ups and purchases alike. The weapons
+// are replayed from the starting staffs, so a second pick of the same weapon reads as its tier 2.
+export function runRecap(records: readonly LevelUpRecord[]): RecapEntry[] {
+  const weapons: PlayerBuild['weapons'] = { ...createBuild().weapons }
+  return records.map((record) => {
+    const tag = record.price !== undefined ? 'Bought' : `Lv ${record.level}`
+    const price = record.price !== undefined ? `${record.price} fragments` : ''
+    if (!record.cardId) return { tag, name: 'no card taken', note: '', rarity: null, cardId: null, skipped: true }
+    const card = CARDS.find((entry) => entry.id === record.cardId)
+    let name = record.cardName ?? record.cardId
+    let note = price
+    if (card?.slot) {
+      const id = record.cardId.slice('weapon.'.length) as PlayerWeaponId
+      const held = weapons[card.slot]
+      const tier = held.id === id ? 2 : 1
+      weapons[card.slot] = { id, tier }
+      if (tier === 2) name = weaponName(id, 2)
+      note = [tier === 2 ? `${card.slot}, tier 2` : `${card.slot} weapon`, price].filter(Boolean).join(' · ')
+    }
+    return { tag, name, note, rarity: record.rarity, cardId: record.cardId, skipped: false }
+  })
 }
