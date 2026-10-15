@@ -12,6 +12,7 @@ import { GameplayScene, type LevelSetup } from './GameplayScene'
 import { addParallax, addTiles, type Parallax } from './levelArt'
 import { generateStretch, type StretchLayout } from './levelGen'
 import { PIT_KILLER } from './RunDirector'
+import { createKrakenIntern, type KrakenIntern } from './intern'
 import { createRescueFrame, rescueAt, rescueSpot } from './rescue'
 import { addText, plural } from './ui'
 
@@ -52,6 +53,8 @@ export class StretchScene extends GameplayScene {
   private rescueStage: 'carry' | 'released' | 'vulnerable' = 'carry'
   private readonly rescueSpot = { x: 0, y: 0 }
   private cloud: Phaser.GameObjects.Sprite | null = null
+  // Deprecated jump(): the kraken intern bridges the holes and lifts the mage up the steps.
+  private intern: KrakenIntern | null = null
 
   constructor(ctx: RunContext) {
     super(SCENE.stretch, ctx)
@@ -123,6 +126,7 @@ export class StretchScene extends GameplayScene {
       colliders: [this.statics],
       rng: this.director.rng.fork(`mobs/${this.segment.index}`),
     }
+    this.intern = this.director.build.corrupted.includes('deprecatedJump') ? createKrakenIntern(this, this.player, this.layout, this.director) : null
     const { segment } = this
     const dataset = segment.datasetId.replace(/\/+$/, '')
     this.showIntro(
@@ -157,7 +161,8 @@ export class StretchScene extends GameplayScene {
     this.prewarmed = this.specs.length
   }
 
-  protected onFrame() {
+  protected onFrame(deltaMs: number) {
+    this.intern?.frame(deltaMs)
     // Spawning waits for the art drawn behind the banner.
     if (this.prewarmed < this.specs.length) return
     const centre = this.cameras.main.midPoint.x
@@ -198,6 +203,7 @@ export class StretchScene extends GameplayScene {
       this.fallIntoPit()
       return
     }
+    if (this.intern?.step(dtMs, this.heldDirection())) return
     if (this.player.isGrounded()) {
       this.safeX = feet.x
       this.safeY = feet.y
@@ -274,5 +280,6 @@ export class StretchScene extends GameplayScene {
   protected onShutdown() {
     for (const slot of this.slots) if (!slot.gone) slot.mob?.destroy()
     this.slots = []
+    this.intern = null
   }
 }
