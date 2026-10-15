@@ -2,13 +2,15 @@ import Phaser from 'phaser'
 import { PALETTE, SCENE } from '../../contracts/constants'
 import type { PlayerWeaponId, PowerUpCard } from '../../contracts/progression'
 import { hashString } from '../../contracts/rng'
-import { weaponName, weaponRelation, type WeaponRelation } from '../../model/progression'
+import { weaponName, weaponRelation, type LevelUpSummary, type WeaponRelation } from '../../model/progression'
 import { CARD_HEIGHT, CARD_WIDTH, glowTexture } from '../art'
 import { cssColor } from '../color'
 import type { View } from '../view'
 import { BuildPanel } from './BuildPanel'
 import { CardNote, createCardFace, fitText, showCardOn, sizeCardFace, type CardFace } from './cardFace'
+import { cardHitRect } from './cardHit'
 import type { RunContext } from './context'
+import { drawScribbleBox } from './panelFrame'
 import { addButton, addText, type Button, onCanvasKey, onClick, overlayView } from './ui'
 
 const MAX_CARDS = 4
@@ -26,17 +28,30 @@ const KEYS: Record<string, number> = {
   Numpad4: 3,
 }
 
-// Intro timeline in ms. Every input is ignored until the last card has landed.
+// Summary timeline in ms. The continue button and keys wait for SUMMARY_GUARD_MS, so a click or
+// key still going from the fight does not skip the screen.
 const DIM_MS = 250
 const TITLE_START = 60
 const TITLE_MS = 380
 const SPARK_START = 140
 const SPARK_STEP = 60
-const CARD_START = 300
+const PANEL_START = 260
+const PANEL_MS = 180
+const COUNT_START = 420
+const COUNT_MS = 650
+// The counted numbers change in this many steps, so their text is not set anew every frame.
+const COUNT_STEPS = 30
+const SUMMARY_GUARD_MS = 600
+const CONTINUE_KEYS = new Set(['Enter', 'NumpadEnter', 'Space', 'Digit1', 'Numpad1'])
+// Cards fly in one after the other, and each can be chosen from the first frame.
 const CARD_STEP = 90
 const CARD_MS = 330
 const HOVER_DETAILS_MS = 600
 const TILT = (4 * Math.PI) / 180
+// A hovered card lifts by this share of its height and grows by HOVER_GROW. Every card bobs by BOB.
+const HOVER_LIFT = 0.04
+const HOVER_GROW = 0.07
+const BOB = 0.012
 // Where the sparkles burst, as fractions of the title's half width and of its height.
 const SPARKS: readonly (readonly [number, number])[] = [[-1.15, 0.1], [1.1, 0], [-0.6, -0.9], [0.65, -0.8], [0.05, -1.2]]
 
@@ -49,7 +64,7 @@ const NO_RELATION: WeaponRelation = { kind: 'none' }
 
 interface CardView {
   face: CardFace
-  // Fixed hit area at the slot, so a card that lifts under the pointer does not flicker.
+  // Fixed hit area around every pose of the card (cardHitRect), so the hover does not flicker.
   zone: Phaser.GameObjects.Zone
   // Outline, ribbon and tag of a weapon card that upgrades or replaces the weapon in its slot.
   ring: Phaser.GameObjects.Graphics
@@ -66,8 +81,25 @@ interface CardView {
   hover: number
 }
 
-// One card choice per level gained, one after the other. The gameplay scene stays held until the
-// last choice. A card is chosen by a click or the keys 1 to 4, and only after the intro.
+// The objects of the summary that opens the screen.
+interface SummaryView {
+  paper: Phaser.GameObjects.Graphics
+  levels: Phaser.GameObjects.Text
+  labels: Phaser.GameObjects.Text
+  values: Phaser.GameObjects.Text
+  changes: Phaser.GameObjects.Text
+  xp: Phaser.GameObjects.Text
+  xpTrack: Phaser.GameObjects.Rectangle
+  xpFill: Phaser.GameObjects.Rectangle
+  next: Button
+  keysHint: Phaser.GameObjects.Text
+}
+
+// The screen opens with a summary of the levels gained: the new level, max HP and HP before and
+// after and the XP towards the next level. Several levels gained at once show as one summary with
+// the totals. "Choose a card" then leads to one card choice per level gained, one after the other.
+// The gameplay scene stays held until the last choice. A card is chosen by a click or the keys 1 to
+// 4 from the moment the offer shows.
 export class LevelUpScene extends Phaser.Scene {
   private readonly ctx: RunContext
   private view!: View
@@ -81,9 +113,16 @@ export class LevelUpScene extends Phaser.Scene {
   private note!: CardNote
   private cards: CardView[] = []
   private offer: PowerUpCard[] = []
-  private locked = true
-  private introMs = 0
-  private introEnd = 0
+  private phase: 'summary' | 'cards' = 'summary'
+  private summary: LevelUpSummary | null = null
+  private summaryView!: SummaryView
+  private countStep = -1
+  private nextShown = false
+  // Time since the summary or the current offer showed.
+  private phaseMs = 0
+  // Choices made since the screen opened and choices in all, for the "1 of 2" of several levels.
+  private choiceIndex = 0
+  private choiceCount = 0
   private clock = 0
   private hovered = -1
   private hoverMs = 0
@@ -113,8 +152,9 @@ export class LevelUpScene extends Phaser.Scene {
     this.offer = []
     this.cards = []
     this.sparks = []
-    this.locked = true
-    this.introMs = 0
+    this.phaseMs = 0
+    this.sparkNext = 0
+    this.countStep = -1
     this.clock = 0
     this.hovered = -1
     this.detailIndex = -1
@@ -133,6 +173,7 @@ export class LevelUpScene extends Phaser.Scene {
       sprite.on(Phaser.Animations.Events.ANIMATION_COMPLETE, () => sprite.setVisible(false))
       return sprite
     })
+    this.summaryView = this.createSummary()
     this.note = new CardNote(this)
     this.buildBlocker = this.add.rectangle(0, 0, 1, 1, PALETTE.navy, 0.6).setOrigin(0, 0).setVisible(false)
     onClick(this, this.buildBlocker, () => this.setBuildOpen(false))
@@ -142,8 +183,11 @@ export class LevelUpScene extends Phaser.Scene {
     this.skipButton = addButton(this, 'Skip', 40, 14, () => this.choose(null))
     this.skipButton.setVisible(false)
     onCanvasKey(this, (code, event) => {
-      if (code === 'Tab') event.preventDefault()
-      if (this.locked) return
+      if (code === 'Tab' || code === 'Space') event.preventDefault()
+      if (this.phase === 'summary') {
+        if (CONTINUE_KEYS.has(code)) this.continueToCards()
+        return
+      }
       if (code === BUILD_KEY && !this.sideLayout) {
         this.setBuildOpen(!this.buildOpen)
         return
@@ -160,24 +204,30 @@ export class LevelUpScene extends Phaser.Scene {
       this.view = view
       this.layout()
     })
-    this.nextOffer()
+    const director = this.ctx.director
+    this.summary = director?.levelUpSummary() ?? null
+    this.choiceIndex = 0
+    this.choiceCount = director?.pendingLevelUps ?? 0
+    if (this.summary) this.showSummary(this.summary)
+    else this.continueToCards()
   }
 
   update(_time: number, delta: number) {
     this.clock += delta
-    if (this.locked) {
-      this.introMs += delta
-      this.playIntro()
-      if (this.introMs >= this.introEnd) this.finishIntro()
+    this.phaseMs += delta
+    this.playTitle()
+    if (this.phase === 'summary') {
+      this.playSummary()
+      return
     }
     const ease = Math.min(1, delta / 80)
     for (let i = 0; i < this.offer.length; i++) {
       const card = this.cards[i]
-      card.hover += ((i === this.hovered && !this.locked ? 1 : 0) - card.hover) * ease
+      card.hover += ((i === this.hovered ? 1 : 0) - card.hover) * ease
       this.poseCard(i)
     }
     this.buildPanel.pulse(this.clock)
-    if (!this.locked && this.hovered >= 0 && this.detailIndex !== this.hovered) {
+    if (this.hovered >= 0 && this.detailIndex !== this.hovered) {
       this.hoverMs += delta
       if (this.hoverMs >= HOVER_DETAILS_MS) this.showDetails(this.hovered, false)
     }
@@ -190,7 +240,6 @@ export class LevelUpScene extends Phaser.Scene {
     const face = createCardFace(this, glowKey, String(index + 1), [ring, ribbon, tag])
     const zone = this.add.zone(0, 0, 1, 1)
     zone.on('pointerover', () => {
-      if (this.locked) return
       this.hovered = index
       this.hoverMs = 0
       this.syncHighlight()
@@ -215,16 +264,14 @@ export class LevelUpScene extends Phaser.Scene {
     }
     if (director.pendingLevelUps === 0) return
     const level = director.build.level - director.pendingLevelUps + 1
-    this.subtitle.setText(`Level ${level} · pick a card`)
+    const count = this.choiceCount > 1 ? ` (${Math.min(this.choiceIndex + 1, this.choiceCount)} of ${this.choiceCount})` : ''
+    this.subtitle.setText(`Level ${level} · pick a card${count}`)
     this.hideDetails()
     this.hovered = -1
     this.syncHighlight()
     this.setBuildOpen(false)
     this.buildPanel.setBuild(director.build)
-    this.locked = true
-    this.introMs = 0
-    this.sparkNext = 0
-    this.introEnd = CARD_START + (this.offer.length - 1) * CARD_STEP + CARD_MS
+    this.phaseMs = 0
     this.offer.forEach((card, i) => {
       const view = this.cards[i]
       showCardOn(this, view.face, card, i / MAX_CARDS)
@@ -234,13 +281,13 @@ export class LevelUpScene extends Phaser.Scene {
       view.relation = weaponRelation(director.build, card)
     })
     this.layout()
-    this.playIntro()
+    for (let i = 0; i < this.offer.length; i++) this.poseCard(i)
     this.updateBuildButton()
   }
 
   // null skips the offer.
   private choose(index: number | null) {
-    if (this.locked || this.offer.length === 0) return
+    if (this.phase !== 'cards' || this.offer.length === 0) return
     const card = index === null ? null : this.offer[index]
     if (card === undefined) return
     this.offer = []
@@ -249,13 +296,65 @@ export class LevelUpScene extends Phaser.Scene {
     this.syncHighlight()
     this.updateBuildButton()
     for (const view of this.cards) view.face.box.setVisible(false)
+    this.choiceIndex++
     this.ctx.gameplay?.chooseCard(card ? card.id : null)
     if (this.ctx.director && this.ctx.director.pendingLevelUps > 0) this.nextOffer()
   }
 
-  // Plays the part of the intro that is due at introMs: dim, title, sparkles and the flying cards.
-  private playIntro() {
-    const t = this.introMs
+  private createSummary(): SummaryView {
+    const view: SummaryView = {
+      paper: this.add.graphics(),
+      levels: addText(this, '', 13, { bold: true, align: 'center' }).setOrigin(0.5, 0).setStroke(NAVY, 3),
+      labels: addText(this, '', 8, { color: PALETTE.navy, bold: true }),
+      values: addText(this, '', 8, { color: PALETTE.navy }),
+      changes: addText(this, '', 8, { color: PALETTE.outline }),
+      xp: addText(this, '', 7, { color: PALETTE.navy }),
+      xpTrack: this.add.rectangle(0, 0, 1, 3, PALETTE.navy, 0.18).setOrigin(0, 0.5),
+      xpFill: this.add.rectangle(0, 0, 1, 3, PALETTE.teal, 1).setOrigin(0, 0.5),
+      next: addButton(this, 'Choose a card', 92, 18, () => this.continueToCards()),
+      keysHint: addText(this, 'or press Enter, Space or 1', 6.5, { align: 'center' }).setOrigin(0.5, 0).setStroke(NAVY, 2),
+    }
+    this.setSummaryVisible(view, false)
+    return view
+  }
+
+  private setSummaryVisible(view: SummaryView, visible: boolean) {
+    for (const part of [view.paper, view.levels, view.labels, view.values, view.changes, view.xp, view.xpTrack, view.xpFill, view.keysHint]) part.setVisible(visible)
+    view.next.setVisible(false)
+    view.keysHint.setAlpha(0)
+    this.nextShown = false
+  }
+
+  // Fills the summary texts. The numbers count up from their old values in playSummary.
+  private showSummary(summary: LevelUpSummary) {
+    this.phase = 'summary'
+    this.phaseMs = 0
+    const view = this.summaryView
+    view.levels.setText(`Level ${summary.fromLevel} → ${summary.toLevel}`)
+    view.labels.setText(summary.rows.map((row) => row.label).join('\n'))
+    view.changes.setText(summary.rows.map((row) => row.change).join('\n'))
+    view.xp.setText(`XP ${summary.xp} / ${summary.xpToNext} to level ${summary.toLevel + 1}`)
+    this.subtitle.setText(this.choiceCount > 1 ? `${this.choiceCount} cards to choose, one per level` : '')
+    this.setSummaryVisible(view, true)
+    for (const card of this.cards) card.face.box.setVisible(false)
+    this.hint.setVisible(false)
+    this.updateBuildButton()
+    this.layout()
+    this.playSummary()
+  }
+
+  private continueToCards() {
+    if (this.phase === 'summary' && this.summary && this.phaseMs < SUMMARY_GUARD_MS) return
+    this.phase = 'cards'
+    this.setSummaryVisible(this.summaryView, false)
+    this.hint.setVisible(true)
+    this.nextOffer()
+  }
+
+  // The dim, the title pop and its sparkles play once, when the screen opens.
+  private playTitle() {
+    const t = this.clock
+    if (t > SPARK_START + SPARK_STEP * SPARKS.length + TITLE_MS) return
     this.dim.setAlpha(Math.min(1, t / DIM_MS))
     if (this.sideLayout) this.buildPanel.setAlpha(this.dim.alpha)
     const pop = Phaser.Math.Clamp((t - TITLE_START) / TITLE_MS, 0, 1)
@@ -270,41 +369,54 @@ export class LevelUpScene extends Phaser.Scene {
         .play({ key: this.sparkAnim, repeat: 0 })
       this.sparkNext++
     }
-    this.hint.setAlpha(this.locked ? Phaser.Math.Clamp((t - this.introEnd + 200) / 200, 0, 1) : 1)
   }
 
-  private finishIntro() {
-    this.locked = false
-    this.dim.setAlpha(1)
-    this.title.setScale(1).setRotation(0).setAlpha(1)
-    this.subtitle.setAlpha(1)
-    this.hint.setAlpha(1)
-    this.buildPanel.setAlpha(1)
-    this.enableInput()
-    this.updateBuildButton()
+  // Fades the paper in, counts the numbers up and shows the button once the guard has passed.
+  private playSummary() {
+    const summary = this.summary
+    if (!summary) return
+    const view = this.summaryView
+    const t = this.phaseMs
+    const fade = Phaser.Math.Clamp((t - PANEL_START) / PANEL_MS, 0, 1)
+    view.levels.setAlpha(Phaser.Math.Clamp((t - TITLE_START - 120) / 200, 0, 1))
+    for (const part of [view.paper, view.labels, view.values, view.xp, view.xpTrack, view.xpFill]) part.setAlpha(fade)
+    const count = Phaser.Math.Clamp((t - COUNT_START) / COUNT_MS, 0, 1)
+    view.changes.setAlpha(count)
+    const step = Math.round(Phaser.Math.Easing.Cubic.Out(count) * COUNT_STEPS)
+    if (step !== this.countStep) {
+      this.countStep = step
+      view.values.setText(summaryValues(summary, step / COUNT_STEPS))
+      view.xpFill.setScale(Math.max(0.001, (summary.xp / summary.xpToNext) * (step / COUNT_STEPS)), 1)
+    }
+    const ready = t >= SUMMARY_GUARD_MS
+    if (ready !== this.nextShown) {
+      this.nextShown = ready
+      view.next.setVisible(ready)
+      view.keysHint.setAlpha(ready ? 1 : 0)
+    }
   }
 
   private enableInput() {
     for (let i = 0; i < MAX_CARDS; i++) {
-      const view = this.cards[i]
-      // An interactive object keeps the hit area it was enabled with, so it is set up anew.
-      view.zone.removeInteractive()
-      if (this.locked || i >= this.offer.length) continue
-      view.zone.setInteractive({ useHandCursor: true })
+      const zone = this.cards[i].zone
+      // Switched on and off, never removed: Phaser clears an input that is removed and added again
+      // in the same frame, which left every card dead after a resize. The hit area follows setSize.
+      if (this.phase === 'cards' && i < this.offer.length) zone.setInteractive({ useHandCursor: true })
+      else zone.disableInteractive()
     }
   }
 
   // Idle bob, hover lift and the fly-in of one card. Only sets properties, nothing is allocated.
   private poseCard(i: number) {
     const view = this.cards[i]
-    const p = this.locked ? Phaser.Math.Clamp((this.introMs - CARD_START - i * CARD_STEP) / CARD_MS, 0, 1) : 1
+    const p = Phaser.Math.Clamp((this.phaseMs - i * CARD_STEP) / CARD_MS, 0, 1)
     const face = view.face
     if (p <= 0) {
       face.box.setVisible(false)
       return
     }
     const e = p >= 1 ? 1 : Phaser.Math.Easing.Back.Out(p)
-    const bob = Math.sin(this.clock / 650 + view.phase) * view.h * 0.012
+    const bob = Math.sin(this.clock / 650 + view.phase) * view.h * BOB
     const wobble = Math.sin(p * Math.PI * 4) * (1 - p) * 0.1
     const rotation = view.tilt * (1 - view.hover) + wobble
     // Rotated Text objects render with their lower part cut off, so the texts are turned back
@@ -312,9 +424,9 @@ export class LevelUpScene extends Phaser.Scene {
     for (const text of face.texts) text.setRotation(-rotation)
     face.box
       .setVisible(true)
-      .setPosition(view.x, view.y + (1 - e) * view.h * 0.9 + bob * p - view.hover * view.h * 0.04)
+      .setPosition(view.x, view.y + (1 - e) * view.h * 0.9 + bob * p - view.hover * view.h * HOVER_LIFT)
       .setRotation(rotation)
-      .setScale((0.9 + 0.1 * e) * (1 + 0.07 * view.hover))
+      .setScale((0.9 + 0.1 * e) * (1 + HOVER_GROW * view.hover))
       .setAlpha(Math.min(1, p * 4))
     if (face.glow.visible) face.glow.setAlpha(0.55 + 0.3 * Math.sin(this.clock / 260))
     if (view.ring.visible) view.ring.setAlpha(0.4 + 0.6 * (0.5 + 0.5 * Math.sin(this.clock / 170 + view.phase)))
@@ -327,6 +439,10 @@ export class LevelUpScene extends Phaser.Scene {
     this.buildBlocker.setSize(w, h)
     const margin = Math.max(6, h * 0.025)
     this.layoutBuildPanel(w, h, margin)
+    if (this.phase === 'summary') {
+      this.layoutSummary(w, h)
+      return
+    }
     const n = this.offer.length
     if (n === 0) return
     const areaW = this.areaW
@@ -360,12 +476,52 @@ export class LevelUpScene extends Phaser.Scene {
       view.y = cardsTop + cardH / 2
       view.w = cardW
       view.h = cardH
-      view.zone.setPosition(view.x, view.y).setSize(cardW, cardH)
+      const hit = cardHitRect({ w: cardW, h: cardH, tilt: TILT, lift: HOVER_LIFT, bob: BOB, hoverScale: 1 + HOVER_GROW, gap })
+      view.zone.setPosition(view.x, view.y + (hit.top + hit.bottom) / 2).setSize(hit.right - hit.left, hit.bottom - hit.top)
       const s = sizeCardFace(view.face, card, cardW)
       if (s > 0) this.decorateCard(view, s)
     }
     this.enableInput()
     if (this.detailIndex >= 0) this.renderPanel()
+  }
+
+  // The title, the levels, the paper with the rows and the XP bar and the button, centred in the view.
+  private layoutSummary(w: number, h: number) {
+    const view = this.summaryView
+    const summary = this.summary
+    if (!summary) return
+    const pad = 8
+    // Measured with the final numbers, so the columns do not move while they count.
+    view.values.setText(summaryValues(summary, 1))
+    this.countStep = -1
+    const valuesX = view.labels.width + 12
+    const changesX = valuesX + view.values.width + 10
+    const rowsW = changesX + view.changes.width
+    const paperW = Math.min(w - 24, Math.max(rowsW, view.xp.width, 150) + pad * 2)
+    const rowsH = view.labels.height
+    const paperH = pad + rowsH + 8 + view.xp.height + 6 + pad
+    const subtitleH = this.subtitle.text ? 12 : 0
+    const head = 50 + subtitleH + 6
+    const stack = head + paperH + 12 + 18 + 4 + 10
+    const top = Math.max(6, (h - stack) / 2)
+    const centre = w / 2
+    this.title.setPosition(centre, top + 14)
+    view.levels.setPosition(centre, top + 30)
+    this.subtitle.setPosition(centre, top + 50 + subtitleH / 2)
+    const px = centre - paperW / 2
+    const py = top + head
+    drawScribbleBox(view.paper, px, py, paperW, paperH, 3)
+    const left = centre - rowsW / 2
+    view.labels.setPosition(left, py + pad)
+    view.values.setPosition(left + valuesX, py + pad)
+    view.changes.setPosition(left + changesX, py + pad)
+    const xpY = py + pad + rowsH + 8
+    view.xp.setPosition(px + pad, xpY)
+    const barY = xpY + view.xp.height + 3
+    view.xpTrack.setPosition(px + pad, barY).setSize(paperW - pad * 2, 3)
+    view.xpFill.setPosition(px + pad, barY).setSize(paperW - pad * 2, 3)
+    view.next.setPosition(centre, py + paperH + 12 + 9)
+    view.keysHint.setPosition(centre, py + paperH + 12 + 18 + 4)
   }
 
   // The side layout puts the build panel left of the cards and gives them the rest. The narrow
@@ -389,7 +545,7 @@ export class LevelUpScene extends Phaser.Scene {
 
   // Shows the panel as an overlay on narrow views. The side layout always shows it.
   private setBuildOpen(open: boolean) {
-    const next = open && !this.sideLayout && !this.locked
+    const next = open && !this.sideLayout && this.phase === 'cards'
     this.buildOpen = next
     this.updateBuildButton()
   }
@@ -397,12 +553,13 @@ export class LevelUpScene extends Phaser.Scene {
   private updateBuildButton() {
     if (!this.buildPanel) return
     const side = this.sideLayout
-    this.buildPanel.setVisible(side || this.buildOpen)
+    const cards = this.phase === 'cards'
+    this.buildPanel.setVisible((side && cards) || this.buildOpen)
     this.buildBlocker.setVisible(this.buildOpen)
     if (this.buildOpen) this.buildBlocker.setInteractive({ useHandCursor: true })
     else this.buildBlocker.disableInteractive()
-    this.buildButton.setVisible(!side && !this.locked && this.offer.length > 0 && !this.buildOpen)
-    this.skipButton.setVisible(!this.locked && this.offer.length > 0 && !this.buildOpen)
+    this.buildButton.setVisible(!side && cards && this.offer.length > 0 && !this.buildOpen)
+    this.skipButton.setVisible(cards && this.offer.length > 0 && !this.buildOpen)
   }
 
   // The card's own marks: the ribbon and outline of an upgrade and the tag of a replacement.
@@ -442,7 +599,6 @@ export class LevelUpScene extends Phaser.Scene {
   }
 
   private toggleDetails(index: number) {
-    if (this.locked) return
     if (this.detailIndex === index) this.hideDetails()
     else this.showDetails(index, true)
   }
@@ -482,4 +638,10 @@ export class LevelUpScene extends Phaser.Scene {
     })
     this.hint.setVisible(false)
   }
+}
+
+// The values column at count progress `t` (0 to 1): each row's old value counting up to its new one.
+function summaryValues(summary: LevelUpSummary, t: number): string {
+  const format = (value: number, unit: '' | '%') => (unit === '%' ? `${value.toFixed(1)}%` : String(Math.round(value)))
+  return summary.rows.map((row) => `${format(row.from, row.unit)} → ${format(row.from + (row.to - row.from) * t, row.unit)}`).join('\n')
 }

@@ -6,8 +6,8 @@ import { createRng, type Rng } from '../../contracts/rng'
 import type { RunPlan, Segment } from '../../contracts/run'
 import { bossFromNode, finalBossFromPlan } from '../../model/content'
 import { appendLevelUp, sourceText, storeSourceText, type LevelUpRecord } from './levelHistory'
-import { addXp, applyCard, buyCard, createBossCharge, createBuild, createLinePicker, priceOf, rollOffer, rollStock, TRADER_LINES } from '../../model/progression'
-import type { BossCharge, TraderMood } from '../../model/progression'
+import { addXp, applyCard, buyCard, createBossCharge, createBuild, createLinePicker, levelUpSummary, priceOf, rollOffer, rollStock, TRADER_LINES } from '../../model/progression'
+import type { BossCharge, LevelUpSummary, TraderMood } from '../../model/progression'
 
 export type RunStage =
   | { kind: 'stretch'; index: number }
@@ -69,6 +69,8 @@ export class RunDirector {
   private readonly stocks = new Map<number, PowerUpCard[]>()
   private readonly traderLines: Record<TraderMood, () => string>
   private history: LevelUpRecord[] = []
+  // The build just before the first of the pending levels, for the level-up summary.
+  private levelUpBase: PlayerBuild | null = null
   private lastOffer: PowerUpCard[] = []
   private readonly bossSpecs = new Map<number, BossSpec>()
   private finalSpec: FinalBossSpec | null = null
@@ -138,10 +140,18 @@ export class RunDirector {
     if (amount <= 0 || this.isOver()) return 0
     const before = this.build.level
     const { build, levelsGained } = addXp(this.build, amount)
+    // XP that arrives while levels still wait for their cards adds to the same summary.
+    if (levelsGained > 0 && this.pendingLevelUps === 0) this.levelUpBase = this.build
     this.build = build
     this.pendingLevelUps += levelsGained
     for (let level = before + 1; level <= build.level; level++) this.hooks.emit({ type: 'levelUp', level })
     return levelsGained
+  }
+
+  // What the pending levels changed, from the build before the first of them to the build now.
+  // Read before the first card is chosen. Null while no level waits.
+  levelUpSummary(): LevelUpSummary | null {
+    return this.pendingLevelUps > 0 && this.levelUpBase ? levelUpSummary(this.levelUpBase, this.build) : null
   }
 
   // The cards chosen so far, in level order. A new run starts with a new director, so it starts empty.
