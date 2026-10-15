@@ -12,7 +12,7 @@ import { GameplayScene, type LevelSetup } from './GameplayScene'
 import { addParallax, addTiles, type Parallax } from './levelArt'
 import { generateStretch, type StretchLayout } from './levelGen'
 import { PIT_KILLER } from './RunDirector'
-import { createRescueFrame, rescueAt } from './rescue'
+import { createRescueFrame, rescueAt, rescueSpot } from './rescue'
 import { addText, plural } from './ui'
 
 const T = TILE
@@ -255,16 +255,10 @@ export class StretchScene extends GameplayScene {
     }
   }
 
-  // The last ground the player stood on, moved a tile in from its edges so the player does not
-  // land on the lip of the same pit again.
+  // The last ground the player stood on: the middle of a stepping stone, or well away from the
+  // edges of wider ground, so the player does not land on the lip of the same pit again.
   private safeSpot(): { x: number; y: number } {
-    const surfaces = [...this.layout.grounds, ...this.layout.platforms]
-    for (const s of surfaces) {
-      if (Math.abs(s.top - this.safeY) > 1 || this.safeX < s.x - 2 || this.safeX > s.x + s.w + 2) continue
-      const margin = Math.min(T, s.w / 2)
-      return { x: Math.min(s.x + s.w - margin, Math.max(s.x + margin, this.safeX)), y: s.top }
-    }
-    return { x: this.safeX, y: this.safeY }
+    return rescueSpot([...this.layout.grounds, ...this.layout.platforms], this.safeX, this.safeY)
   }
 
   protected inspectableMobs(): Mob[] {

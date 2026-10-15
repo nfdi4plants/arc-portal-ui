@@ -7,6 +7,7 @@ import {
   RESCUE_MS,
   createRescueFrame,
   rescueAt,
+  rescueSpot,
 } from '../../../src/game/phaser/scenes/rescue'
 
 const at = (ms: number) => ({ ...rescueAt(createRescueFrame(), ms) })
@@ -51,5 +52,24 @@ describe('rescueAt', () => {
     expect(end.cloudDy).toBeLessThan(-RESCUE_DROP)
     expect(end.cloudAlpha).toBe(0)
     expect(end.done).toBe(true)
+  })
+})
+
+describe('rescueSpot', () => {
+  const ground = { x: 0, w: 480, top: 300 }
+  // A three-tile stepping stone over a pit, one tile above the ground.
+  const stone = { x: 600, w: 72, top: 276 }
+
+  it('puts the mage in the middle of a stepping stone it left near the edge', () => {
+    expect(rescueSpot([ground, stone], 669, 276)).toEqual({ x: 636, y: 276 })
+  })
+
+  it('finds the stone when the feet sank a few units into it', () => {
+    expect(rescueSpot([ground, stone], 604, 279.5)).toEqual({ x: 636, y: 276 })
+  })
+
+  it('keeps two tiles from the edge of wide ground and stays put further in', () => {
+    expect(rescueSpot([ground, stone], 478, 300)).toEqual({ x: 432, y: 300 })
+    expect(rescueSpot([ground, stone], 200, 300)).toEqual({ x: 200, y: 300 })
   })
 })

@@ -1,3 +1,5 @@
+import { TILE } from '../../contracts/constants'
+
 // The pit rescue: a cloud carries the mage down from above onto the last safe ground, lets go and
 // flies off. Pure, so the timeline is unit-tested. Times in ms, distances in world units.
 
@@ -51,4 +53,33 @@ export function rescueAt(out: RescueFrame, elapsedMs: number): RescueFrame {
   out.vulnerable = elapsedMs >= releaseMs + RESCUE_GRACE_MS
   out.done = elapsedMs >= RESCUE_MS
   return out
+}
+
+export interface Surface {
+  x: number
+  w: number
+  top: number
+}
+
+// Surfaces up to this wide put the mage down in their middle: on a stepping stone over a pit any
+// other spot is close enough to an edge to fall again.
+export const RESCUE_CENTRE_MAX_W = 4 * TILE
+// On wider ground the landing spot keeps at least this far from both edges.
+export const RESCUE_EDGE_MARGIN = 2 * TILE
+// Feet can sink a few units into a one-way platform, so the surface match allows some slack.
+const TOP_SLACK = 6
+
+// Where the cloud puts the mage down: the surface it last stood on, found by its last grounded
+// feet position, and a spot on it away from the edges. Falls back to that position when no
+// surface matches.
+export function rescueSpot(surfaces: readonly Surface[], x: number, y: number): { x: number; y: number } {
+  let best: Surface | null = null
+  for (const s of surfaces) {
+    if (Math.abs(s.top - y) > TOP_SLACK || x < s.x - 2 || x > s.x + s.w + 2) continue
+    if (!best || Math.abs(s.top - y) < Math.abs(best.top - y)) best = s
+  }
+  if (!best) return { x, y }
+  if (best.w <= RESCUE_CENTRE_MAX_W) return { x: best.x + best.w / 2, y: best.top }
+  const margin = Math.min(RESCUE_EDGE_MARGIN, best.w / 2)
+  return { x: Math.min(best.x + best.w - margin, Math.max(best.x + margin, x)), y: best.top }
 }
