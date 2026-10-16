@@ -1,8 +1,6 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-// Primer dialogs and tables render slowly in jsdom when the suite runs in parallel.
-vi.setConfig({ testTimeout: 15000 })
 import App from './App.tsx'
 import { TOKEN_STORAGE_KEY } from './auth/context.ts'
 import { availableDataHubs, defaultDataHub } from './config/gitlab.ts'

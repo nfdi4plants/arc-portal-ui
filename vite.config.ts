@@ -25,5 +25,7 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./tests/setup.ts', './src/test/setup.ts'],
     restoreMocks: true,
+    // jsdom restyles the page against Primer's CSS after every DOM change, so tests that click through whole screens take several seconds.
+    testTimeout: 30000,
   },
 })

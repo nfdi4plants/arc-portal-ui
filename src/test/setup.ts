@@ -1,6 +1,10 @@
 import '@testing-library/jest-dom/vitest'
-import { cleanup } from '@testing-library/react'
+import { cleanup, configure } from '@testing-library/react'
 import { afterEach, vi } from 'vitest'
+
+// jsdom recomputes every element's style against all of Primer's CSS after each DOM change, so one role query
+// takes 0.3 to 0.8 s. The 1 s default leaves findBy* only one or two tries.
+configure({ asyncUtilTimeout: 5000 })
 
 // Primer dialogs observe their scrollable body; jsdom has no layout observer.
 Object.defineProperty(globalThis, 'ResizeObserver', {
