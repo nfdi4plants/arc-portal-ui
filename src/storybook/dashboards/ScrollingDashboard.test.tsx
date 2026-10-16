@@ -27,6 +27,10 @@ vi.mock('@nfdi4plants/arc-web-view', () => ({ WebViewer: () => {
   </>
 } }))
 
+// Each menu click or role query makes jsdom restyle the whole dashboard (about a second here),
+// and the menu tests take around 20 such steps.
+const MENU_TEST_TIMEOUT = 60000
+
 async function openDashboard() {
   const store = createArcStore(sampleCrateSource())
   await store.load()
@@ -78,7 +82,7 @@ describe('ScrollingDashboard', () => {
     await user.keyboard('{Escape}{Escape}')
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
     expect(investigation).toHaveFocus()
-  }, 15000)
+  }, MENU_TEST_TIMEOUT)
 
   it('opens selected assay, study, run and workflow folders in Webview and closes both menus', async () => {
     const metadata = await openDashboard()
@@ -100,7 +104,7 @@ describe('ScrollingDashboard', () => {
       expect(screen.getByRole('textbox')).toHaveValue('saved search')
     }
     expect(screen.getByRole('region', { name: 'Provenance explorer' })).toBeVisible()
-  }, 15000)
+  }, MENU_TEST_TIMEOUT)
 
   it('jumps and moves focus between the viewers while preserving file input', async () => {
     await openDashboard()
@@ -132,7 +136,7 @@ describe('ScrollingDashboard', () => {
     expect(game.scrollIntoView).toHaveBeenCalledWith({ block: 'start', behavior: 'smooth' })
     expect(game).toHaveFocus()
     expect(screen.getByRole('textbox')).toHaveValue('assays')
-  }, 15000)
+  })
 
   it('expands each viewer and restores it with its contents intact', async () => {
     await openDashboard()
@@ -146,5 +150,5 @@ describe('ScrollingDashboard', () => {
     await user.click(screen.getByRole('button', { name: 'Shrink Graphview' }))
     expect(screen.getByRole('textbox')).toHaveValue('studies')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-  }, 15000)
+  })
 })
