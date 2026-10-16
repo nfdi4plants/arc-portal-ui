@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import mageUrl from '../../game/assets/ARCMage.png'
+import mageUrl from '@arc-rdg/arcade/mage.png'
 import './arcMage.css'
 
 // ARCMage.png is a 1448x1086 canvas with the robot inside x55..241, y173..451.

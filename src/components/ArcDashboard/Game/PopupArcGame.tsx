@@ -1,6 +1,5 @@
 import type { ProvenanceIndex } from '../../../arc/provenance/types'
-import ArcGame from './ArcGame'
-import { ArcadeBanner } from './ArcadeBanner'
+import { Arcade, ArcadeBanner } from '@arc-rdg/arcade/react'
 import { PopupDashlet, type PopupDashletProps } from '../../PopupDashlet'
 
 export type PopupArcGameProps = Omit<PopupDashletProps, 'children' | 'title' | 'description'> & {
@@ -18,7 +17,7 @@ export function PopupArcGame({ index, arcTitle, symbol, ...props }: PopupArcGame
       title="ARCade"
       description="Play a short run through the provenance of this ARC."
     >
-      <ArcGame index={index} arcTitle={arcTitle} />
+      <Arcade title={arcTitle} provenance={index} />
     </PopupDashlet>
   )
 }
