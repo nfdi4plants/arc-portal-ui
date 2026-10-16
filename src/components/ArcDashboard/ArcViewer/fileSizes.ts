@@ -20,7 +20,7 @@ export function formatSize(size: number): string {
 export async function loadFileSizes(repositoryUrl: string, signal: AbortSignal, token?: string, onProgress?: (sizes: FileSizes) => void): Promise<FileSizes> {
   const repository = new URL(repositoryUrl)
   const base = `${repository.origin}/api/v4/projects/${encodeURIComponent(decodeURIComponent(repository.pathname.replace(/^\//, '').replace(/\/$/, '')))}/repository`
-  const headers: Record<string, string> = token ? {'PRIVATE-TOKEN': token} : {}
+  const headers: Record<string, string> = token ? {Authorization: `Bearer ${token}`} : {}
   const files: string[] = []
   const folders: string[] = []
   for (let page = 1; ; page++) {

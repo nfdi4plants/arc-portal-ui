@@ -22,7 +22,7 @@ function transport() {
     if (url.pathname === '/api/v4/groups/2/projects') return projectResponse([gitLabProjectFull()], { 'X-Total': '3', 'X-Next-Page': '' })
     if (url.pathname === '/api/v4/projects') {
       if (url.searchParams.get('per_page') === '1') return projectResponse([gitLabProjectFull()], { 'X-Total': '26' })
-      const token = new Headers(init?.headers).get('PRIVATE-TOKEN')
+      const token = new Headers(init?.headers).get('Authorization')
       const page = Number(url.searchParams.get('page'))
       return projectResponse([gitLabProjectFull({
         name: (token ? 'Private ' : '') + url.host + ' ARC ' + page,
@@ -101,9 +101,9 @@ describe('dashboard request lifecycle', () => {
     expect(requests(call, otherHost, '/api/v4/groups', { all_available: 'false' })).toHaveLength(0)
     expect(requests(call, officialHost, '/api/v4/groups', { all_available: 'false' })).toHaveLength(1)
     expect(requests(call, officialHost, '/api/v4/projects').every(([, init]) =>
-      new Headers(init?.headers).get('PRIVATE-TOKEN') === 'official-token')).toBe(true)
+      new Headers(init?.headers).get('Authorization') === 'Bearer official-token')).toBe(true)
     expect(requests(call, otherHost, '/api/v4/projects').every(([, init]) =>
-      !new Headers(init?.headers).has('PRIVATE-TOKEN'))).toBe(true)
+      !new Headers(init?.headers).has('Authorization'))).toBe(true)
   })
 
   it('settles a failed saved login and keeps the dashboard mounted through a later retry', async () => {

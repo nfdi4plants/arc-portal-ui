@@ -17,7 +17,7 @@ const fetchCall = stubGitLabFetch(async url => {
 })
 const initialFetch = fetchCall.getMockImplementation()!
 
-function hasToken(init?: RequestInit) { return new Headers(init?.headers).has('PRIVATE-TOKEN') }
+function hasToken(init?: RequestInit) { return new Headers(init?.headers).has('Authorization') }
 function userCalls() { return fetchCall.mock.calls.filter(call => new URL(String(call[0])).pathname === '/api/v4/user') }
 function projectCalls(host?: string) {
   return fetchCall.mock.calls.filter(call => {
@@ -58,7 +58,7 @@ describe('optional login in the portal', () => {
     expect(await screen.findByRole('button', { name: `Unstar ${officialHost} ARC (43 stars)` })).toBeEnabled()
     const request = fetchCall.mock.calls.find(([input]) => new URL(String(input)).pathname === '/api/v4/projects/1/star')!
     expect(request[1]?.method).toBe('POST')
-    expect(new Headers(request[1]?.headers).get('PRIVATE-TOKEN')).toBe('api-token')
+    expect(new Headers(request[1]?.headers).get('Authorization')).toBe('Bearer api-token')
     const menu = await openAccountMenu(user)
     await user.click(menu.getByRole('button', { name: 'Logout' }))
     const anonymousStar = await screen.findByRole('button', { name: `Star ${officialHost} ARC (42 stars)` })
@@ -85,7 +85,7 @@ describe('optional login in the portal', () => {
       { headers: expect.any(Headers), signal: expect.any(AbortSignal), credentials: 'omit' },
     ))
     const download = fetchCall.mock.calls.find(([input]) => String(input).includes('/packages/generic/'))!
-    expect(new Headers(download[1]?.headers).get('PRIVATE-TOKEN')).toBe('plantmicrobe-token')
+    expect(new Headers(download[1]?.headers).get('Authorization')).toBe('Bearer plantmicrobe-token')
   })
 
   it('keeps discovery public, authenticates through Enter and reloads the ARCs with the token', async () => {
@@ -111,7 +111,7 @@ describe('optional login in the portal', () => {
 
     await waitFor(() => expect(projectCalls(officialHost).some(call => hasToken(call[1]))).toBe(true))
     const authenticated = projectCalls(officialHost).find(call => hasToken(call[1]))!
-    expect(new Headers(authenticated[1]?.headers).get('PRIVATE-TOKEN')).toBe('runtime-token')
+    expect(new Headers(authenticated[1]?.headers).get('Authorization')).toBe('Bearer runtime-token')
     expect(new URL(String(authenticated[0])).searchParams.has('visibility')).toBe(false)
     expect(fetchCall.mock.calls.every(call => !String(call[0]).includes('runtime-token'))).toBe(true)
 

@@ -83,7 +83,7 @@ describe('ARC repository versions', () => {
       '/api/v4/projects/research%2Fplant-arc/repository/tags',
     ])
     for (const [, init] of fetchCall.mock.calls) {
-      expect(new Headers(init?.headers).get('PRIVATE-TOKEN')).toBe('runtime-token')
+      expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer runtime-token')
       expect(init?.signal).toBe(controller.signal)
     }
   })

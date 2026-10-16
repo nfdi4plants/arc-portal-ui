@@ -22,7 +22,7 @@ describe('useROCrate', () => {
       'https://datahub.example/gitlab/api/v4/projects/42/packages/generic/isa_arc_json/0.0.1/arc-ro-crate-metadata.json',
       { headers: expect.any(Headers), signal: expect.any(AbortSignal), credentials: 'omit' },
     )
-    expect(new Headers(fetchCall.mock.calls[0][1]?.headers).has('PRIVATE-TOKEN')).toBe(false)
+    expect(new Headers(fetchCall.mock.calls[0][1]?.headers).has('Authorization')).toBe(false)
 
     await act(async () => pending.resolve(new Response(crateJson)))
     expect(result.current.status).toBe('Result')
@@ -88,11 +88,12 @@ describe('useROCrate', () => {
       ({ token }: { token: string | undefined }) => useROCrate('https://datahub.example', 42, token),
       { initialProps: { token: 'runtime-token' as string | undefined } },
     )
-    expect(new Headers(fetchCall.mock.calls[0][1]?.headers).get('PRIVATE-TOKEN')).toBe('runtime-token')
+    expect(new Headers(fetchCall.mock.calls[0][1]?.headers).get('Authorization')).toBe('Bearer runtime-token')
+    expect(new Headers(fetchCall.mock.calls[0][1]?.headers).has('PRIVATE-TOKEN')).toBe(false)
 
     rerender({ token: undefined })
     expect(fetchCall.mock.calls[0][1]?.signal?.aborted).toBe(true)
-    expect(new Headers(fetchCall.mock.calls[1][1]?.headers).has('PRIVATE-TOKEN')).toBe(false)
+    expect(new Headers(fetchCall.mock.calls[1][1]?.headers).has('Authorization')).toBe(false)
     await waitFor(() => expect(result.current.status).toBe('Error'))
     await act(async () => pending.resolve(new Response(crateJson)))
     expect(result.current.status).toBe('Error')

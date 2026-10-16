@@ -63,7 +63,7 @@ disabled when that DataHUB has no signed-in account. Star changes update the
 button in place without refetching or removing rows, so they can be undone
 immediately even in the Starred view. Use Update to reload the results.
 
-Tokens are supplied at runtime through `PRIVATE-TOKEN` headers; they never go in
+Tokens are supplied at runtime as `Authorization: Bearer` headers; they never go in
 request URLs. Browser session credentials are omitted. Do not put private tokens
 in committed source, Vite environment variables, or public bundles.
 

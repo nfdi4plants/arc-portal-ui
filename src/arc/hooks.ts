@@ -26,7 +26,7 @@ export function useROCrate(source: string | null, projectId: number | null, toke
       label: `ARC ${projectId}`,
       async fetchROCrate(signal) {
         const headers = new Headers({ Accept: 'application/json' })
-        if (token) headers.set('PRIVATE-TOKEN', token)
+        if (token) headers.set('Authorization', `Bearer ${token}`)
         const response = await fetch(url, { headers, signal, credentials: 'omit' })
         if (!response.ok) throw new Error(`Unable to load RO-Crate (${response.status}).`)
         return response.text()

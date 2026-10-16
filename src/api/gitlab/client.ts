@@ -31,7 +31,7 @@ export async function requestGitLab<T>(
   try {
     url = apiUrl(source, resource, params)
     headers = new Headers({ Accept: 'application/json' })
-    if (options.token) headers.set('PRIVATE-TOKEN', options.token)
+    if (options.token) headers.set('Authorization', `Bearer ${options.token}`)
   } catch (error) {
     return Failure(error instanceof Error ? error.message : 'Invalid GitLab request options.')
   }

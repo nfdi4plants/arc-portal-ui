@@ -148,7 +148,7 @@ export async function getProjectArchiveSize(
   url.searchParams.set('sha', ref)
   url.searchParams.set('include_lfs_blobs', 'true')
   const headers = new Headers()
-  if (options.token) headers.set('PRIVATE-TOKEN', options.token)
+  if (options.token) headers.set('Authorization', `Bearer ${options.token}`)
   try {
     const response = await (options.fetchCall ?? fetch)(url, {
       method: 'HEAD', headers, signal: options.signal, credentials: 'omit', redirect: 'error',

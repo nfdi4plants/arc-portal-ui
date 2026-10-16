@@ -15,7 +15,7 @@ describe('getGroupProjectCount', () => {
     expect(Object.fromEntries(url.searchParams)).toEqual({
       simple: 'true', order_by: 'id', sort: 'desc', per_page: '1', include_subgroups: 'true', with_shared: 'false',
     })
-    expect(new Headers(init?.headers).get('PRIVATE-TOKEN')).toBe('runtime-token')
+    expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer runtime-token')
   })
 
   it.each([
@@ -42,7 +42,7 @@ describe('getProjectCount', () => {
       simple: 'true', order_by: 'id', sort: 'desc', per_page: '1', visibility: 'public',
     })
     expect(init?.credentials).toBe('omit')
-    expect(new Headers(init?.headers).has('PRIVATE-TOKEN')).toBe(false)
+    expect(new Headers(init?.headers).has('Authorization')).toBe(false)
   })
 
   it('counts accessible projects with a runtime token and forwards cancellation', async () => {
@@ -51,7 +51,7 @@ describe('getProjectCount', () => {
     expect(await getProjectCount(source, { fetchCall, token: 'runtime-token', signal: controller.signal })).toEqual(Success(2))
     const [input, init] = fetchCall.mock.calls[0]
     expect(new URL(String(input)).searchParams.has('visibility')).toBe(false)
-    expect(new Headers(init?.headers).get('PRIVATE-TOKEN')).toBe('runtime-token')
+    expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer runtime-token')
     expect(init?.signal).toBe(controller.signal)
     expect(String(input)).not.toContain('runtime-token')
   })

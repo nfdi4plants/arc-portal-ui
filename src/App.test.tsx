@@ -41,7 +41,7 @@ it('opens an ARC using its project id and the URL of its source DataHUB', async 
     { headers: expect.any(Headers), signal: expect.any(AbortSignal), credentials: 'omit' },
   ))
   const download = fetchCall.mock.calls.find(([input]) => String(input).includes('/packages/generic/'))!
-  expect(new Headers(download[1]?.headers).has('PRIVATE-TOKEN')).toBe(false)
+  expect(new Headers(download[1]?.headers).has('Authorization')).toBe(false)
 })
 
 it('opens the scrolling dashboard with investigation submenus and returns to discovery', async () => {

@@ -22,7 +22,8 @@ describe('GitLab authentication and groups', () => {
     const fetchCall = vi.fn<typeof fetch>().mockResolvedValue(Response.json(user))
     expect(await getCurrentUser(source, { token: 'runtime-token', fetchCall })).toEqual(Success(user))
     expect(String(fetchCall.mock.calls[0][0])).toBe(`${source}/api/v4/user`)
-    expect(new Headers(fetchCall.mock.calls[0][1]?.headers).get('PRIVATE-TOKEN')).toBe('runtime-token')
+    expect(new Headers(fetchCall.mock.calls[0][1]?.headers).get('Authorization')).toBe('Bearer runtime-token')
+    expect(new Headers(fetchCall.mock.calls[0][1]?.headers).has('PRIVATE-TOKEN')).toBe(false)
     expect(fetchCall.mock.calls[0][1]?.credentials).toBe('omit')
   })
 
@@ -38,7 +39,7 @@ describe('GitLab authentication and groups', () => {
     await listGroups(source, { visibility: 'public', fetchCall })
     let url = new URL(String(fetchCall.mock.calls[0][0]))
     expect(url.searchParams.get('visibility')).toBe('public')
-    expect(new Headers(fetchCall.mock.calls[0][1]?.headers).has('PRIVATE-TOKEN')).toBe(false)
+    expect(new Headers(fetchCall.mock.calls[0][1]?.headers).has('Authorization')).toBe(false)
     await listGroups(source, { allAvailable: false, token: 'token', fetchCall })
     url = new URL(String(fetchCall.mock.calls[1][0]))
     expect(url.searchParams.get('all_available')).toBe('false')

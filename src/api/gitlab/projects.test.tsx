@@ -29,7 +29,7 @@ describe('GitLab projects API', () => {
     await listProjects(instance, { fetchCall: fetchMock })
     expect(requestedUrl().href).toBe(`${instance.replace(/\/+$/, '')}/api/v4/projects?page=1&per_page=20`)
     expect(fetchMock.mock.calls[0][1]?.credentials).toBe('omit')
-    expect(new Headers(fetchMock.mock.calls[0][1]?.headers).has('PRIVATE-TOKEN')).toBe(false)
+    expect(new Headers(fetchMock.mock.calls[0][1]?.headers).has('Authorization')).toBe(false)
   })
 
   it('requests one authenticated membership page ordered by last update', async () => {
@@ -39,7 +39,7 @@ describe('GitLab projects API', () => {
     expect(Object.fromEntries(requestedUrl().searchParams)).toEqual({
       membership: 'true', order_by: 'updated_at', sort: 'desc', page: '2', per_page: '25',
     })
-    expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get('PRIVATE-TOKEN')).toBe('runtime-token')
+    expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get('Authorization')).toBe('Bearer runtime-token')
     expect(fetchMock.mock.calls[0][1]?.method ?? 'GET').toBe('GET')
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
@@ -49,7 +49,7 @@ describe('GitLab projects API', () => {
     expect(Object.fromEntries(requestedUrl().searchParams)).toEqual({
       starred: 'true', search: 'plants', page: '2', per_page: '25',
     })
-    expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get('PRIVATE-TOKEN')).toBe('runtime-token')
+    expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get('Authorization')).toBe('Bearer runtime-token')
   })
 
   it('loads starred IDs across pages with the current user’s token', async () => {
@@ -58,7 +58,7 @@ describe('GitLab projects API', () => {
       : Response.json([{ id: 8 }], { headers: { 'X-Next-Page': '' } }))
     expect(await listStarredProjectIds(source, { fetchCall: fetchMock, token: 'runtime-token' })).toEqual(Success([7, 8]))
     expect(Object.fromEntries(requestedUrl().searchParams)).toEqual({ starred: 'true', simple: 'true', per_page: '100', page: '2' })
-    expect(fetchMock.mock.calls.every(([, init]) => new Headers(init?.headers).get('PRIVATE-TOKEN') === 'runtime-token')).toBe(true)
+    expect(fetchMock.mock.calls.every(([, init]) => new Headers(init?.headers).get('Authorization') === 'Bearer runtime-token')).toBe(true)
   })
 
   it.each([true, false])('posts the authenticated star change (starred: %s) and returns the updated count', async starred => {
@@ -67,7 +67,7 @@ describe('GitLab projects API', () => {
     expect(await setProjectStarred(source, 1, starred, { fetchCall: fetchMock, token: 'runtime-token' })).toEqual(Success(updated))
     expect(requestedUrl().pathname).toBe(`/api/v4/projects/1/${starred ? 'star' : 'unstar'}`)
     expect(fetchMock.mock.calls[0][1]?.method).toBe('POST')
-    expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get('PRIVATE-TOKEN')).toBe('runtime-token')
+    expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get('Authorization')).toBe('Bearer runtime-token')
   })
 
   it('rejects anonymous star requests without sending them', async () => {
@@ -89,7 +89,7 @@ describe('GitLab projects API', () => {
     expect(requestedUrl().searchParams.get('visibility')).toBe('public')
     await searchProjects(source, 'plants', { fetchCall: fetchMock, token: 'runtime-token' })
     expect(requestedUrl().searchParams.has('visibility')).toBe(false)
-    expect(new Headers(fetchMock.mock.calls.at(-1)![1]?.headers).get('PRIVATE-TOKEN')).toBe('runtime-token')
+    expect(new Headers(fetchMock.mock.calls.at(-1)![1]?.headers).get('Authorization')).toBe('Bearer runtime-token')
     expect(requestedUrl().href).not.toContain('runtime-token')
   })
 
@@ -179,7 +179,7 @@ describe('GitLab projects API', () => {
     it('sends the token and no visibility filter after login', async () => {
       await listAllProjects(source, { fetchCall: fetchMock, token: 'runtime-token' })
       expect(requestedUrl().searchParams.has('visibility')).toBe(false)
-      expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get('PRIVATE-TOKEN')).toBe('runtime-token')
+      expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get('Authorization')).toBe('Bearer runtime-token')
     })
 
     it('follows the next page and concatenates the items', async () => {
@@ -209,7 +209,7 @@ describe('GitLab projects API', () => {
       expect(Object.fromEntries(url.searchParams)).toEqual({
         membership: 'true', simple: 'true', per_page: '100', page: '1',
       })
-      expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get('PRIVATE-TOKEN')).toBe('runtime-token')
+      expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get('Authorization')).toBe('Bearer runtime-token')
     })
 
     it('follows the next page and concatenates the ids', async () => {
