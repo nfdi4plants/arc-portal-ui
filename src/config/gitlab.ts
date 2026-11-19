@@ -16,6 +16,7 @@ export const dataHubCollection = {
   default: defaultDataHub,
   supported: [
     { id: 'plantmicrobe', name: 'gitlab.plantmicrobe.de', url: 'https://gitlab.plantmicrobe.de/' },
+    { id: 'hhu-datahub', name: 'HHU-DataHUB', url: 'https://datahub.hhu.de/' },
   ] satisfies GitLabInstance[],
 }
 
